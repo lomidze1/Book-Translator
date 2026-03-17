@@ -25,13 +25,13 @@
        │             │  Translation │────────────┘
        │             └──────────────┘
        │                    │
-       │             ┌──────────────┐
-       │             │  Chapter     │
-       │             └──────────────┘
-       │                    │
-       ├────<┌──────────────┐
-       │     │  Bookmark    │
-       │     └──────────────┘
+       │             ┌──────────────┐     ┌──────────────┐
+       │             │  Chapter     │────<│ AudioChapter │
+       │             └──────────────┘     └──────────────┘
+       │                    │                    │
+       ├────<┌──────────────┐            ┌──────────────┐
+       │     │  Bookmark    │            │  AudioBook   │
+       │     └──────────────┘            └──────────────┘
        │
        ├────<┌──────────────┐
        │     │  Highlight   │
@@ -125,6 +125,7 @@ model Book {
   translations    Translation[]
   userBooks       UserBook[]
   chapters        Chapter[]       // ორიგინალი თავები
+  audioBooks      AudioBook[]     // აუდიო ვერსიები
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -153,6 +154,7 @@ model Chapter {
 
   // Relations
   translatedChapters TranslatedChapter[]
+  audioChapters      AudioChapter[]      // აუდიო ვერსიები
 
   @@unique([bookId, number])
 }
@@ -178,6 +180,7 @@ model Translation {
 
   // Relations
   translatedChapters TranslatedChapter[]
+  audioBooks      AudioBook[]
   payment         Payment?
 
   startedAt       DateTime?
@@ -369,6 +372,83 @@ model ReadingProgress {
 }
 ```
 
+### AudioBook (აუდიო წიგნი)
+
+```prisma
+model AudioBook {
+  id              String           @id @default(cuid())
+  bookId          String
+  book            Book             @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  translationId   String
+  translation     Translation      @relation(fields: [translationId], references: [id])
+
+  language        String           @default("ka") // აუდიოს ენა
+  voiceId         String           // Google TTS voice ID (მაგ: "ka-GE-Standard-A")
+  status          AudioStatus      @default(PENDING)
+  progress        Float            @default(0) // 0-100%
+
+  totalDuration   Int?             // სრული ხანგრძლივობა (წამები)
+  totalSize       Int?             // სრული ზომა (bytes)
+  totalChapters   Int              @default(0)
+  completedChapters Int            @default(0)
+
+  // Relations
+  chapters        AudioChapter[]
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([bookId, translationId, voiceId])
+}
+
+enum AudioStatus {
+  PENDING       // რიგში
+  IN_PROGRESS   // გენერირდება
+  COMPLETED     // დასრულებული
+  FAILED        // შეცდომა
+  PARTIAL       // ნაწილობრივ მზადაა (ზოგიერთი თავი მზადაა)
+}
+```
+
+### AudioChapter (აუდიო თავი)
+
+```prisma
+model AudioChapter {
+  id              String        @id @default(cuid())
+  audioBookId     String
+  audioBook       AudioBook     @relation(fields: [audioBookId], references: [id], onDelete: Cascade)
+  chapterId       String
+  chapter         Chapter       @relation(fields: [chapterId], references: [id])
+
+  chapterNumber   Int
+  audioUrl        String?       // S3 URL (მაგ: "audio/books/{bookId}/chapters/{num}.mp3")
+  duration        Int?          // ხანგრძლივობა (წამები)
+  fileSize        Int?          // ფაილის ზომა (bytes)
+  format          String        @default("mp3") // mp3, ogg, wav
+
+  status          AudioChapterStatus @default(PENDING)
+
+  // სინქრონიზაცია ტექსტთან
+  timestamps      Json?         // [{start: 0, end: 2.5, text: "პირველი წინადადება"}, ...]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([audioBookId, chapterNumber])
+}
+
+enum AudioChapterStatus {
+  PENDING       // ჯერ არ დაწყებულა
+  GENERATING    // გენერირდება
+  COMPLETED     // მზადაა
+  FAILED        // შეცდომა
+}
+```
+
 ---
 
 ## ინდექსები
@@ -397,4 +477,7 @@ model ReadingProgress {
 | `rate-limit:{ip}:{endpoint}` | Rate limiting | 1 წუთი |
 | `book-search:{query}` | ძებნის cache | 1 საათი |
 | `translation-progress:{id}` | თარგმნის პროგრესი | persistent |
-| `bull:translation:*` | BullMQ jobs | persistent |
+| `bull:translation:*` | BullMQ translation jobs | persistent |
+| `tts-progress:{audioBookId}` | TTS გენერაციის პროგრესი | persistent |
+| `bull:tts:*` | BullMQ TTS jobs | persistent |
+| `audio-cache:{bookId}:{chapter}` | აუდიო streaming cache | 24 საათი |

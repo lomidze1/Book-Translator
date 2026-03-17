@@ -9,6 +9,7 @@ Book Translator საშუალებას აძლევს მომხ�
 - ატვირთონ PDF, EPUB, TXT ან DOCX ფორმატში
 - AI-ით (Claude API) გადათარგმნონ ქართულ ენაზე
 - წაიკითხონ ჩაშენებულ Online Reader-ში (ვები + მობილური)
+- მოუსმინონ წიგნს ხმოვანი წაკითხვით (Text-to-Speech)
 
 ## მონორეპოს სტრუქტურა
 
@@ -18,6 +19,7 @@ apps/
   mobile/       → React Native მობილური (iOS + Android)
   api/          → NestJS Backend API
   translator/   → AI თარგმნის Worker სერვისი
+  tts-worker/   → ხმოვანი წაკითხვის (TTS) სერვისი
 
 packages/
   ui/           → გაზიარებული UI კომპონენტები
@@ -32,6 +34,7 @@ packages/
 - **Mobile:** React Native (Expo)
 - **Backend:** NestJS, Prisma, PostgreSQL, Redis, BullMQ
 - **AI:** Claude API (Anthropic)
+- **TTS:** Google Cloud TTS (Neural2) — ქართული ხმოვანი წაკითხვა
 - **Storage:** AWS S3
 - **Payments:** BOG Pay, TBC Pay
 

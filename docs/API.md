@@ -499,7 +499,111 @@ TBC Pay callback.
 
 ---
 
-## 8. WebSocket Events (Socket.io)
+## 8. TTS / ხმოვანი წაკითხვა (Voice Reader)
+
+### POST `/tts/generate` 🔒
+აუდიოს გენერაციის დაწყება წიგნისთვის.
+```json
+// Request
+{
+  "bookId": "clx...",
+  "translationId": "clx...",
+  "voiceId": "ka-GE-Standard-A", // optional — default voice
+  "chapters": [1, 2, 3]          // optional — კონკრეტული თავები (ცარიელი = ყველა)
+}
+
+// Response 201
+{
+  "audioBookId": "clx...",
+  "status": "PENDING",
+  "totalChapters": 12,
+  "estimatedDuration": "~15 წუთი"
+}
+```
+
+### GET `/tts/{audioBookId}` 🔒
+აუდიო წიგნის სტატუსი და ინფორმაცია.
+```json
+// Response 200
+{
+  "id": "clx...",
+  "bookId": "clx...",
+  "status": "IN_PROGRESS",
+  "progress": 33.3,
+  "totalChapters": 12,
+  "completedChapters": 4,
+  "voiceId": "ka-GE-Standard-A",
+  "totalDuration": null,
+  "chapters": [
+    { "number": 1, "status": "COMPLETED", "duration": 320 },
+    { "number": 2, "status": "COMPLETED", "duration": 280 },
+    { "number": 3, "status": "COMPLETED", "duration": 350 },
+    { "number": 4, "status": "COMPLETED", "duration": 290 },
+    { "number": 5, "status": "GENERATING", "duration": null },
+    { "number": 6, "status": "PENDING", "duration": null }
+  ]
+}
+```
+
+### GET `/tts/{audioBookId}/chapters/{chapterNumber}/stream` 🔒
+აუდიო თავის streaming (მზა თავებისთვის).
+```
+// Response 200
+Content-Type: audio/mpeg
+Accept-Ranges: bytes
+Content-Length: 4567890
+
+<binary audio data>
+```
+
+### GET `/tts/{audioBookId}/chapters/{chapterNumber}/timestamps` 🔒
+ტექსტ-აუდიო სინქრონიზაციის მონაცემები (კარაოკე რეჟიმისთვის).
+```json
+// Response 200
+{
+  "chapterNumber": 1,
+  "duration": 320,
+  "timestamps": [
+    { "start": 0.0, "end": 2.5, "text": "პირველი წინადადება აქ იწყება." },
+    { "start": 2.5, "end": 5.1, "text": "მეორე წინადადება გრძელდება." }
+  ]
+}
+```
+
+### GET `/tts/voices` 🔒
+ხელმისაწვდომი ხმების სია.
+```json
+// Response 200
+{
+  "voices": [
+    {
+      "id": "ka-GE-Standard-A",
+      "name": "ანა",
+      "gender": "FEMALE",
+      "language": "ka-GE",
+      "preview": "https://s3.../voice-previews/ka-GE-Standard-A.mp3"
+    },
+    {
+      "id": "ka-GE-Standard-B",
+      "name": "გიორგი",
+      "gender": "MALE",
+      "language": "ka-GE",
+      "preview": "https://s3.../voice-previews/ka-GE-Standard-B.mp3"
+    }
+  ]
+}
+```
+
+### DELETE `/tts/{audioBookId}` 🔒
+აუდიო წიგნის წაშლა (S3 ფაილების ჩათვლით).
+```json
+// Response 200
+{ "message": "Audio book deleted" }
+```
+
+---
+
+## 9. WebSocket Events (Socket.io)
 
 ### კლიენტი → სერვერი
 
@@ -507,6 +611,8 @@ TBC Pay callback.
 |---|---|---|
 | `join:translation` | `{ translationId }` | თარგმნის ოთახში შესვლა |
 | `leave:translation` | `{ translationId }` | ოთახიდან გასვლა |
+| `join:tts` | `{ audioBookId }` | TTS გენერაციის ოთახში შესვლა |
+| `leave:tts` | `{ audioBookId }` | TTS ოთახიდან გასვლა |
 
 ### სერვერი → კლიენტი
 
@@ -516,6 +622,10 @@ TBC Pay callback.
 | `translation:chapter-done` | `{ translationId, chapterNumber, title }` | თავი გადათარგმნილია |
 | `translation:completed` | `{ translationId }` | თარგმნა დასრულდა |
 | `translation:failed` | `{ translationId, error }` | შეცდომა |
+| `tts:progress` | `{ audioBookId, progress, currentChapter, totalChapters }` | TTS გენერაციის პროგრესი |
+| `tts:chapter-done` | `{ audioBookId, chapterNumber, duration }` | თავის აუდიო მზადაა |
+| `tts:completed` | `{ audioBookId, totalDuration }` | მთელი წიგნის აუდიო მზადაა |
+| `tts:failed` | `{ audioBookId, chapterNumber, error }` | TTS შეცდომა |
 
 ---
 
@@ -557,5 +667,7 @@ TBC Pay callback.
 | `GET /books/search` | 30 requests / წუთი / user |
 | `POST /books/upload` | 10 requests / საათი / user |
 | `POST /translations` | 5 requests / საათი / user |
+| `POST /tts/generate` | 5 requests / საათი / user |
+| `GET /tts/*/stream` | 60 requests / წუთი / user |
 | სხვა `GET` endpoints | 100 requests / წუთი / user |
 | სხვა `POST/PATCH/DELETE` | 30 requests / წუთი / user |
