@@ -76,7 +76,41 @@
 |---|---|---|
 | **epub.js** (ვებისთვის) | EPUB rendering | სტანდარტული ebook reader |
 | **Custom React Reader** | თარგმანის ჩვენება | კასტომ reader კომპონენტი |
-| **Web Speech API / Google TTS** | Text-to-Speech | ქართული აუდიო კითხვა |
+
+---
+
+## TTS Worker — ხმოვანი წაკითხვის სერვისი
+
+| ტექნოლოგია | დანიშნულება | რატომ |
+|---|---|---|
+| **BullMQ Worker** | Job processing | Queue-დან აუდიო გენერაციის სამუშაოების აღება |
+| **Google Cloud TTS (Neural2)** | Text-to-Speech API | საუკეთესო ქართული ხმები, ბუნებრივი ჟღერადობა |
+| **ffmpeg (fluent-ffmpeg)** | აუდიო processing | ფრაგმენტების შეერთება, ფორმატის კონვერტაცია, bitrate |
+| **AWS S3** | აუდიო ფაილების შენახვა | MP3/M4A ფაილების storage + streaming |
+| **Socket.io** | რეალ-ტაიმ პროგრესი | აუდიო გენერაციის პროგრესის ჩვენება |
+
+### მობილური აუდიო პლეიერი
+
+| ტექნოლოგია | დანიშნულება | რატომ |
+|---|---|---|
+| **expo-av** | აუდიო playback | Expo-ს ოფიციალური აუდიო ბიბლიოთეკა |
+| **react-native-track-player** | Background playback | Lock screen controls, notification player, CarPlay/Android Auto |
+| **@react-native-community/slider** | Progress slider | აუდიოში ნავიგაცია |
+
+### ვებ აუდიო პლეიერი
+
+| ტექნოლოგია | დანიშნულება | რატომ |
+|---|---|---|
+| **HTML5 Audio API** | აუდიო playback | ბრაუზერის ნეიტივი, არ სჭირდება ბიბლიოთეკა |
+| **Media Session API** | OS-level controls | ბრაუზერის მინი-პლეიერი, keyboard media keys |
+
+### რატომ Google Cloud TTS?
+
+1. **ქართული ენის მხარდაჭერა** — Neural2 ხმები ქართულისთვის (ka-GE)
+2. **ბუნებრივი ჟღერადობა** — WaveNet/Neural2 ტექნოლოგია, არა რობოტული
+3. **SSML მხარდაჭერა** — პაუზები, ინტონაცია, სიჩქარის კონტროლი
+4. **მაღალი throughput** — დიდი ტექსტის სწრაფი დამუშავება
+5. **ფასი** — ~$4/1M სიმბოლო (Neural2), ~$16/1M (Studio) — გონივრული
 
 ---
 
