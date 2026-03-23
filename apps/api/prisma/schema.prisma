@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// === Phase 1 Models ===
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  emailVerified DateTime?
+  phone         String?   @unique
+  phoneVerified Boolean   @default(false)
+  passwordHash  String?
+  name          String?
+  avatar        String?
+  role          Role      @default(USER)
+  locale        String    @default("ka")
+
+  // Relations
+  accounts        Account[]
+  books           UserBook[]
+  payments        Payment[]
+  bookmarks       Bookmark[]
+  highlights      Highlight[]
+  notes           Note[]
+  readingProgress ReadingProgress[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          String
+  providerAccountId String
+  refreshToken      String?
+  accessToken       String?
+  expiresAt         Int?
+
+  @@unique([provider, providerAccountId])
+}
+
+// === Phase 2+ Models (stubs for relations) ===
+
+model Book {
+  id             String     @id @default(cuid())
+  title          String
+  author         String?
+  description    String?
+  isbn           String?    @unique
+  coverUrl       String?
+  language       String     @default("en")
+  pageCount      Int?
+  fileHash       String?    @unique
+  originalFileUrl String?
+  originalFormat FileFormat
+  fileSize       Int?
+  googleBooksId  String?
+  openLibraryId  String?
+  buyLinks       Json?
+
+  translations Translation[]
+  userBooks    UserBook[]
+  chapters     Chapter[]
+  audioBooks   AudioBook[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum FileFormat {
+  PDF
+  EPUB
+  TXT
+  DOCX
+}
+
+model Chapter {
+  id              String  @id @default(cuid())
+  bookId          String
+  book            Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  number          Int
+  title           String?
+  originalContent String
+  wordCount       Int?
+
+  translatedChapters TranslatedChapter[]
+  audioChapters      AudioChapter[]
+
+  @@unique([bookId, number])
+}
+
+model Translation {
+  id             String            @id @default(cuid())
+  bookId         String
+  book           Book              @relation(fields: [bookId], references: [id])
+  sourceLanguage String            @default("en")
+  targetLanguage String            @default("ka")
+  status         TranslationStatus @default(PENDING)
+  progress       Float             @default(0)
+  aiModel        String?
+  totalTokensUsed Int?
+  glossary       Json?
+
+  translatedChapters TranslatedChapter[]
+  audioBooks         AudioBook[]
+  payment            Payment?
+
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TranslationStatus {
+  PENDING
+  PAID
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model TranslatedChapter {
+  id                String      @id @default(cuid())
+  translationId     String
+  translation       Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  chapterId         String
+  chapter           Chapter     @relation(fields: [chapterId], references: [id])
+  translatedContent String
+  editedContent     String?
+  isEdited          Boolean     @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([translationId, chapterId])
+}
+
+model UserBook {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId        String
+  book          Book         @relation(fields: [bookId], references: [id])
+  type          UserBookType
+  translationId String?
+
+  addedAt DateTime @default(now())
+
+  @@unique([userId, bookId, type])
+}
+
+enum UserBookType {
+  UPLOADED
+  PURCHASED_ORIGINAL
+  PURCHASED_TRANSLATION
+}
+
+model Payment {
+  id              String         @id @default(cuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id])
+  translationId   String?        @unique
+  translation     Translation?   @relation(fields: [translationId], references: [id])
+  amount          Decimal
+  currency        String         @default("GEL")
+  status          PaymentStatus  @default(PENDING)
+  provider        PaymentProvider
+  providerOrderId String?
+  providerTxId    String?
+  type            PaymentType
+  description     String?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  BOG
+  TBC
+}
+
+enum PaymentType {
+  TRANSLATION
+  PURCHASE_ORIGINAL
+  PURCHASE_TRANSLATION
+}
+
+model Bookmark {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId        String
+  chapterNumber Int
+  position      Int
+  label         String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bookId, chapterNumber, position])
+}
+
+model Highlight {
+  id            String @id @default(cuid())
+  userId        String
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId        String
+  chapterNumber Int
+  startPosition Int
+  endPosition   Int
+  color         String @default("yellow")
+  selectedText  String
+
+  notes Note[]
+
+  createdAt DateTime @default(now())
+}
+
+model Note {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  highlightId   String?
+  highlight     Highlight? @relation(fields: [highlightId], references: [id], onDelete: Cascade)
+  bookId        String
+  chapterNumber Int
+  content       String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ReadingProgress {
+  id              String @id @default(cuid())
+  userId          String
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId          String
+  currentChapter  Int    @default(1)
+  currentPosition Int    @default(0)
+  percentage      Float  @default(0)
+
+  lastReadAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, bookId])
+}
+
+model AudioBook {
+  id              String      @id @default(cuid())
+  bookId          String
+  book            Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  translationId   String
+  translation     Translation @relation(fields: [translationId], references: [id])
+  language        String      @default("ka")
+  voiceId         String
+  status          AudioStatus @default(PENDING)
+  progress        Float       @default(0)
+  totalDuration   Int?
+  totalSize       Int?
+  totalChapters   Int         @default(0)
+  completedChapters Int       @default(0)
+
+  chapters AudioChapter[]
+
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bookId, translationId, voiceId])
+}
+
+enum AudioStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+model AudioChapter {
+  id            String             @id @default(cuid())
+  audioBookId   String
+  audioBook     AudioBook          @relation(fields: [audioBookId], references: [id], onDelete: Cascade)
+  chapterId     String
+  chapter       Chapter            @relation(fields: [chapterId], references: [id])
+  chapterNumber Int
+  audioUrl      String?
+  duration      Int?
+  fileSize      Int?
+  format        String             @default("mp3")
+  status        AudioChapterStatus @default(PENDING)
+  timestamps    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([audioBookId, chapterNumber])
+}
+
+enum AudioChapterStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+}
