@@ -219,3 +219,24 @@ book-translator/
 - **DB** — PostgreSQL read replicas საჭიროებისას
 - **S3** — თავისთავად სკალირებადია
 - **Redis** — Bull Queue + Caching
+
+## Docker (Development Environment)
+
+```yaml
+# docker-compose up -d — გაუშვებს PostgreSQL და Redis კონტეინერებს
+services:
+  postgres:  # PostgreSQL 16 — port 5432
+  redis:     # Redis 7 — port 6379
+```
+
+## გაზიარებული პაკეტები (packages/)
+
+```
+packages/
+├── config/    # ESLint, Prettier, TypeScript კონფიგურაცია
+└── shared/    # გაზიარებული ტიპები და ინტერფეისები
+```
+
+მომავალი:
+- `packages/ui` — გაზიარებული UI კომპონენტები (ფაზა 2+)
+- `packages/reader` — Online Reader კომპონენტი (ფაზა 5)

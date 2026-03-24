@@ -16,8 +16,8 @@
 |---|---|---|
 | **Next.js 15** | React Framework (App Router) | SSR, SEO, API routes, მაღალი პერფორმანსი |
 | **React 19** | UI ბიბლიოთეკა | კომპონენტების არქიტექტურა |
-| **TailwindCSS 4** | CSS Framework | სწრაფი სტილიზაცია, responsive design |
-| **shadcn/ui** | UI კომპონენტები | ლამაზი, კასტომიზებადი, accessible |
+| **SCSS (Sass)** | CSS Framework | CSS modules, variables, mixins, nested selectors |
+| **shadcn/ui** | UI components (optional — for future use) | ლამაზი, კასტომიზებადი, accessible |
 | **TanStack Query** | სერვერის სტეიტი | caching, refetching, optimistic updates |
 | **Zustand** | კლიენტის სტეიტი | მარტივი, მსუბუქი state management |
 | **Socket.io-client** | WebSocket | თარგმნის რეალ-ტაიმ პროგრესი |
@@ -146,6 +146,13 @@
 - **Railway** — PostgreSQL, Redis, Node.js სერვისები ერთ ადგილას, მარტივი კონფიგურაცია, auto-scaling
 - ამ კომბინაციით ბიუჯეტი გონივრულია და ხარისხი მაღალი
 - თუ მომავალში საჭირო გახდება → AWS-ზე მიგრაცია მარტივია Docker-ის წყალობით
+
+### Docker (Development)
+
+| სერვისი | Image | Port | დანიშნულება |
+|---|---|---|---|
+| **PostgreSQL 16** | postgres:16-alpine | 5432 | მონაცემთა ბაზა |
+| **Redis 7** | redis:7-alpine | 6379 | Cache, Queue, OTP storage |
 
 ---
 

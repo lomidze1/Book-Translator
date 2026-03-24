@@ -481,3 +481,24 @@ enum AudioChapterStatus {
 | `tts-progress:{audioBookId}` | TTS გენერაციის პროგრესი | persistent |
 | `bull:tts:*` | BullMQ TTS jobs | persistent |
 | `audio-cache:{bookId}:{chapter}` | აუდიო streaming cache | 24 საათი |
+
+## Docker Setup
+
+PostgreSQL და Redis Docker Compose-ით ეშვება:
+
+```bash
+# კონტეინერების გაშვება
+docker-compose up -d
+
+# კონტეინერების გაჩერება
+docker-compose down
+
+# Prisma მიგრაცია
+cd apps/api && npx prisma migrate dev
+```
+
+### Connection URLs (Development)
+```
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/book_translator
+REDIS_URL=redis://localhost:6379
+```

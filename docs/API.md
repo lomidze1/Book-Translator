@@ -3,7 +3,7 @@
 ## Base URL
 ```
 Production: https://api.book-translator.ge/v1
-Development: http://localhost:3001/v1
+Development: http://localhost:4000/v1
 ```
 
 ## ავტორიზაცია

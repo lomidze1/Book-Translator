@@ -50,6 +50,7 @@ model Account {
   expiresAt         Int?
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 // === Phase 2+ Models (stubs for relations) ===
@@ -78,6 +79,9 @@ model Book {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([googleBooksId])
+  @@index([openLibraryId])
 }
 
 enum FileFormat {
@@ -124,6 +128,9 @@ model Translation {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([bookId])
+  @@index([status])
 }
 
 enum TranslationStatus {
@@ -148,6 +155,8 @@ model TranslatedChapter {
   updatedAt DateTime @updatedAt
 
   @@unique([translationId, chapterId])
+  @@index([translationId])
+  @@index([chapterId])
 }
 
 model UserBook {
@@ -162,6 +171,8 @@ model UserBook {
   addedAt DateTime @default(now())
 
   @@unique([userId, bookId, type])
+  @@index([userId])
+  @@index([bookId])
 }
 
 enum UserBookType {
@@ -188,6 +199,10 @@ model Payment {
   paidAt    DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([provider])
 }
 
 enum PaymentStatus {
@@ -221,6 +236,8 @@ model Bookmark {
   createdAt DateTime @default(now())
 
   @@unique([userId, bookId, chapterNumber, position])
+  @@index([userId])
+  @@index([bookId])
 }
 
 model Highlight {
@@ -237,6 +254,9 @@ model Highlight {
   notes Note[]
 
   createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([bookId])
 }
 
 model Note {
@@ -251,6 +271,9 @@ model Note {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([bookId])
 }
 
 model ReadingProgress {
@@ -266,6 +289,7 @@ model ReadingProgress {
   updatedAt  DateTime @updatedAt
 
   @@unique([userId, bookId])
+  @@index([userId])
 }
 
 model AudioBook {
@@ -293,6 +317,9 @@ model AudioBook {
   updatedAt DateTime @updatedAt
 
   @@unique([bookId, translationId, voiceId])
+  @@index([bookId])
+  @@index([translationId])
+  @@index([status])
 }
 
 enum AudioStatus {
@@ -321,6 +348,8 @@ model AudioChapter {
   updatedAt DateTime @updatedAt
 
   @@unique([audioBookId, chapterNumber])
+  @@index([audioBookId])
+  @@index([status])
 }
 
 enum AudioChapterStatus {
