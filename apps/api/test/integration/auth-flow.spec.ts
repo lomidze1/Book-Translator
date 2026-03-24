@@ -9,6 +9,12 @@ vi.mock('bcrypt', () => ({
   compare: vi.fn(),
 }));
 
+vi.mock('google-auth-library', () => ({
+  OAuth2Client: vi.fn().mockImplementation(() => ({
+    verifyIdToken: vi.fn(),
+  })),
+}));
+
 vi.mock('passport-jwt', () => ({
   ExtractJwt: {
     fromAuthHeaderAsBearerToken: vi.fn().mockReturnValue(() => 'mock-token'),
@@ -48,20 +54,31 @@ describe('Integration — Auth Flow Scenarios', () => {
     verify: vi.fn(),
   };
 
+  const mockRedisService = {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    del: vi.fn().mockResolvedValue(undefined),
+    incr: vi.fn().mockResolvedValue(1),
+    expire: vi.fn().mockResolvedValue(undefined),
+    isConnected: true,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.JWT_ACCESS_SECRET = 'test-access-secret';
     process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+    mockRedisService.get.mockResolvedValue(null);
+    mockRedisService.incr.mockResolvedValue(1);
 
-    authService = new (AuthService as any)(mockPrisma, mockJwt);
+    authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedisService);
     jwtStrategy = new (JwtStrategy as any)(mockPrisma);
     (jwtStrategy as any).prisma = mockPrisma;
   });
 
   // ============================================================
-  // Full Registration → Login Flow
+  // Full Registration -> Login Flow
   // ============================================================
-  describe('Registration → Login flow', () => {
+  describe('Registration -> Login flow', () => {
     it('should register user and then login successfully', async () => {
       // Step 1: Register
       mockPrisma.user.findUnique.mockResolvedValueOnce(null); // No existing user
@@ -132,9 +149,9 @@ describe('Integration — Auth Flow Scenarios', () => {
   });
 
   // ============================================================
-  // Login → Token Refresh Flow
+  // Login -> Token Refresh Flow
   // ============================================================
-  describe('Login → Token Refresh flow', () => {
+  describe('Login -> Token Refresh flow', () => {
     it('should login and then refresh tokens', async () => {
       // Step 1: Login
       mockPrisma.user.findUnique.mockResolvedValueOnce({
@@ -174,9 +191,9 @@ describe('Integration — Auth Flow Scenarios', () => {
   });
 
   // ============================================================
-  // Login → JWT Strategy Validation Flow
+  // Login -> JWT Strategy Validation Flow
   // ============================================================
-  describe('Login → JWT Strategy validate flow', () => {
+  describe('Login -> JWT Strategy validate flow', () => {
     it('should login and then validate the JWT payload via strategy', async () => {
       // Step 1: Login
       mockPrisma.user.findUnique.mockResolvedValueOnce({
@@ -306,12 +323,15 @@ describe('Integration — Auth Flow Scenarios', () => {
   // OTP Flow
   // ============================================================
   describe('OTP Flow', () => {
-    it('should send OTP and fail verification (placeholder implementation)', async () => {
+    it('should send OTP and then verify successfully with correct code', async () => {
       // Send OTP
+      mockRedisService.get.mockResolvedValue(null); // no rate limit
       const sendResult = await authService.sendOtp({ phone: '+995599123456' });
       expect(sendResult.message).toBe('OTP sent successfully');
 
-      // Verify OTP (should fail since validateOtp returns false)
+      // Verify OTP — stored OTP does not match (we don't know the generated one)
+      mockRedisService.incr.mockResolvedValue(1);
+      mockRedisService.get.mockResolvedValue(null); // OTP expired or not matching
       await expect(
         authService.verifyOtp({ phone: '+995599123456', code: '123456' }),
       ).rejects.toThrow('Invalid or expired OTP');

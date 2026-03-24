@@ -12,6 +12,12 @@ vi.mock('bcrypt', () => ({
   compare: vi.fn(),
 }));
 
+vi.mock('google-auth-library', () => ({
+  OAuth2Client: vi.fn().mockImplementation(() => ({
+    verifyIdToken: vi.fn(),
+  })),
+}));
+
 describe('AuthService — Edge Cases & Security', () => {
   let authService: AuthService;
 
@@ -32,9 +38,20 @@ describe('AuthService — Edge Cases & Security', () => {
     verify: vi.fn(),
   };
 
+  const mockRedisService = {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    del: vi.fn().mockResolvedValue(undefined),
+    incr: vi.fn().mockResolvedValue(1),
+    expire: vi.fn().mockResolvedValue(undefined),
+    isConnected: true,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    authService = new (AuthService as any)(mockPrisma, mockJwt);
+    mockRedisService.get.mockResolvedValue(null);
+    mockRedisService.incr.mockResolvedValue(1);
+    authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedisService);
   });
 
   // ============================================================
@@ -342,10 +359,11 @@ describe('AuthService — Edge Cases & Security', () => {
   // GOOGLE AUTH — Edge Cases
   // ============================================================
   describe('googleAuth — edge cases', () => {
-    it('should throw Error since Google verification is not implemented', async () => {
+    it('should throw UnauthorizedException when Google token verification fails', async () => {
+      // verifyIdToken is not configured to return anything useful, so verifyGoogleToken returns null
       await expect(
         authService.googleAuth({ idToken: 'any-token' }),
-      ).rejects.toThrow('Google token verification not implemented');
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw for empty idToken string', async () => {
@@ -357,15 +375,18 @@ describe('AuthService — Edge Cases & Security', () => {
   // SEND OTP — Edge Cases
   // ============================================================
   describe('sendOtp — edge cases', () => {
-    it('should always return success (no actual SMS sent)', async () => {
+    it('should return success when no rate limit exists', async () => {
+      mockRedisService.get.mockResolvedValue(null);
       const result = await authService.sendOtp({ phone: '+995599123456' });
       expect(result).toEqual({ message: 'OTP sent successfully' });
+      expect(mockRedisService.set).toHaveBeenCalled();
     });
 
-    it('should not throw for any phone number format', async () => {
-      // sendOtp does not validate internally, it just generates OTP
+    it('should store OTP in redis', async () => {
+      mockRedisService.get.mockResolvedValue(null);
       const result = await authService.sendOtp({ phone: '+995577000000' });
       expect(result.message).toBe('OTP sent successfully');
+      expect(mockRedisService.set).toHaveBeenCalled();
     });
   });
 
@@ -373,20 +394,30 @@ describe('AuthService — Edge Cases & Security', () => {
   // VERIFY OTP — Edge Cases
   // ============================================================
   describe('verifyOtp — edge cases', () => {
-    it('should always fail since validateOtp returns false (placeholder)', async () => {
+    it('should fail when OTP not found in redis (expired or never sent)', async () => {
+      mockRedisService.get.mockResolvedValue(null);
+      mockRedisService.incr.mockResolvedValue(1);
+
       await expect(
         authService.verifyOtp({ phone: '+995599123456', code: '123456' }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException with specific message', async () => {
+      mockRedisService.get.mockResolvedValue(null);
+      mockRedisService.incr.mockResolvedValue(1);
+
       await expect(
         authService.verifyOtp({ phone: '+995599123456', code: '000000' }),
       ).rejects.toThrow('Invalid or expired OTP');
     });
 
-    it('should reject any code since OTP storage is not implemented', async () => {
-      const codes = ['111111', '999999', '000000', '123456'];
+    it('should reject wrong OTP codes', async () => {
+      mockRedisService.incr.mockResolvedValue(1);
+      // Stored OTP is '999999' but we try different codes
+      mockRedisService.get.mockResolvedValue('999999');
+
+      const codes = ['111111', '000000', '123456'];
       for (const code of codes) {
         await expect(
           authService.verifyOtp({ phone: '+995599123456', code }),

@@ -9,6 +9,12 @@ vi.mock('bcrypt', () => ({
   compare: vi.fn(),
 }));
 
+vi.mock('google-auth-library', () => ({
+  OAuth2Client: vi.fn().mockImplementation(() => ({
+    verifyIdToken: vi.fn(),
+  })),
+}));
+
 describe('AuthService', () => {
   let authService: AuthService;
 
@@ -29,10 +35,22 @@ describe('AuthService', () => {
     verify: vi.fn(),
   };
 
+  const mockRedisService = {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    del: vi.fn().mockResolvedValue(undefined),
+    incr: vi.fn().mockResolvedValue(1),
+    expire: vi.fn().mockResolvedValue(undefined),
+    isConnected: true,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset redis defaults
+    mockRedisService.get.mockResolvedValue(null);
+    mockRedisService.incr.mockResolvedValue(1);
     // Directly instantiate with mocks (bypass NestJS DI)
-    authService = new (AuthService as any)(mockPrismaService, mockJwtService);
+    authService = new (AuthService as any)(mockPrismaService, mockJwtService, mockRedisService);
   });
 
   // ============================================================
@@ -256,9 +274,10 @@ describe('AuthService', () => {
   describe('googleAuth', () => {
     const googleAuthDto = { idToken: 'google-id-token-123' };
 
-    it('should throw error when Google token verification is not yet implemented', async () => {
+    it('should throw UnauthorizedException when Google token verification fails', async () => {
+      // The googleClient.verifyIdToken will throw (default mock), causing verifyGoogleToken to return null
       await expect(authService.googleAuth(googleAuthDto)).rejects.toThrow(
-        'Google token verification not implemented',
+        UnauthorizedException,
       );
     });
   });
@@ -270,9 +289,13 @@ describe('AuthService', () => {
     const sendOtpDto = { phone: '+995599123456' };
 
     it('should return success message when OTP is sent', async () => {
+      // redis.get returns null (no rate limit)
+      mockRedisService.get.mockResolvedValue(null);
+
       const result = await authService.sendOtp(sendOtpDto);
 
       expect(result).toEqual({ message: 'OTP sent successfully' });
+      expect(mockRedisService.set).toHaveBeenCalled();
     });
   });
 
@@ -283,6 +306,10 @@ describe('AuthService', () => {
     const verifyOtpDto = { phone: '+995599123456', code: '123456' };
 
     it('should throw BadRequestException when OTP is invalid', async () => {
+      // redis.get returns null (no stored OTP)
+      mockRedisService.get.mockResolvedValue(null);
+      mockRedisService.incr.mockResolvedValue(1);
+
       await expect(authService.verifyOtp(verifyOtpDto)).rejects.toThrow(BadRequestException);
       await expect(authService.verifyOtp(verifyOtpDto)).rejects.toThrow(
         'Invalid or expired OTP',
