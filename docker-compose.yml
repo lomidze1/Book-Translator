@@ -6,7 +6,7 @@ services:
     container_name: book-translator-db
     restart: unless-stopped
     ports:
-      - '5432:5432'
+      - '5433:5432'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-book_translator}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-book_translator_pass}
