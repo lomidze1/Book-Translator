@@ -32,12 +32,31 @@ Book-Translator/
 ## ხელმისაწვდომი აგენტები
 
 ### Test Guardian (`test-guardian`)
-ტესტირების ექსპერტი აგენტი. გამოიყენე კოდის ტესტირებისთვის:
-- Edge case ტესტები
-- Security ტესტები
-- Coverage ანალიზი
-- DTO ვალიდაცია
-- Integration ტესტები
+ტესტირების ექსპერტი. Edge cases, security tests, coverage, DTO validation.
+
+### Code Reviewer (`code-reviewer`)
+კოდის ხარისხის მცველი. DRY, SOLID, NestJS best practices, TypeScript strictness.
+
+### Prisma Guardian (`prisma-guardian`)
+ბაზის მცველი. Schema validation, index analysis, migration safety, docs sync.
+
+### Security Auditor (`security-auditor`)
+უსაფრთხოების აუდიტორი. Auth bypass, input sanitization, secrets, OWASP Top 10.
+
+### Doc Sync (`doc-sync`)
+დოკუმენტაციის სინქრონიზატორი. კოდის ცვლილებები → docs/ განახლება.
+
+### API Builder (`api-builder`)
+Module გენერატორი. ერთი ბრძანებით: module + service + controller + DTOs + tests.
+
+## ხელმისაწვდომი სკილები (commands/)
+
+| სკილი | ბრძანება | აღწერა |
+|---|---|---|
+| **nest-module** | `/nest-module <name>` | NestJS module scaffolding |
+| **pre-commit-check** | `/pre-commit-check` | Commit-ის წინ ვალიდაცია |
+| **phase-checker** | `/phase-checker [N]` | ROADMAP ფაზის პროგრესი |
+| **api-test-gen** | `/api-test-gen <file>` | ტესტების ავტო-გენერაცია |
 
 ## ძირითადი ბრძანებები
 
