@@ -1,0 +1,15 @@
+@use '../styles/variables' as *;
+
+.footer {
+  margin-top: auto;
+  border-top: 1px solid $color-border;
+  padding: $spacing-lg;
+  text-align: center;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  font-size: 0.875rem;
+  color: $color-secondary;
+}

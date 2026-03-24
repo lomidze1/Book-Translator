@@ -1,142 +1,160 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
 .page {
-  --background: #fafafa;
-  --foreground: #fff;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 $spacing-lg;
+}
 
-  --text-primary: #000;
-  --text-secondary: #666;
+// Hero
+.hero {
+  text-align: center;
+  padding: $spacing-xl * 2 0 $spacing-xl;
+}
 
-  --button-primary-hover: #383838;
-  --button-secondary-hover: #f2f2f2;
-  --button-secondary-border: #ebebeb;
+.title {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: $spacing-md;
 
+  @include mobile {
+    font-size: 2rem;
+  }
+}
+
+.highlight {
+  color: $color-primary;
+}
+
+.subtitle {
+  font-size: 1.25rem;
+  color: $color-secondary;
+  max-width: 640px;
+  margin: 0 auto $spacing-lg;
+  line-height: 1.6;
+
+  @include mobile {
+    font-size: 1rem;
+  }
+}
+
+.actions {
   display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
+  gap: $spacing-md;
   justify-content: center;
-  font-family: var(--font-geist-sans);
-  background-color: var(--background);
+  flex-wrap: wrap;
 }
 
-.main {
-  display: flex;
-  flex: 1;
-  width: 100%;
-  max-width: 800px;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: space-between;
-  background-color: var(--foreground);
-  padding: 120px 60px;
-}
-
-.intro {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  gap: 24px;
-}
-
-.intro h1 {
-  max-width: 320px;
-  font-size: 40px;
+.primaryBtn {
+  padding: $spacing-sm + 4 $spacing-lg;
+  background: $color-primary;
+  color: #fff;
+  border-radius: $radius-md;
   font-weight: 600;
-  line-height: 48px;
-  letter-spacing: -2.4px;
-  text-wrap: balance;
-  color: var(--text-primary);
-}
+  font-size: 1.1rem;
+  transition: background 0.2s;
 
-.intro p {
-  max-width: 440px;
-  font-size: 18px;
-  line-height: 32px;
-  text-wrap: balance;
-  color: var(--text-secondary);
-}
-
-.intro a {
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.ctas {
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  max-width: 440px;
-  gap: 16px;
-  font-size: 14px;
-}
-
-.ctas a {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 128px;
-  border: 1px solid transparent;
-  transition: 0.2s;
-  cursor: pointer;
-  width: fit-content;
-  font-weight: 500;
-}
-
-a.primary {
-  background: var(--text-primary);
-  color: var(--background);
-  gap: 8px;
-}
-
-a.secondary {
-  border-color: var(--button-secondary-border);
-}
-
-/* Enable hover only on non-touch devices */
-@media (hover: hover) and (pointer: fine) {
-  a.primary:hover {
-    background: var(--button-primary-hover);
-    border-color: transparent;
-  }
-
-  a.secondary:hover {
-    background: var(--button-secondary-hover);
-    border-color: transparent;
+  &:hover {
+    background: $color-primary-dark;
   }
 }
 
-@media (max-width: 600px) {
-  .main {
-    padding: 48px 24px;
-  }
+.secondaryBtn {
+  padding: $spacing-sm + 4 $spacing-lg;
+  border: 2px solid $color-border;
+  border-radius: $radius-md;
+  font-weight: 600;
+  font-size: 1.1rem;
+  transition: border-color 0.2s;
 
-  .intro {
-    gap: 16px;
-  }
-
-  .intro h1 {
-    font-size: 32px;
-    line-height: 40px;
-    letter-spacing: -1.92px;
+  &:hover {
+    border-color: $color-primary;
+    color: $color-primary;
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .logo {
-    filter: invert(1);
+// Features
+.features {
+  padding: $spacing-xl * 2 0;
+}
+
+.sectionTitle {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: $spacing-xl;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-lg;
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  padding: $spacing-lg;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  transition: box-shadow 0.2s;
+
+  h3 {
+    font-size: 1.25rem;
+    margin-bottom: $spacing-sm;
   }
 
-  .page {
-    --background: #000;
-    --foreground: #000;
-
-    --text-primary: #ededed;
-    --text-secondary: #999;
-
-    --button-primary-hover: #ccc;
-    --button-secondary-hover: #1a1a1a;
-    --button-secondary-border: #1a1a1a;
+  p {
+    color: $color-secondary;
+    line-height: 1.5;
   }
+
+  &:hover {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  }
+}
+
+// Pricing
+.pricing {
+  padding: $spacing-xl 0 $spacing-xl * 2;
+}
+
+.priceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-lg;
+  max-width: 640px;
+  margin: 0 auto;
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.priceCard {
+  text-align: center;
+  padding: $spacing-xl $spacing-lg;
+  border: 2px solid $color-border;
+  border-radius: $radius-lg;
+
+  h3 {
+    font-size: 1.125rem;
+    margin-bottom: $spacing-sm;
+  }
+
+  p {
+    color: $color-secondary;
+    line-height: 1.5;
+  }
+}
+
+.price {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: $color-primary;
+  margin: $spacing-sm 0;
 }

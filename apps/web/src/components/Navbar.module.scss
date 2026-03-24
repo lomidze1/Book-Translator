@@ -1,0 +1,55 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--background);
+  border-bottom: 1px solid $color-border;
+  padding: $spacing-md $spacing-lg;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: $color-primary;
+}
+
+.links {
+  display: flex;
+  gap: $spacing-sm;
+  align-items: center;
+}
+
+.loginBtn {
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+  font-weight: 500;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba($color-primary, 0.08);
+  }
+}
+
+.registerBtn {
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+  font-weight: 500;
+  background: $color-primary;
+  color: #fff;
+  transition: background 0.2s;
+
+  &:hover {
+    background: $color-primary-dark;
+  }
+}

@@ -1,66 +1,64 @@
-import Image from "next/image";
-import styles from "./page.module.scss";
+import Link from 'next/link';
+import styles from './page.module.scss';
 
-export default function Home() {
+export default function HomePage() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+      <section className={styles.hero}>
+        <h1 className={styles.title}>
+          წიგნების <span className={styles.highlight}>AI თარგმანი</span> ქართულად
+        </h1>
+        <p className={styles.subtitle}>
+          ატვირთე ინგლისურენოვანი წიგნი PDF, EPUB ან DOCX ფორმატში და მიიღე
+          ხარისხიანი ქართული თარგმანი Claude AI-ის მეშვეობით.
+        </p>
+        <div className={styles.actions}>
+          <Link href="/register" className={styles.primaryBtn}>
+            დაიწყე უფასოდ
+          </Link>
+          <Link href="#features" className={styles.secondaryBtn}>
+            გაიგე მეტი
+          </Link>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      <section id="features" className={styles.features}>
+        <h2 className={styles.sectionTitle}>რას გთავაზობთ</h2>
+        <div className={styles.grid}>
+          <div className={styles.card}>
+            <h3>AI თარგმანი</h3>
+            <p>Claude API-ის მეშვეობით მაღალხარისხიანი, კონტექსტის გათვალისწინებით თარგმანი.</p>
+          </div>
+          <div className={styles.card}>
+            <h3>Online Reader</h3>
+            <p>წაიკითხე ნათარგმნი წიგნი ჩაშენებულ რიდერში სანიშნეებით და ხაზგასმებით.</p>
+          </div>
+          <div className={styles.card}>
+            <h3>ხმოვანი წაკითხვა</h3>
+            <p>მოისმინე წიგნი ქართულად Text-to-Speech ტექნოლოგიით.</p>
+          </div>
+          <div className={styles.card}>
+            <h3>მრავალი ფორმატი</h3>
+            <p>PDF, EPUB, TXT, DOCX — ატვირთე ნებისმიერი ფორმატის წიგნი.</p>
+          </div>
         </div>
-      </main>
+      </section>
+
+      <section className={styles.pricing}>
+        <h2 className={styles.sectionTitle}>ფასები</h2>
+        <div className={styles.priceGrid}>
+          <div className={styles.priceCard}>
+            <h3>ახალი წიგნი</h3>
+            <p className={styles.price}>10 &#8382;</p>
+            <p>სრული თარგმანი ინგლისურიდან ქართულად</p>
+          </div>
+          <div className={styles.priceCard}>
+            <h3>არსებული თარგმანი</h3>
+            <p className={styles.price}>5 &#8382;</p>
+            <p>უკვე ნათარგმნი წიგნის წვდომა</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
