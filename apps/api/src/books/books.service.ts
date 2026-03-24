@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { S3Service } from '../s3/s3.service';
 import { CreateBookDto, UpdateBookDto, SearchBooksDto, PaginationDto } from './dto';
 import * as crypto from 'crypto';
 
@@ -33,7 +34,10 @@ export interface SearchResult {
 
 @Injectable()
 export class BooksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3: S3Service,
+  ) {}
 
   // ========================
   // Search (Aggregated)
@@ -343,8 +347,7 @@ export class BooksService {
     // Extract basic metadata from filename
     const nameWithoutExt = file.originalname.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
 
-    // TODO: Upload to S3 and get URL
-    // For now, store metadata only
+    // Create book record first to get ID
     const book = await this.prisma.book.create({
       data: {
         title: nameWithoutExt,
@@ -352,8 +355,17 @@ export class BooksService {
         fileHash,
         fileSize: file.size,
         language: 'en',
-        // originalFileUrl will be set after S3 upload
       },
+    });
+
+    // Upload to S3
+    const s3Key = this.s3.generateBookKey(book.id, file.originalname);
+    await this.s3.upload(s3Key, file.buffer, file.mimetype);
+
+    // Update book with S3 URL
+    await this.prisma.book.update({
+      where: { id: book.id },
+      data: { originalFileUrl: s3Key },
     });
 
     // Add to user's library

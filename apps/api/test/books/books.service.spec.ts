@@ -17,11 +17,24 @@ describe('BooksService', () => {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    userBook: {
+      create: vi.fn(),
+    },
+  };
+
+  const mockS3Service = {
+    upload: vi.fn().mockResolvedValue('books/book-1/original.pdf'),
+    getPresignedUrl: vi.fn().mockResolvedValue('https://presigned-url.com'),
+    delete: vi.fn().mockResolvedValue(undefined),
+    exists: vi.fn().mockResolvedValue(true),
+    generateBookKey: vi.fn().mockReturnValue('books/book-1/original.pdf'),
+    generateTranslationKey: vi.fn().mockReturnValue('books/book-1/translations/tr-1/chapter-1.txt'),
+    generateAudioKey: vi.fn().mockReturnValue('books/book-1/audio/ab-1/chapter-1.mp3'),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    booksService = new (BooksService as any)(mockPrismaService);
+    booksService = new (BooksService as any)(mockPrismaService, mockS3Service);
   });
 
   // ========================
