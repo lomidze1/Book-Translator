@@ -9,6 +9,12 @@ export default function Navbar() {
           Book Translator
         </Link>
         <div className={styles.links}>
+          <Link href="/search" className={styles.navLink}>
+            ძებნა
+          </Link>
+          <Link href="/upload" className={styles.navLink}>
+            ატვირთვა
+          </Link>
           <Link href="/login" className={styles.loginBtn}>
             შესვლა
           </Link>

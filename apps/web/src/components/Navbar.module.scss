@@ -30,6 +30,18 @@
   align-items: center;
 }
 
+.navLink {
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+  font-weight: 500;
+  color: $color-secondary;
+  transition: color 0.2s;
+
+  &:hover {
+    color: $color-primary;
+  }
+}
+
 .loginBtn {
   padding: $spacing-sm $spacing-md;
   border-radius: $radius-md;
