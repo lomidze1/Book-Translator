@@ -8,11 +8,16 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
 import { CreateBookDto, UpdateBookDto, SearchBooksDto, PaginationDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { FileValidationPipe } from './upload/file-validation.pipe';
 
 @Controller('books')
 @UseGuards(JwtAuthGuard)
@@ -40,6 +45,15 @@ export class BooksController {
   @Post()
   create(@Body() dto: CreateBookDto) {
     return this.booksService.create(dto);
+  }
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  async upload(
+    @UploadedFile(new FileValidationPipe()) file: Express.Multer.File,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.booksService.handleUpload(file, user.id);
   }
 
   @Patch(':id')

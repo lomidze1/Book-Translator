@@ -307,6 +307,72 @@ export class BooksService {
   }
 
   // ========================
+  // File Upload
+  // ========================
+
+  async handleUpload(file: Express.Multer.File, userId: string) {
+    const fileHash = this.generateFileHash(file.buffer);
+
+    // Check duplicate
+    const existing = await this.prisma.book.findUnique({
+      where: { fileHash },
+      include: { translations: { where: { status: 'COMPLETED' } } },
+    });
+
+    if (existing) {
+      // Book already exists — offer discounted price
+      return {
+        duplicate: true,
+        book: existing,
+        translationAvailable: existing.translations.length > 0,
+        message: existing.translations.length > 0
+          ? 'ეს წიგნი უკვე ნათარგმნია. შეგიძლია შეიძინო 5₾-ად.'
+          : 'ეს წიგნი უკვე ბაზაშია.',
+      };
+    }
+
+    // Detect format from extension
+    const ext = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+    const formatMap: Record<string, string> = {
+      '.pdf': 'PDF',
+      '.epub': 'EPUB',
+      '.txt': 'TXT',
+      '.docx': 'DOCX',
+    };
+
+    // Extract basic metadata from filename
+    const nameWithoutExt = file.originalname.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+
+    // TODO: Upload to S3 and get URL
+    // For now, store metadata only
+    const book = await this.prisma.book.create({
+      data: {
+        title: nameWithoutExt,
+        originalFormat: formatMap[ext] as any || 'PDF',
+        fileHash,
+        fileSize: file.size,
+        language: 'en',
+        // originalFileUrl will be set after S3 upload
+      },
+    });
+
+    // Add to user's library
+    await this.prisma.userBook.create({
+      data: {
+        userId,
+        bookId: book.id,
+        type: 'UPLOADED',
+      },
+    });
+
+    return {
+      duplicate: false,
+      book,
+      message: 'წიგნი წარმატებით აიტვირთა. გადაიხადე 10₾ თარგმნის დასაწყებად.',
+    };
+  }
+
+  // ========================
   // Helpers
   // ========================
 
