@@ -14,13 +14,24 @@ export class S3Service implements OnModuleInit {
   private bucket: string;
 
   async onModuleInit() {
-    this.bucket = process.env.AWS_S3_BUCKET || '';
+    this.bucket = process.env.AWS_S3_BUCKET;
+    const region = process.env.AWS_REGION;
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+
+    if (!this.bucket || !accessKeyId || !secretAccessKey) {
+      if (process.env.NODE_ENV === 'test') {
+        // Allow tests to run without real AWS credentials
+        this.bucket = 'test-bucket';
+        this.client = new S3Client({ region: 'eu-central-1' });
+        return;
+      }
+      throw new Error('Missing required AWS environment variables: AWS_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY');
+    }
+
     this.client = new S3Client({
-      region: process.env.AWS_REGION || 'eu-central-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      },
+      region: region || 'eu-central-1',
+      credentials: { accessKeyId, secretAccessKey },
     });
   }
 
@@ -35,6 +46,8 @@ export class S3Service implements OnModuleInit {
         Key: key,
         Body: buffer,
         ContentType: contentType,
+        ServerSideEncryption: 'AES256',
+        ContentDisposition: 'attachment',
       }),
     );
     return key;
@@ -76,8 +89,11 @@ export class S3Service implements OnModuleInit {
         }),
       );
       return true;
-    } catch {
-      return false;
+    } catch (error: any) {
+      if (error?.name === 'NotFound' || error?.$metadata?.httpStatusCode === 404) {
+        return false;
+      }
+      throw error;
     }
   }
 

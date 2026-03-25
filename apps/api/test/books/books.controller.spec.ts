@@ -11,6 +11,7 @@ describe('BooksController', () => {
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
+    handleUpload: vi.fn(),
   };
 
   beforeEach(() => {
@@ -69,25 +70,67 @@ describe('BooksController', () => {
   });
 
   describe('update', () => {
-    it('should update a book', async () => {
+    it('should update a book with ownership check', async () => {
       const dto = { title: 'Updated Title' };
+      const mockUser = { id: 'user-1' };
       mockBooksService.update.mockResolvedValue({ id: 'b1', ...dto });
 
-      const result = await controller.update('b1', dto);
+      const result = await controller.update('b1', dto, mockUser);
 
       expect(result.title).toBe('Updated Title');
-      expect(mockBooksService.update).toHaveBeenCalledWith('b1', dto);
+      expect(mockBooksService.update).toHaveBeenCalledWith('b1', dto, 'user-1');
     });
   });
 
   describe('remove', () => {
-    it('should delete a book', async () => {
+    it('should delete a book with ownership check', async () => {
+      const mockUser = { id: 'user-1' };
       mockBooksService.remove.mockResolvedValue({ id: 'b1' });
 
-      const result = await controller.remove('b1');
+      const result = await controller.remove('b1', mockUser);
 
       expect(result.id).toBe('b1');
-      expect(mockBooksService.remove).toHaveBeenCalledWith('b1');
+      expect(mockBooksService.remove).toHaveBeenCalledWith('b1', 'user-1');
+    });
+  });
+
+  // ========================
+  // Upload
+  // ========================
+
+  describe('upload', () => {
+    const mockFile = {
+      originalname: 'test.pdf',
+      mimetype: 'application/pdf',
+      size: 1024,
+      buffer: Buffer.from('pdf data'),
+    } as Express.Multer.File;
+
+    const mockUser = { id: 'user-1' };
+
+    it('should call handleUpload with file and userId', async () => {
+      const expected = { duplicate: false, book: { id: 'b1' }, message: 'Success' };
+      mockBooksService.handleUpload.mockResolvedValue(expected);
+
+      const result = await controller.upload(mockFile, mockUser);
+
+      expect(mockBooksService.handleUpload).toHaveBeenCalledWith(mockFile, 'user-1');
+      expect(result).toEqual(expected);
+    });
+
+    it('should return duplicate info when book exists', async () => {
+      const expected = {
+        duplicate: true,
+        book: { id: 'existing' },
+        translationAvailable: true,
+        message: 'ეს წიგნი უკვე ნათარგმნია.',
+      };
+      mockBooksService.handleUpload.mockResolvedValue(expected);
+
+      const result = await controller.upload(mockFile, mockUser);
+
+      expect(result.duplicate).toBe(true);
+      expect(result.translationAvailable).toBe(true);
     });
   });
 });

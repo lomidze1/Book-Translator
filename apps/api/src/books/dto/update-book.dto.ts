@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, MaxLength, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsUrl, MaxLength, Min, Max } from 'class-validator';
 
 export class UpdateBookDto {
   @IsOptional()
@@ -17,7 +17,7 @@ export class UpdateBookDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUrl({}, { message: 'coverUrl უნდა იყოს ვალიდური URL' })
   coverUrl?: string;
 
   @IsOptional()

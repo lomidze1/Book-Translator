@@ -16,7 +16,7 @@ export class PaginationDto {
   limit?: number = 20;
 
   @IsOptional()
-  @IsString()
+  @IsIn(['createdAt', 'title', 'author', 'pageCount', 'updatedAt'])
   sortBy?: string = 'createdAt';
 
   @IsOptional()

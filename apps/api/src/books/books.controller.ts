@@ -12,6 +12,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { BooksService } from './books.service';
 import { CreateBookDto, UpdateBookDto, SearchBooksDto, PaginationDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -48,6 +49,7 @@ export class BooksController {
   }
 
   @Post('upload')
+  @Throttle({ upload: { ttl: 900000, limit: 5 } })
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
   async upload(
     @UploadedFile(new FileValidationPipe()) file: Express.Multer.File,
@@ -57,12 +59,19 @@ export class BooksController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateBookDto) {
-    return this.booksService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateBookDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.booksService.update(id, dto, user.id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.booksService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.booksService.remove(id, user.id);
   }
 }

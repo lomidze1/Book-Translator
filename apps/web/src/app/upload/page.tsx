@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useRef, DragEvent } from 'react';
+import { useState, useRef, useEffect, useCallback, DragEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import styles from './page.module.scss';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 const ACCEPTED_TYPES = [
   'application/pdf',
@@ -25,13 +28,36 @@ function getFileExtension(name: string): string {
   return name.substring(name.lastIndexOf('.')).toLowerCase();
 }
 
+interface UploadResponse {
+  duplicate: boolean;
+  book: { id: string; title?: string };
+  translationAvailable?: boolean;
+  message: string;
+}
+
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router = useRouter();
+
+  // Cleanup XHR and timers on unmount
+  useEffect(() => {
+    return () => {
+      if (xhrRef.current) {
+        xhrRef.current.abort();
+      }
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
 
   const validateFile = (f: File): string | null => {
     const ext = getFileExtension(f.name);
@@ -84,39 +110,83 @@ export default function UploadPage() {
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = useCallback(async () => {
     if (!file) return;
     setUploading(true);
     setUploadProgress(0);
+    setError('');
+    setUploadResult(null);
 
-    // Simulate upload progress (real implementation will use S3)
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 200);
+    const formData = new FormData();
+    formData.append('file', file);
 
     try {
-      // TODO: Real upload to S3 via API
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      clearInterval(interval);
+      const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
+
+      const uploadPromise = new Promise<UploadResponse>((resolve, reject) => {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 90);
+            setUploadProgress(percent);
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(data);
+            } else {
+              const errorMsg = data.message || 'ატვირთვა ვერ მოხერხდა';
+              reject(new Error(Array.isArray(errorMsg) ? errorMsg[0] : errorMsg));
+            }
+          } catch {
+            reject(new Error('სერვერმა არასწორი პასუხი დააბრუნა'));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('ქსელის შეცდომა. შეამოწმე ინტერნეტ კავშირი.'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('ატვირთვა გაუქმდა'));
+        });
+
+        const token = localStorage.getItem('token');
+        xhr.open('POST', `${API_URL}/api/books/upload`);
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+        xhr.send(formData);
+      });
+
+      const result = await uploadPromise;
+      xhrRef.current = null;
       setUploadProgress(100);
-    } catch {
-      clearInterval(interval);
-      setError('ატვირთვა ვერ მოხერხდა. სცადე თავიდან.');
+      setUploadResult(result);
+
+      if (!result.duplicate) {
+        redirectTimerRef.current = setTimeout(() => {
+          router.push(`/books/${result.book.id}`);
+        }, 2000);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'ატვირთვა ვერ მოხერხდა. სცადე თავიდან.';
+      setError(message);
+      setUploadProgress(0);
     } finally {
       setUploading(false);
+      xhrRef.current = null;
     }
-  };
+  }, [file, router]);
 
   const removeFile = () => {
     setFile(null);
     setError('');
     setUploadProgress(0);
+    setUploadResult(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -192,9 +262,21 @@ export default function UploadPage() {
             </button>
           )}
 
-          {uploadProgress === 100 && (
+          {uploadProgress === 100 && uploadResult && (
             <div className={styles.success}>
-              <p>✅ ფაილი წარმატებით აიტვირთა! თარგმნა მალე დაიწყება.</p>
+              {uploadResult.duplicate ? (
+                <>
+                  <p>{uploadResult.message}</p>
+                  <button
+                    className={styles.uploadBtn}
+                    onClick={() => router.push(`/books/${uploadResult.book.id}`)}
+                  >
+                    წიგნის ნახვა
+                  </button>
+                </>
+              ) : (
+                <p>წიგნი წარმატებით აიტვირთა! გადამისამართდები წიგნის გვერდზე...</p>
+              )}
             </div>
           )}
 

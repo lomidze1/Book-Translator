@@ -11,12 +11,14 @@ Book-Translator/
 │   │   ├── src/
 │   │   │   ├── auth/     # Auth module (JWT, Google OAuth, OTP)
 │   │   │   ├── users/    # Users module (profile CRUD)
+│   │   │   ├── books/    # Books module (search, upload, CRUD)
+│   │   │   ├── s3/       # AWS S3 service (file storage)
 │   │   │   ├── prisma/   # Prisma service
 │   │   │   └── redis/    # Redis service (OTP, rate limiting)
-│   │   ├── test/         # Vitest tests (280+)
+│   │   ├── test/         # Vitest tests (400+)
 │   │   └── prisma/       # Prisma schema + migrations
 │   └── web/              # Next.js 15 frontend (SCSS)
-│       ├── src/app/      # Pages (landing, login, register)
+│       ├── src/app/      # Pages (landing, login, register, search, upload, books)
 │       ├── src/components/  # Navbar, Footer
 │       └── src/styles/   # SCSS variables, mixins
 ├── packages/
@@ -88,7 +90,7 @@ pnpm turbo build
 - **Frontend:** Next.js 15 + React 19 + SCSS
 - **Auth:** JWT + Passport.js + Google OAuth (google-auth-library) + OTP (Redis)
 - **Database:** PostgreSQL 16 (Docker) + Redis 7 (Docker)
-- **Testing:** Vitest (280+ tests)
+- **Testing:** Vitest (400+ tests)
 - **Validation:** class-validator + class-transformer
 - **Language:** TypeScript
 
@@ -103,4 +105,4 @@ pnpm turbo build
 
 ## ბრანჩები
 - **main** — სტაბილური ვერსია
-- **test** — აქტიური განვითარება (ფაზა 1 დასრულებული)
+- **test** — აქტიური განვითარება (ფაზა 2 დასრულების პროცესში)

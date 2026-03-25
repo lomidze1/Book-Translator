@@ -2,12 +2,19 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { CreateBookDto, UpdateBookDto, SearchBooksDto, PaginationDto } from './dto';
 import * as crypto from 'crypto';
+
+const MIME_EXTENSION_MAP: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.epub': 'application/epub+zip',
+  '.txt': 'text/plain',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
 
 export interface ExternalBookResult {
   source: 'google' | 'openlibrary';
@@ -293,8 +300,12 @@ export class BooksService {
     return book;
   }
 
-  async update(id: string, dto: UpdateBookDto) {
+  async update(id: string, dto: UpdateBookDto, userId?: string) {
     await this.findOne(id); // throws if not found
+
+    if (userId) {
+      await this.verifyOwnership(id, userId);
+    }
 
     return this.prisma.book.update({
       where: { id },
@@ -302,12 +313,25 @@ export class BooksService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, userId?: string) {
     await this.findOne(id); // throws if not found
+
+    if (userId) {
+      await this.verifyOwnership(id, userId);
+    }
 
     return this.prisma.book.delete({
       where: { id },
     });
+  }
+
+  private async verifyOwnership(bookId: string, userId: string): Promise<void> {
+    const userBook = await this.prisma.userBook.findFirst({
+      where: { bookId, userId },
+    });
+    if (!userBook) {
+      throw new ForbiddenException('ამ წიგნის რედაქტირების უფლება არ გაქვს');
+    }
   }
 
   // ========================
@@ -324,10 +348,9 @@ export class BooksService {
     });
 
     if (existing) {
-      // Book already exists — offer discounted price
       return {
         duplicate: true,
-        book: existing,
+        book: { id: existing.id },
         translationAvailable: existing.translations.length > 0,
         message: existing.translations.length > 0
           ? 'ეს წიგნი უკვე ნათარგმნია. შეგიძლია შეიძინო 5₾-ად.'
@@ -344,13 +367,21 @@ export class BooksService {
       '.docx': 'DOCX',
     };
 
-    // Extract basic metadata from filename
-    const nameWithoutExt = file.originalname.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+    // Sanitize filename for title: strip HTML, path traversal, special chars
+    const sanitizedName = file.originalname
+      .replace(/\.[^.]+$/, '')        // Remove extension
+      .replace(/[<>"'&/\\]/g, '')     // Strip HTML/path chars
+      .replace(/\.\./g, '')           // Strip path traversal
+      .replace(/[_-]/g, ' ')          // Replace separators with spaces
+      .trim() || 'Untitled';
+
+    // Server-derived Content-Type (don't trust client MIME)
+    const contentType = MIME_EXTENSION_MAP[ext] || 'application/octet-stream';
 
     // Create book record first to get ID
     const book = await this.prisma.book.create({
       data: {
-        title: nameWithoutExt,
+        title: sanitizedName,
         originalFormat: formatMap[ext] as any || 'PDF',
         fileHash,
         fileSize: file.size,
@@ -358,15 +389,21 @@ export class BooksService {
       },
     });
 
-    // Upload to S3
-    const s3Key = this.s3.generateBookKey(book.id, file.originalname);
-    await this.s3.upload(s3Key, file.buffer, file.mimetype);
+    try {
+      // Upload to S3 with server-derived Content-Type
+      const s3Key = this.s3.generateBookKey(book.id, file.originalname);
+      await this.s3.upload(s3Key, file.buffer, contentType);
 
-    // Update book with S3 URL
-    await this.prisma.book.update({
-      where: { id: book.id },
-      data: { originalFileUrl: s3Key },
-    });
+      // Update book with S3 URL
+      await this.prisma.book.update({
+        where: { id: book.id },
+        data: { originalFileUrl: s3Key },
+      });
+    } catch (error) {
+      // Rollback: delete orphaned book record if S3 upload fails
+      await this.prisma.book.delete({ where: { id: book.id } });
+      throw error;
+    }
 
     // Add to user's library
     await this.prisma.userBook.create({

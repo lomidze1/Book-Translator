@@ -11,6 +11,13 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.epub', '.txt', '.docx'];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 // Magic bytes for file type verification
+const EXTENSION_MIME_MAP: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.epub': 'application/epub+zip',
+  '.txt': 'text/plain',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
 const MAGIC_BYTES: Record<string, number[]> = {
   pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
   epub: [0x50, 0x4b, 0x03, 0x04], // PK (ZIP)
@@ -46,6 +53,14 @@ export class FileValidationPipe implements PipeTransform {
     // MIME type check
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       throw new BadRequestException('ფაილის MIME ტიპი არ არის მხარდაჭერილი');
+    }
+
+    // MIME-to-extension cross-validation
+    const expectedMime = EXTENSION_MIME_MAP[ext];
+    if (expectedMime && file.mimetype !== expectedMime) {
+      throw new BadRequestException(
+        `ფაილის ტიპი და MIME არ ემთხვევა ერთმანეთს (${ext} ≠ ${file.mimetype})`,
+      );
     }
 
     // Magic bytes check (for PDF, EPUB, DOCX)

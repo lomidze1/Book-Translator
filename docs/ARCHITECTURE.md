@@ -78,7 +78,7 @@ book-translator/
 **ტექნიკური დეტალები:**
 - Next.js 15 (App Router)
 - React 19
-- TailwindCSS + shadcn/ui
+- SCSS (Sass modules)
 - React Query (TanStack Query) — სერვერის მონაცემების მართვა
 - Zustand — კლიენტის სტეიტის მართვა
 - Socket.io-client — რეალ-ტაიმ თარგმნის პროგრესი
@@ -106,6 +106,7 @@ book-translator/
 | **Auth** | რეგისტრაცია, ლოგინი, JWT, OAuth, OTP |
 | **Users** | მომხმარებლის პროფილი, პარამეტრები |
 | **Books** | წიგნების ძებნა, ატვირთვა, მეტადატა |
+| **S3** | AWS S3 ფაილების მენეჯმენტი (upload, presigned URLs) |
 | **Translation** | თარგმნის დაწყება, პროგრესის ტრეკინგი, შედეგი |
 | **Payment** | BOG Pay, TBC Pay ინტეგრაცია |
 | **Reader** | სანიშნეები, ხაზგასმები, შენიშვნები, კითხვის პროგრესი |

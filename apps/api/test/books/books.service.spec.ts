@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { BooksService } from '../../src/books/books.service';
 
 // Mock global fetch
+const originalFetch = global.fetch;
 global.fetch = vi.fn();
+
+afterAll(() => {
+  global.fetch = originalFetch;
+});
 
 describe('BooksService', () => {
   let booksService: BooksService;
@@ -19,6 +24,7 @@ describe('BooksService', () => {
     },
     userBook: {
       create: vi.fn(),
+      findFirst: vi.fn(),
     },
   };
 
@@ -143,6 +149,24 @@ describe('BooksService', () => {
         NotFoundException,
       );
     });
+
+    it('should throw ForbiddenException when user does not own the book', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({ id: 'b1', title: 'Book' });
+      mockPrismaService.userBook.findFirst.mockResolvedValue(null);
+
+      await expect(booksService.update('b1', { title: 'X' }, 'user-999')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should allow update when user owns the book', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({ id: 'b1', title: 'Old' });
+      mockPrismaService.userBook.findFirst.mockResolvedValue({ id: 'ub-1' });
+      mockPrismaService.book.update.mockResolvedValue({ id: 'b1', title: 'New' });
+
+      const result = await booksService.update('b1', { title: 'New' }, 'user-1');
+      expect(result.title).toBe('New');
+    });
   });
 
   describe('remove', () => {
@@ -159,10 +183,114 @@ describe('BooksService', () => {
 
       await expect(booksService.remove('nonexistent')).rejects.toThrow(NotFoundException);
     });
+
+    it('should throw ForbiddenException when user does not own the book', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({ id: 'b1' });
+      mockPrismaService.userBook.findFirst.mockResolvedValue(null);
+
+      await expect(booksService.remove('b1', 'user-999')).rejects.toThrow(ForbiddenException);
+    });
   });
 
   // ========================
-  // Search
+  // Aggregated Search
+  // ========================
+
+  describe('search', () => {
+    it('should aggregate results from Google, OpenLibrary, and database', async () => {
+      // Mock Google Books
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [{
+            id: 'g1',
+            volumeInfo: {
+              title: 'Google Book',
+              authors: ['Author'],
+              industryIdentifiers: [{ type: 'ISBN_13', identifier: '9781111111111' }],
+            },
+          }],
+        }),
+      });
+
+      // Mock Open Library
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          docs: [{
+            title: 'OL Book',
+            author_name: ['OL Author'],
+            isbn: ['9782222222222'],
+            key: '/works/OL1',
+          }],
+        }),
+      });
+
+      // Mock database search
+      mockPrismaService.book.findMany.mockResolvedValue([
+        { id: 'db1', title: 'DB Book', translations: [] },
+      ]);
+
+      // Mock ISBN lookup for enrichment (no match)
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+
+      const result = await booksService.search({ q: 'test', limit: 10 });
+
+      expect(result.external.length).toBeGreaterThanOrEqual(1);
+      expect(result.database).toHaveLength(1);
+      expect(result.total).toBeGreaterThan(0);
+    });
+
+    it('should deduplicate external results by ISBN', async () => {
+      const sharedIsbn = '9781234567890';
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [{
+            id: 'g1',
+            volumeInfo: {
+              title: 'Same Book Google',
+              industryIdentifiers: [{ type: 'ISBN_13', identifier: sharedIsbn }],
+            },
+          }],
+        }),
+      });
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          docs: [{
+            title: 'Same Book OL',
+            isbn: [sharedIsbn],
+            key: '/works/OL1',
+          }],
+        }),
+      });
+
+      mockPrismaService.book.findMany.mockResolvedValue([]);
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+
+      const result = await booksService.search({ q: 'test', limit: 10 });
+
+      // Should be deduplicated — only one result for that ISBN
+      const isbnResults = result.external.filter(b => b.isbn === sharedIsbn);
+      expect(isbnResults).toHaveLength(1);
+    });
+
+    it('should handle all external APIs failing gracefully', async () => {
+      (global.fetch as any).mockRejectedValue(new Error('Network error'));
+      mockPrismaService.book.findMany.mockResolvedValue([{ id: 'db1', title: 'DB' }]);
+
+      const result = await booksService.search({ q: 'test', limit: 10 });
+
+      expect(result.external).toHaveLength(0);
+      expect(result.database).toHaveLength(1);
+    });
+  });
+
+  // ========================
+  // Search — Individual APIs
   // ========================
 
   describe('searchGoogleBooks', () => {
@@ -256,6 +384,231 @@ describe('BooksService', () => {
           where: expect.objectContaining({ OR: expect.any(Array) }),
         }),
       );
+    });
+  });
+
+  // ========================
+  // File Upload
+  // ========================
+
+  describe('handleUpload', () => {
+    const mockFile = {
+      originalname: 'clean-code.pdf',
+      mimetype: 'application/pdf',
+      size: 1024 * 1024,
+      buffer: Buffer.from('fake pdf content'),
+    } as Express.Multer.File;
+
+    const userId = 'user-1';
+
+    it('should upload new book successfully', async () => {
+      // No duplicate
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      // Create book
+      mockPrismaService.book.create.mockResolvedValue({
+        id: 'new-book',
+        title: 'clean code',
+        originalFormat: 'PDF',
+      });
+      // Update with S3 URL
+      mockPrismaService.book.update.mockResolvedValue({});
+      // Create UserBook
+      mockPrismaService.userBook.create.mockResolvedValue({});
+
+      const result = await booksService.handleUpload(mockFile, userId);
+
+      expect(result.duplicate).toBe(false);
+      expect(result.book.id).toBe('new-book');
+      expect(mockS3Service.upload).toHaveBeenCalled();
+      expect(mockS3Service.generateBookKey).toHaveBeenCalledWith('new-book', 'clean-code.pdf');
+      expect(mockPrismaService.userBook.create).toHaveBeenCalledWith({
+        data: { userId, bookId: 'new-book', type: 'UPLOADED' },
+      });
+    });
+
+    it('should detect duplicate by file hash', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({
+        id: 'existing-book',
+        title: 'Existing Book',
+        translations: [],
+      });
+
+      const result = await booksService.handleUpload(mockFile, userId);
+
+      expect(result.duplicate).toBe(true);
+      expect(result.book.id).toBe('existing-book');
+      expect(result.translationAvailable).toBe(false);
+      expect(mockS3Service.upload).not.toHaveBeenCalled();
+    });
+
+    it('should detect duplicate with available translation', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({
+        id: 'existing-book',
+        title: 'Existing Book',
+        translations: [{ id: 'tr-1', targetLanguage: 'ka' }],
+      });
+
+      const result = await booksService.handleUpload(mockFile, userId);
+
+      expect(result.duplicate).toBe(true);
+      expect(result.translationAvailable).toBe(true);
+      expect(result.message).toContain('5₾');
+    });
+
+    it('should extract title from filename', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.book.create.mockResolvedValue({ id: 'new-book' });
+      mockPrismaService.book.update.mockResolvedValue({});
+      mockPrismaService.userBook.create.mockResolvedValue({});
+
+      const fileWithDashes = {
+        ...mockFile,
+        originalname: 'my-great-book.pdf',
+      } as Express.Multer.File;
+
+      await booksService.handleUpload(fileWithDashes, userId);
+
+      expect(mockPrismaService.book.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          title: 'my great book',
+        }),
+      });
+    });
+
+    it('should detect format from extension', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.book.create.mockResolvedValue({ id: 'new-book' });
+      mockPrismaService.book.update.mockResolvedValue({});
+      mockPrismaService.userBook.create.mockResolvedValue({});
+
+      const epubFile = {
+        ...mockFile,
+        originalname: 'book.epub',
+      } as Express.Multer.File;
+
+      await booksService.handleUpload(epubFile, userId);
+
+      expect(mockPrismaService.book.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          originalFormat: 'EPUB',
+        }),
+      });
+    });
+
+    it('should store file size', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.book.create.mockResolvedValue({ id: 'new-book' });
+      mockPrismaService.book.update.mockResolvedValue({});
+      mockPrismaService.userBook.create.mockResolvedValue({});
+
+      await booksService.handleUpload(mockFile, userId);
+
+      expect(mockPrismaService.book.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          fileSize: mockFile.size,
+        }),
+      });
+    });
+
+    it('should update book with S3 key after upload', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.book.create.mockResolvedValue({ id: 'new-book' });
+      mockPrismaService.book.update.mockResolvedValue({});
+      mockPrismaService.userBook.create.mockResolvedValue({});
+
+      await booksService.handleUpload(mockFile, userId);
+
+      expect(mockPrismaService.book.update).toHaveBeenCalledWith({
+        where: { id: 'new-book' },
+        data: { originalFileUrl: 'books/book-1/original.pdf' },
+      });
+    });
+
+    it('should rollback book record when S3 upload fails', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.book.create.mockResolvedValue({ id: 'orphan-book' });
+      mockS3Service.upload.mockRejectedValueOnce(new Error('S3 failure'));
+      mockPrismaService.book.delete.mockResolvedValue({});
+
+      await expect(booksService.handleUpload(mockFile, userId)).rejects.toThrow('S3 failure');
+
+      // Verify rollback — orphaned book record deleted
+      expect(mockPrismaService.book.delete).toHaveBeenCalledWith({
+        where: { id: 'orphan-book' },
+      });
+      expect(mockPrismaService.userBook.create).not.toHaveBeenCalled();
+    });
+
+    it('should sanitize HTML in filename', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.book.create.mockResolvedValue({ id: 'new-book' });
+      mockPrismaService.book.update.mockResolvedValue({});
+      mockPrismaService.userBook.create.mockResolvedValue({});
+
+      const xssFile = {
+        ...mockFile,
+        originalname: '<script>alert(1)</script>.pdf',
+      } as Express.Multer.File;
+
+      await booksService.handleUpload(xssFile, userId);
+
+      expect(mockPrismaService.book.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          title: expect.not.stringContaining('<script>'),
+        }),
+      });
+    });
+
+    it('should sanitize path traversal in filename', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.book.create.mockResolvedValue({ id: 'new-book' });
+      mockPrismaService.book.update.mockResolvedValue({});
+      mockPrismaService.userBook.create.mockResolvedValue({});
+
+      const traversalFile = {
+        ...mockFile,
+        originalname: '../../../etc/passwd.pdf',
+      } as Express.Multer.File;
+
+      await booksService.handleUpload(traversalFile, userId);
+
+      expect(mockPrismaService.book.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          title: expect.not.stringContaining('..'),
+        }),
+      });
+    });
+
+    it('should use server-derived Content-Type instead of client MIME', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.book.create.mockResolvedValue({ id: 'new-book' });
+      mockPrismaService.book.update.mockResolvedValue({});
+      mockPrismaService.userBook.create.mockResolvedValue({});
+
+      await booksService.handleUpload(mockFile, userId);
+
+      // Should use server-derived 'application/pdf' not client mimetype
+      expect(mockS3Service.upload).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Buffer),
+        'application/pdf',
+      );
+    });
+
+    it('should return only book id in duplicate response (not full book)', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({
+        id: 'existing-book',
+        title: 'Secret Title',
+        fileHash: 'abc',
+        translations: [],
+      });
+
+      const result = await booksService.handleUpload(mockFile, userId);
+
+      expect(result.duplicate).toBe(true);
+      // Should not expose full book metadata
+      expect(result.book).toEqual({ id: 'existing-book' });
+      expect((result.book as any).title).toBeUndefined();
     });
   });
 
