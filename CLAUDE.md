@@ -87,7 +87,7 @@ pnpm turbo build
 ## ტექნოლოგიური სტეკი
 - **Monorepo:** pnpm workspaces + Turborepo
 - **Backend:** NestJS + Prisma + PostgreSQL
-- **Frontend:** Next.js 15 + React 19 + SCSS
+- **Frontend:** Next.js 15 + React 19 + SCSS + next-intl (i18n)
 - **Auth:** JWT + Passport.js + Google OAuth (google-auth-library) + OTP (Redis)
 - **Database:** PostgreSQL 16 (Docker) + Redis 7 (Docker)
 - **Testing:** Vitest (400+ tests)
@@ -102,6 +102,13 @@ pnpm turbo build
 - ტესტებში direct instantiation (NestJS DI-ს გვერდის ავლა)
 - vi.fn() და vi.mock() მოკინგისთვის
 - ქართული unicode სიმბოლოების მხარდაჭერა
+
+## i18n (ინტერნაციონალიზაცია)
+- **ბიბლიოთეკა:** next-intl
+- **ენები:** ქართული (ka, default), ინგლისური (en)
+- **თარგმანის ფაილები:** `apps/web/messages/{ka,en}.json`
+- **Routing:** `[locale]` dynamic segment (`/ka/search`, `/en/search`)
+- **ენის გადართვა:** LanguageSwitcher კომპონენტი Navbar-ში
 
 ## ბრანჩები
 - **main** — სტაბილური ვერსია

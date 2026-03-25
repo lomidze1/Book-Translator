@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import styles from './page.module.scss';
+import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
+import styles from '../../search/page.module.scss';
 
 interface ExternalBook {
   source: 'google' | 'openlibrary';
@@ -37,6 +38,7 @@ interface SearchResult {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function SearchPage() {
+  const t = useTranslations('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,7 +62,6 @@ export default function SearchPage() {
     }
   }, []);
 
-  // Debounced search
   useEffect(() => {
     if (query.length < 2) {
       setResults(null);
@@ -75,16 +76,14 @@ export default function SearchPage() {
   return (
     <div className={styles.main}>
       <div className={styles.container}>
-          <h1 className={styles.title}>წიგნის ძებნა</h1>
-          <p className={styles.subtitle}>
-            მოძებნე ინგლისურენოვანი წიგნი სახელით, ავტორით ან ISBN-ით
-          </p>
+          <h1 className={styles.title}>{t('title')}</h1>
+          <p className={styles.subtitle}>{t('subtitle')}</p>
 
           <div className={styles.searchBox}>
             <input
               type="text"
               className={styles.searchInput}
-              placeholder="მაგ: Clean Code, Robert Martin, 978-0132350884..."
+              placeholder={t('placeholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -94,14 +93,13 @@ export default function SearchPage() {
               onClick={() => search(query)}
               disabled={loading || query.length < 2}
             >
-              {loading ? 'ძებნა...' : 'ძებნა'}
+              {loading ? t('searching') : t('button')}
             </button>
           </div>
 
-          {/* Database results */}
           {results?.database && results.database.length > 0 && (
             <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>ჩვენს ბაზაში</h2>
+              <h2 className={styles.sectionTitle}>{t('section_database')}</h2>
               <div className={styles.grid}>
                 {results.database.map((book) => (
                   <Link href={`/books/${book.id}`} key={book.id} className={styles.card}>
@@ -116,7 +114,7 @@ export default function SearchPage() {
                       <h3 className={styles.cardTitle}>{book.title}</h3>
                       {book.author && <p className={styles.cardAuthor}>{book.author}</p>}
                       {book.translations.length > 0 && (
-                        <span className={styles.badgeTranslated}>ქართული თარგმანი ✓</span>
+                        <span className={styles.badgeTranslated}>{t('badge_translated')}</span>
                       )}
                     </div>
                   </Link>
@@ -125,11 +123,10 @@ export default function SearchPage() {
             </section>
           )}
 
-          {/* External results */}
           {results?.external && results.external.length > 0 && (
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>
-                ნაპოვნია ონლაინ ({results.external.length})
+                {t('section_online', { count: results.external.length })}
               </h2>
               <div className={styles.grid}>
                 {results.external.map((book, i) => (
@@ -150,7 +147,7 @@ export default function SearchPage() {
                         </p>
                       )}
                       <div className={styles.cardMeta}>
-                        {book.pageCount && <span>{book.pageCount} გვ.</span>}
+                        {book.pageCount && <span>{book.pageCount} {t('pages_short')}</span>}
                         <span className={styles.source}>
                           {book.source === 'google' ? 'Google Books' : 'Open Library'}
                         </span>
@@ -160,9 +157,7 @@ export default function SearchPage() {
                           href={`/books/${book.databaseBookId}`}
                           className={styles.badgeInDb}
                         >
-                          {book.translationAvailable
-                            ? 'ქართული — 5₾'
-                            : 'ინგლისური — 1$'}
+                          {book.translationAvailable ? t('badge_georgian') : t('badge_english')}
                         </Link>
                       )}
                     </div>
@@ -172,10 +167,9 @@ export default function SearchPage() {
             </section>
           )}
 
-          {/* No results */}
           {searched && !loading && results?.total === 0 && (
             <div className={styles.noResults}>
-              <p>წიგნი ვერ მოიძებნა. სცადე სხვა საძიებო სიტყვა.</p>
+              <p>{t('no_results')}</p>
             </div>
           )}
       </div>

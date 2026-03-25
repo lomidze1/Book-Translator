@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import styles from './page.module.scss';
+import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
+import styles from '../../register/page.module.scss';
 
 export default function RegisterPage() {
+  const t = useTranslations('register');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +21,7 @@ export default function RegisterPage() {
     setSuccess('');
 
     if (password !== confirmPassword) {
-      setError('პაროლები არ ემთხვევა');
+      setError(t('error_password_mismatch'));
       return;
     }
 
@@ -35,13 +37,13 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || 'რეგისტრაცია ვერ მოხერხდა');
+        setError(data.message || t('error_default'));
         return;
       }
 
-      setSuccess('რეგისტრაცია წარმატებით დასრულდა! შეამოწმეთ ელ-ფოსტა.');
+      setSuccess(t('success'));
     } catch {
-      setError('სერვერთან კავშირი ვერ მოხერხდა');
+      setError(t('error_server'));
     } finally {
       setLoading(false);
     }
@@ -50,25 +52,25 @@ export default function RegisterPage() {
   return (
     <div className={styles.container}>
       <div className={styles.formCard}>
-        <h1 className={styles.title}>რეგისტრაცია</h1>
+        <h1 className={styles.title}>{t('title')}</h1>
 
         {error && <p className={styles.error}>{error}</p>}
         {success && <p className={styles.success}>{success}</p>}
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <label className={styles.label}>
-            სახელი
+            {t('name')}
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="თქვენი სახელი"
+              placeholder={t('name_placeholder')}
               className={styles.input}
             />
           </label>
 
           <label className={styles.label}>
-            ელ-ფოსტა
+            {t('email')}
             <input
               type="email"
               value={email}
@@ -80,12 +82,12 @@ export default function RegisterPage() {
           </label>
 
           <label className={styles.label}>
-            პაროლი
+            {t('password')}
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="მინიმუმ 8 სიმბოლო"
+              placeholder={t('password_placeholder')}
               required
               minLength={8}
               className={styles.input}
@@ -93,12 +95,12 @@ export default function RegisterPage() {
           </label>
 
           <label className={styles.label}>
-            პაროლის დადასტურება
+            {t('confirm_password')}
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="გაიმეორეთ პაროლი"
+              placeholder={t('confirm_placeholder')}
               required
               minLength={8}
               className={styles.input}
@@ -106,13 +108,13 @@ export default function RegisterPage() {
           </label>
 
           <button type="submit" disabled={loading} className={styles.submitBtn}>
-            {loading ? 'იტვირთება...' : 'რეგისტრაცია'}
+            {loading ? t('loading') : t('submit')}
           </button>
         </form>
 
         <p className={styles.switchLink}>
-          უკვე გაქვს ანგარიში?{' '}
-          <Link href="/login">შესვლა</Link>
+          {t('has_account')}{' '}
+          <Link href="/login">{t('login_link')}</Link>
         </p>
       </div>
     </div>

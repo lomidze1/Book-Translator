@@ -1,7 +1,13 @@
-import Link from 'next/link';
+'use client';
+
+import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
+import LanguageSwitcher from './LanguageSwitcher';
 import styles from './Navbar.module.scss';
 
 export default function Navbar() {
+  const t = useTranslations('navbar');
+
   return (
     <nav className={styles.navbar}>
       <div className={styles.container}>
@@ -10,16 +16,17 @@ export default function Navbar() {
         </Link>
         <div className={styles.links}>
           <Link href="/search" className={styles.navLink}>
-            ძებნა
+            {t('search')}
           </Link>
           <Link href="/upload" className={styles.navLink}>
-            ატვირთვა
+            {t('upload')}
           </Link>
+          <LanguageSwitcher />
           <Link href="/login" className={styles.loginBtn}>
-            შესვლა
+            {t('login')}
           </Link>
           <Link href="/register" className={styles.registerBtn}>
-            რეგისტრაცია
+            {t('register')}
           </Link>
         </div>
       </div>

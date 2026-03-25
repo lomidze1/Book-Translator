@@ -1,0 +1,31 @@
+.switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+
+  &:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &.active {
+    color: #fff;
+    font-weight: 600;
+  }
+}
+
+.divider {
+  color: #555;
+  font-size: 0.85rem;
+}

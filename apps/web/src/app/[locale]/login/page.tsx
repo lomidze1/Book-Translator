@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import styles from './page.module.scss';
+import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
+import styles from '../../login/page.module.scss';
 
 export default function LoginPage() {
+  const t = useTranslations('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -25,16 +27,15 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || 'შესვლა ვერ მოხერხდა');
+        setError(data.message || t('error_default'));
         return;
       }
 
-      // TODO: Store tokens and redirect
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       window.location.href = '/';
     } catch {
-      setError('სერვერთან კავშირი ვერ მოხერხდა');
+      setError(t('error_server'));
     } finally {
       setLoading(false);
     }
@@ -43,13 +44,13 @@ export default function LoginPage() {
   return (
     <div className={styles.container}>
       <div className={styles.formCard}>
-        <h1 className={styles.title}>შესვლა</h1>
+        <h1 className={styles.title}>{t('title')}</h1>
 
         {error && <p className={styles.error}>{error}</p>}
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <label className={styles.label}>
-            ელ-ფოსტა
+            {t('email')}
             <input
               type="email"
               value={email}
@@ -61,12 +62,12 @@ export default function LoginPage() {
           </label>
 
           <label className={styles.label}>
-            პაროლი
+            {t('password')}
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="პაროლი"
+              placeholder={t('password_placeholder')}
               required
               minLength={8}
               className={styles.input}
@@ -74,13 +75,13 @@ export default function LoginPage() {
           </label>
 
           <button type="submit" disabled={loading} className={styles.submitBtn}>
-            {loading ? 'იტვირთება...' : 'შესვლა'}
+            {loading ? t('loading') : t('submit')}
           </button>
         </form>
 
         <p className={styles.switchLink}>
-          არ გაქვს ანგარიში?{' '}
-          <Link href="/register">რეგისტრაცია</Link>
+          {t('no_account')}{' '}
+          <Link href="/register">{t('register_link')}</Link>
         </p>
       </div>
     </div>

@@ -79,6 +79,7 @@ book-translator/
 - Next.js 15 (App Router)
 - React 19
 - SCSS (Sass modules)
+- next-intl — i18n (ქართული + ინგლისური, `[locale]` routing)
 - React Query (TanStack Query) — სერვერის მონაცემების მართვა
 - Zustand — კლიენტის სტეიტის მართვა
 - Socket.io-client — რეალ-ტაიმ თარგმნის პროგრესი
