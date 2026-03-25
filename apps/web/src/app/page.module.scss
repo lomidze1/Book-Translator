@@ -25,12 +25,12 @@
 }
 
 .highlight {
-  color: $color-primary;
+  color: var(--primary);
 }
 
 .subtitle {
   font-size: 1.25rem;
-  color: $color-secondary;
+  color: var(--text-secondary);
   max-width: 640px;
   margin: 0 auto $spacing-lg;
   line-height: 1.6;
@@ -49,7 +49,7 @@
 
 .primaryBtn {
   padding: $spacing-sm + 4 $spacing-lg;
-  background: $color-primary;
+  background: var(--primary);
   color: #fff;
   border-radius: $radius-md;
   font-weight: 600;
@@ -57,21 +57,21 @@
   transition: background 0.2s;
 
   &:hover {
-    background: $color-primary-dark;
+    background: var(--primary-hover);
   }
 }
 
 .secondaryBtn {
   padding: $spacing-sm + 4 $spacing-lg;
-  border: 2px solid $color-border;
+  border: 2px solid var(--card-border);
   border-radius: $radius-md;
   font-weight: 600;
   font-size: 1.1rem;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, color 0.2s;
 
   &:hover {
-    border-color: $color-primary;
-    color: $color-primary;
+    border-color: var(--primary);
+    color: var(--primary);
   }
 }
 
@@ -99,8 +99,9 @@
 
 .card {
   padding: $spacing-lg;
-  border: 1px solid $color-border;
+  border: 1px solid var(--card-border);
   border-radius: $radius-lg;
+  background: var(--card-bg);
   transition: box-shadow 0.2s;
 
   h3 {
@@ -109,12 +110,12 @@
   }
 
   p {
-    color: $color-secondary;
+    color: var(--text-secondary);
     line-height: 1.5;
   }
 
   &:hover {
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 24px var(--shadow);
   }
 }
 
@@ -138,8 +139,9 @@
 .priceCard {
   text-align: center;
   padding: $spacing-xl $spacing-lg;
-  border: 2px solid $color-border;
+  border: 2px solid var(--card-border);
   border-radius: $radius-lg;
+  background: var(--card-bg);
 
   h3 {
     font-size: 1.125rem;
@@ -147,7 +149,7 @@
   }
 
   p {
-    color: $color-secondary;
+    color: var(--text-secondary);
     line-height: 1.5;
   }
 }
@@ -155,6 +157,6 @@
 .price {
   font-size: 2.5rem;
   font-weight: 800;
-  color: $color-primary;
+  color: var(--primary);
   margin: $spacing-sm 0;
 }

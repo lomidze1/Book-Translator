@@ -120,5 +120,9 @@
   "language_switcher": {
     "ka": "ქარ",
     "en": "Eng"
+  },
+  "theme": {
+    "light": "Light mode",
+    "dark": "Dark mode"
   }
 }

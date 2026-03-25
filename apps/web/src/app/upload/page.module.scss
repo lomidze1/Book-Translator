@@ -21,12 +21,12 @@
 
 .subtitle {
   text-align: center;
-  color: $color-secondary;
+  color: var(--text-secondary);
   margin-bottom: $spacing-xl;
 }
 
 .dropZone {
-  border: 2px dashed $color-border;
+  border: 2px dashed var(--card-border);
   border-radius: $radius-lg;
   padding: $spacing-xl;
   text-align: center;
@@ -35,20 +35,20 @@
   margin-bottom: $spacing-md;
 
   &:hover {
-    border-color: $color-primary;
-    background: #f0f9ff;
+    border-color: var(--primary);
+    background: var(--info-bg);
   }
 
   &.dragActive {
-    border-color: $color-primary;
-    background: #dbeafe;
+    border-color: var(--primary);
+    background: var(--info-border);
   }
 
   &.hasFile {
     cursor: default;
     border-style: solid;
-    border-color: $color-primary;
-    background: #f0f9ff;
+    border-color: var(--primary);
+    background: var(--info-bg);
   }
 }
 
@@ -72,14 +72,14 @@
   font-size: 1.1rem;
 
   span {
-    color: $color-primary;
+    color: var(--primary);
     font-weight: 600;
     text-decoration: underline;
   }
 }
 
 .dropHint {
-  color: $color-secondary;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
@@ -105,7 +105,7 @@
 }
 
 .fileSize {
-  color: $color-secondary;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
@@ -113,8 +113,8 @@
   width: 32px;
   height: 32px;
   border: none;
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--remove-bg);
+  color: var(--remove-text);
   border-radius: $radius-full;
   cursor: pointer;
   font-size: 1rem;
@@ -124,13 +124,13 @@
   transition: background 0.2s;
 
   &:hover {
-    background: #fecaca;
+    background: var(--remove-hover);
   }
 }
 
 .error {
-  color: #dc2626;
-  background: #fef2f2;
+  color: var(--error-text);
+  background: var(--error-bg);
   padding: $spacing-sm $spacing-md;
   border-radius: $radius-md;
   margin-bottom: $spacing-md;
@@ -152,14 +152,14 @@
 .progressBar {
   flex: 1;
   height: 10px;
-  background: #e2e8f0;
+  background: var(--progress-bg);
   border-radius: 5px;
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
-  background: $color-primary;
+  background: var(--primary);
   border-radius: 5px;
   transition: width 0.3s;
 }
@@ -168,7 +168,7 @@
   display: block;
   width: 100%;
   padding: 16px;
-  background: $color-primary;
+  background: var(--primary);
   color: white;
   border: none;
   border-radius: $radius-md;
@@ -179,26 +179,26 @@
   margin-bottom: $spacing-lg;
 
   &:hover {
-    background: $color-primary-dark;
+    background: var(--primary-hover);
   }
 }
 
 .success {
   text-align: center;
   padding: $spacing-lg;
-  background: #f0fdf4;
+  background: var(--success-bg);
   border-radius: $radius-md;
   margin-bottom: $spacing-lg;
 
   p {
-    color: #166534;
+    color: var(--success-text);
     font-weight: 500;
     font-size: 1.1rem;
   }
 }
 
 .infoBox {
-  background: #f8fafc;
+  background: var(--surface);
   border-radius: $radius-md;
   padding: $spacing-lg;
 
@@ -213,7 +213,7 @@
     display: flex;
     flex-direction: column;
     gap: $spacing-sm;
-    color: $color-secondary;
+    color: var(--text-secondary);
     line-height: 1.5;
   }
 }

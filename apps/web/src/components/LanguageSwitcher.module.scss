@@ -7,7 +7,7 @@
 .btn {
   background: none;
   border: none;
-  color: #999;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 0.85rem;
   padding: 4px 6px;
@@ -15,17 +15,17 @@
   transition: color 0.2s, background 0.2s;
 
   &:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--foreground);
+    background: var(--surface-hover);
   }
 
   &.active {
-    color: #fff;
+    color: var(--foreground);
     font-weight: 600;
   }
 }
 
 .divider {
-  color: #555;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }

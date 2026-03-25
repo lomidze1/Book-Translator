@@ -21,7 +21,7 @@
 
 .subtitle {
   text-align: center;
-  color: $color-secondary;
+  color: var(--text-secondary);
   margin-bottom: $spacing-lg;
 }
 
@@ -39,20 +39,22 @@
 .searchInput {
   flex: 1;
   padding: 14px 20px;
-  border: 2px solid $color-border;
+  border: 2px solid var(--input-border);
   border-radius: $radius-md;
   font-size: 1rem;
+  background: var(--input-bg);
+  color: var(--foreground);
   transition: border-color 0.2s;
 
   &:focus {
     outline: none;
-    border-color: $color-primary;
+    border-color: var(--primary);
   }
 }
 
 .searchButton {
   padding: 14px 32px;
-  background: $color-primary;
+  background: var(--primary);
   color: white;
   border: none;
   border-radius: $radius-md;
@@ -63,7 +65,7 @@
   white-space: nowrap;
 
   &:hover:not(:disabled) {
-    background: $color-primary-dark;
+    background: var(--primary-hover);
   }
 
   &:disabled {
@@ -81,7 +83,7 @@
   font-weight: 600;
   margin-bottom: $spacing-md;
   padding-bottom: $spacing-sm;
-  border-bottom: 2px solid $color-border;
+  border-bottom: 2px solid var(--card-border);
 }
 
 .grid {
@@ -97,23 +99,23 @@
 .card {
   display: flex;
   flex-direction: column;
-  border: 1px solid $color-border;
+  border: 1px solid var(--card-border);
   border-radius: $radius-md;
   overflow: hidden;
   transition: box-shadow 0.2s, transform 0.2s;
   text-decoration: none;
   color: inherit;
-  background: white;
+  background: var(--card-bg);
 
   &:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px var(--shadow);
     transform: translateY(-2px);
   }
 }
 
 .cardCover {
   height: 200px;
-  background: #f1f5f9;
+  background: var(--surface-hover);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -151,12 +153,12 @@
 
 .cardAuthor {
   font-size: 0.875rem;
-  color: $color-secondary;
+  color: var(--text-secondary);
 }
 
 .cardDesc {
   font-size: 0.8rem;
-  color: $color-secondary;
+  color: var(--text-secondary);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -168,20 +170,20 @@
   display: flex;
   gap: $spacing-sm;
   font-size: 0.75rem;
-  color: $color-secondary;
+  color: var(--text-secondary);
   margin-top: auto;
 }
 
 .source {
-  background: #f1f5f9;
+  background: var(--surface-hover);
   padding: 2px 8px;
   border-radius: $radius-sm;
 }
 
 .badgeTranslated {
   display: inline-block;
-  background: #dcfce7;
-  color: #166534;
+  background: var(--badge-green-bg);
+  color: var(--badge-green-text);
   padding: 4px 10px;
   border-radius: $radius-sm;
   font-size: 0.8rem;
@@ -191,8 +193,8 @@
 
 .badgeInDb {
   display: inline-block;
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--badge-blue-bg);
+  color: var(--badge-blue-text);
   padding: 6px 12px;
   border-radius: $radius-sm;
   font-size: 0.8rem;
@@ -203,13 +205,13 @@
   transition: background 0.2s;
 
   &:hover {
-    background: #bfdbfe;
+    background: var(--badge-blue-hover);
   }
 }
 
 .noResults {
   text-align: center;
   padding: $spacing-xl;
-  color: $color-secondary;
+  color: var(--text-secondary);
   font-size: 1.1rem;
 }

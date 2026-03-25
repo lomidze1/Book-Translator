@@ -6,7 +6,7 @@
   top: 0;
   z-index: 100;
   background: var(--background);
-  border-bottom: 1px solid $color-border;
+  border-bottom: 1px solid var(--card-border);
   padding: $spacing-md $spacing-lg;
 }
 
@@ -21,7 +21,7 @@
 .logo {
   font-size: 1.25rem;
   font-weight: 700;
-  color: $color-primary;
+  color: var(--primary);
 }
 
 .links {
@@ -34,11 +34,11 @@
   padding: $spacing-sm $spacing-md;
   border-radius: $radius-md;
   font-weight: 500;
-  color: $color-secondary;
+  color: var(--text-secondary);
   transition: color 0.2s;
 
   &:hover {
-    color: $color-primary;
+    color: var(--primary);
   }
 }
 
@@ -49,7 +49,7 @@
   transition: background 0.2s;
 
   &:hover {
-    background: rgba($color-primary, 0.08);
+    background: var(--surface-hover);
   }
 }
 
@@ -57,11 +57,11 @@
   padding: $spacing-sm $spacing-md;
   border-radius: $radius-md;
   font-weight: 500;
-  background: $color-primary;
+  background: var(--primary);
   color: #fff;
   transition: background 0.2s;
 
   &:hover {
-    background: $color-primary-dark;
+    background: var(--primary-hover);
   }
 }

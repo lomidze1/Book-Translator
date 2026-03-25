@@ -15,6 +15,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
+const themeScript = `(function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.setAttribute('data-theme','dark')}else{document.documentElement.setAttribute('data-theme','light')}})()`;
+
 export default async function LocaleLayout({
   children,
   params,
@@ -29,8 +31,11 @@ export default async function LocaleLayout({
   }
 
   return (
-    <html lang={locale}>
-      <body>
+    <html lang={locale} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body suppressHydrationWarning>
         <NextIntlClientProvider>
           <Navbar />
           <main>{children}</main>

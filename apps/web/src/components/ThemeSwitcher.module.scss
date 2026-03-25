@@ -1,0 +1,24 @@
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: none;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+
+  &:hover {
+    color: var(--foreground);
+    background: var(--surface-hover);
+    border-color: var(--text-muted);
+  }
+}
+
+.placeholder {
+  width: 34px;
+  height: 34px;
+}

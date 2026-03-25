@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import LanguageSwitcher from './LanguageSwitcher';
+import ThemeSwitcher from './ThemeSwitcher';
 import styles from './Navbar.module.scss';
 
 export default function Navbar() {
@@ -21,6 +22,7 @@ export default function Navbar() {
           <Link href="/upload" className={styles.navLink}>
             {t('upload')}
           </Link>
+          <ThemeSwitcher />
           <LanguageSwitcher />
           <Link href="/login" className={styles.loginBtn}>
             {t('login')}

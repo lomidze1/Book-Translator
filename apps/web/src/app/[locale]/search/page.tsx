@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import styles from '../../search/page.module.scss';
@@ -62,16 +62,11 @@ export default function SearchPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (query.length < 2) {
-      setResults(null);
-      setSearched(false);
-      return;
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      search(query);
     }
-
-    const timer = setTimeout(() => search(query), 500);
-    return () => clearTimeout(timer);
-  }, [query, search]);
+  };
 
   return (
     <div className={styles.main}>
@@ -86,6 +81,7 @@ export default function SearchPage() {
               placeholder={t('placeholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
               autoFocus
             />
             <button

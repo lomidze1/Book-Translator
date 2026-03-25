@@ -120,5 +120,9 @@
   "language_switcher": {
     "ka": "ქარ",
     "en": "Eng"
+  },
+  "theme": {
+    "light": "ნათელი რეჟიმი",
+    "dark": "მუქი რეჟიმი"
   }
 }
