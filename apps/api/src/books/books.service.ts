@@ -110,7 +110,7 @@ export class BooksService {
       const response = await fetch(url);
       if (!response.ok) return [];
 
-      const data = await response.json();
+      const data: any = await response.json();
       if (!data.items) return [];
 
       return data.items.map((item: any) => {
@@ -150,7 +150,7 @@ export class BooksService {
       const response = await fetch(url);
       if (!response.ok) return [];
 
-      const data = await response.json();
+      const data: any = await response.json();
       if (!data.docs) return [];
 
       return data.docs.map((doc: any) => {
