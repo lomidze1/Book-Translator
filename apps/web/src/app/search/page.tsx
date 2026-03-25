@@ -50,7 +50,7 @@ export default function SearchPage() {
     setSearched(true);
 
     try {
-      const res = await fetch(`${API_URL}/books/search?q=${encodeURIComponent(q)}&limit=20`);
+      const res = await fetch(`${API_URL}/api/books/search?q=${encodeURIComponent(q)}&limit=20`);
       if (res.ok) {
         const data: SearchResult = await res.json();
         setResults(data);

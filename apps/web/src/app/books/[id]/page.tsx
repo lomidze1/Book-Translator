@@ -45,7 +45,7 @@ export default function BookDetailsPage() {
   useEffect(() => {
     async function fetchBook() {
       try {
-        const res = await fetch(`${API_URL}/books/${params.id}`);
+        const res = await fetch(`${API_URL}/api/books/${params.id}`);
         if (!res.ok) throw new Error('Book not found');
         const data = await res.json();
         setBook(data);
