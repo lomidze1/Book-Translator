@@ -2,8 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback, DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
 import styles from './page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -191,11 +189,9 @@ export default function UploadPage() {
   };
 
   return (
-    <>
-      <Navbar />
-      <main className={styles.main}>
-        <div className={styles.container}>
-          <h1 className={styles.title}>წიგნის ატვირთვა</h1>
+    <div className={styles.main}>
+      <div className={styles.container}>
+        <h1 className={styles.title}>წიგნის ატვირთვა</h1>
           <p className={styles.subtitle}>
             ატვირთე ინგლისურენოვანი წიგნი და გადათარგმნე ქართულად AI-ით
           </p>
@@ -290,9 +286,7 @@ export default function UploadPage() {
               <li>წაიკითხე ნათარგმნი წიგნი ონლაინ რიდერში</li>
             </ol>
           </div>
-        </div>
-      </main>
-      <Footer />
-    </>
+      </div>
+    </div>
   );
 }

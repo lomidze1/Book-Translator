@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
 import styles from './page.module.scss';
 
 interface ExternalBook {
@@ -75,10 +73,8 @@ export default function SearchPage() {
   }, [query, search]);
 
   return (
-    <>
-      <Navbar />
-      <main className={styles.main}>
-        <div className={styles.container}>
+    <div className={styles.main}>
+      <div className={styles.container}>
           <h1 className={styles.title}>წიგნის ძებნა</h1>
           <p className={styles.subtitle}>
             მოძებნე ინგლისურენოვანი წიგნი სახელით, ავტორით ან ISBN-ით
@@ -182,9 +178,7 @@ export default function SearchPage() {
               <p>წიგნი ვერ მოიძებნა. სცადე სხვა საძიებო სიტყვა.</p>
             </div>
           )}
-        </div>
-      </main>
-      <Footer />
-    </>
+      </div>
+    </div>
   );
 }

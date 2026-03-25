@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import Navbar from '../../../components/Navbar';
-import Footer from '../../../components/Footer';
 import styles from './page.module.scss';
 
 interface BookDetails {
@@ -60,30 +58,22 @@ export default function BookDetailsPage() {
 
   if (loading) {
     return (
-      <>
-        <Navbar />
-        <main className={styles.main}>
-          <div className={styles.container}>
-            <p className={styles.loading}>იტვირთება...</p>
-          </div>
-        </main>
-        <Footer />
-      </>
+      <div className={styles.main}>
+        <div className={styles.container}>
+          <p className={styles.loading}>იტვირთება...</p>
+        </div>
+      </div>
     );
   }
 
   if (error || !book) {
     return (
-      <>
-        <Navbar />
-        <main className={styles.main}>
-          <div className={styles.container}>
-            <p className={styles.error}>{error || 'წიგნი ვერ მოიძებნა'}</p>
-            <Link href="/search" className={styles.backLink}>← ძებნაზე დაბრუნება</Link>
-          </div>
-        </main>
-        <Footer />
-      </>
+      <div className={styles.main}>
+        <div className={styles.container}>
+          <p className={styles.error}>{error || 'წიგნი ვერ მოიძებნა'}</p>
+          <Link href="/search" className={styles.backLink}>← ძებნაზე დაბრუნება</Link>
+        </div>
+      </div>
     );
   }
 
@@ -91,11 +81,9 @@ export default function BookDetailsPage() {
   const inProgressTranslation = book.translations.find(t => t.status === 'IN_PROGRESS');
 
   return (
-    <>
-      <Navbar />
-      <main className={styles.main}>
-        <div className={styles.container}>
-          <Link href="/search" className={styles.backLink}>← ძებნაზე დაბრუნება</Link>
+    <div className={styles.main}>
+      <div className={styles.container}>
+        <Link href="/search" className={styles.backLink}>← ძებნაზე დაბრუნება</Link>
 
           <div className={styles.bookLayout}>
             {/* Cover */}
@@ -191,8 +179,7 @@ export default function BookDetailsPage() {
             </div>
           </div>
         </div>
-      </main>
-      <Footer />
-    </>
+      </div>
+    </div>
   );
 }
