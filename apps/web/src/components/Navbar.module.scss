@@ -65,3 +65,33 @@
     background: var(--primary-hover);
   }
 }
+
+.profileBtn {
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+  font-weight: 500;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--primary);
+    color: #fff;
+  }
+}
+
+.logoutBtn {
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+  font-weight: 500;
+  background: none;
+  border: 1px solid var(--card-border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: var(--error-text);
+    color: var(--error-text);
+  }
+}

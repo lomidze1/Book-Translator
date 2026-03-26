@@ -7,7 +7,9 @@
     "search": "Search",
     "upload": "Upload",
     "login": "Login",
-    "register": "Register"
+    "register": "Register",
+    "profile": "Profile",
+    "logout": "Logout"
   },
   "footer": {
     "copyright": "© {year} Book Translator. All rights reserved."
@@ -43,6 +45,7 @@
     "loading": "Loading...",
     "error_default": "Login failed",
     "error_server": "Could not connect to server",
+    "forgot_password": "Forgot password?",
     "no_account": "Don't have an account?",
     "register_link": "Register"
   },
@@ -124,6 +127,43 @@
     "chapters": "Chapters ({count})",
     "chapter": "Chapter {number}",
     "words": "{count} words"
+  },
+  "forgot_password": {
+    "title": "Reset Password",
+    "subtitle": "Enter your email and we'll send you a reset link",
+    "email": "Email",
+    "submit": "Send Reset Link",
+    "loading": "Sending...",
+    "success": "Password reset link has been sent to your email. Check your inbox.",
+    "error_default": "Request failed",
+    "error_server": "Could not connect to server",
+    "error_rate_limit": "Too many requests. Please try again later.",
+    "back_to_login": "Back to Login"
+  },
+  "reset_password": {
+    "title": "New Password",
+    "subtitle": "Enter your new password",
+    "password": "New Password",
+    "password_placeholder": "Minimum 8 characters",
+    "confirm_password": "Confirm Password",
+    "confirm_placeholder": "Repeat password",
+    "submit": "Change Password",
+    "loading": "Changing...",
+    "success": "Password changed successfully! Redirecting to login...",
+    "error_default": "Password change failed",
+    "error_server": "Could not connect to server",
+    "error_invalid_token": "Link is invalid or expired",
+    "error_password_mismatch": "Passwords do not match",
+    "error_password_min": "Minimum 8 characters",
+    "error_password_strength": "At least 1 uppercase letter and 1 number"
+  },
+  "verify_email": {
+    "title": "Email Verification",
+    "verifying": "Verifying...",
+    "success": "Email verified successfully!",
+    "already_verified": "Email is already verified.",
+    "error_invalid_token": "Link is invalid or expired.",
+    "go_to_login": "Go to Login"
   },
   "language_switcher": {
     "ka": "ქარ",

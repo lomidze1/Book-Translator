@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
+import { useAuth } from '@/context/AuthContext';
 import styles from '../../login/page.module.scss';
 
 export default function LoginPage() {
   const t = useTranslations('login');
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -32,8 +34,7 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      login(data.accessToken, data.refreshToken, data.user);
       window.location.href = '/';
     } catch {
       setError(t('error_server'));
@@ -100,6 +101,10 @@ export default function LoginPage() {
             {loading ? t('loading') : t('submit')}
           </button>
         </form>
+
+        <p className={styles.forgotLink}>
+          <Link href="/forgot-password">{t('forgot_password')}</Link>
+        </p>
 
         <p className={styles.switchLink}>
           {t('no_account')}{' '}

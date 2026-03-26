@@ -113,6 +113,20 @@
   }
 }
 
+.forgotLink {
+  text-align: right;
+  margin-top: $spacing-sm;
+  font-size: 0.825rem;
+
+  a {
+    color: var(--primary);
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
 .switchLink {
   text-align: center;
   margin-top: $spacing-lg;
