@@ -2,8 +2,10 @@ import { Injectable, ConflictException, UnauthorizedException, BadRequestExcepti
 import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { EmailService } from '../email/email.service';
 import { RegisterDto, LoginDto, GoogleAuthDto, SendOtpDto, VerifyOtpDto } from './dto';
 
 export interface AuthTokens {
@@ -27,6 +29,12 @@ const OTP_TTL_SECONDS = 300; // 5 minutes
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_RATE_LIMIT_SECONDS = 60; // 1 request per minute per phone
 
+// Password reset constants
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const FORGOT_PASSWORD_RATE_LIMIT_SECONDS = 900; // 15 minutes
+const FORGOT_PASSWORD_MAX_REQUESTS = 3;
+
 @Injectable()
 export class AuthService {
   private googleClient: OAuth2Client;
@@ -35,6 +43,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly redis: RedisService,
+    private readonly emailService: EmailService,
   ) {
     this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
   }
@@ -62,7 +71,23 @@ export class AuthService {
       },
     });
 
-    // TODO: Send verification email
+    // Send verification email
+    try {
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerificationToken: hashedToken,
+          emailVerificationExpires: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+        },
+      });
+
+      await this.emailService.sendEmailVerification(dto.email, verificationToken, dto.name);
+    } catch {
+      // Email sending failure should not block registration
+    }
 
     return {
       message: 'Verification email sent',
@@ -257,6 +282,142 @@ export class AuthService {
         avatar: user.avatar,
       },
     };
+  }
+
+  // ========================
+  // Password Reset
+  // ========================
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    // Rate limiting
+    const rateLimitKey = `password-reset:rate:${email.toLowerCase()}`;
+    const rateLimitCount = await this.redis.incr(rateLimitKey);
+    if (rateLimitCount === 1) {
+      await this.redis.expire(rateLimitKey, FORGOT_PASSWORD_RATE_LIMIT_SECONDS);
+    }
+    if (rateLimitCount > FORGOT_PASSWORD_MAX_REQUESTS) {
+      throw new BadRequestException('Too many requests. Please try again later.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    // Always return success to not reveal if email exists
+    if (!user) {
+      return { message: 'Reset link sent to email' };
+    }
+
+    // Don't allow reset for OAuth-only users (no password)
+    if (!user.passwordHash) {
+      return { message: 'Reset link sent to email' };
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+      },
+    });
+
+    await this.emailService.sendPasswordResetEmail(user.email!, resetToken, user.name ?? undefined);
+
+    return { message: 'Reset link sent to email' };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    return { message: 'Password updated successfully' };
+  }
+
+  // ========================
+  // Email Verification
+  // ========================
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+
+    if (user.emailVerified) {
+      return { message: 'Email already verified' };
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: new Date(),
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+
+    return { message: 'Email verified successfully' };
+  }
+
+  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!user) {
+      return { message: 'Verification email sent' };
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('Email is already verified');
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+      },
+    });
+
+    await this.emailService.sendEmailVerification(user.email!, verificationToken, user.name ?? undefined);
+
+    return { message: 'Verification email sent' };
   }
 
   // ========================

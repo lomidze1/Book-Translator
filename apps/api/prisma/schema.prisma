@@ -21,6 +21,14 @@ model User {
   role          Role      @default(USER)
   locale        String    @default("ka")
 
+  // Email verification
+  emailVerificationToken   String?   @unique
+  emailVerificationExpires DateTime?
+
+  // Password reset
+  passwordResetToken       String?   @unique
+  passwordResetExpires     DateTime?
+
   // Relations
   accounts        Account[]
   books           UserBook[]

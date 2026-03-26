@@ -41,6 +41,31 @@
   font-size: 0.875rem;
 }
 
+.progressBar {
+  width: 100%;
+  height: 4px;
+  background: var(--progress-bg);
+  border-radius: 2px;
+  margin-bottom: $spacing-md;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--input-border-valid);
+  border-radius: 2px;
+  animation: progressSlide 5s linear forwards;
+}
+
+@keyframes progressSlide {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
 .form {
   display: flex;
   flex-direction: column;
@@ -91,6 +116,56 @@
     opacity: 0.6;
     cursor: not-allowed;
   }
+}
+
+.inputWrapper {
+  position: relative;
+}
+
+.inputError {
+  border-color: var(--input-border-error);
+
+  &:focus {
+    border-color: var(--input-border-error);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+  }
+}
+
+.inputValid {
+  border-color: var(--input-border-valid);
+
+  &:focus {
+    border-color: var(--input-border-valid);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+  }
+}
+
+.fieldError {
+  color: var(--error-text);
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.eyeButton {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    color: var(--foreground);
+  }
+}
+
+.inputWithIcon {
+  padding-right: 44px;
 }
 
 .switchLink {

@@ -96,19 +96,44 @@ OTP-ის ვერიფიკაცია.
 ```
 
 ### POST `/auth/forgot-password`
+პაროლის აღდგენის მოთხოვნა. Rate limit: 3 req / 15 min / email.
 ```json
 // Request
 { "email": "user@example.com" }
-// Response 200
+
+// Response 200 (ყოველთვის — email-ის არსებობა არ ამჟღავნდება)
 { "message": "Reset link sent to email" }
 ```
+**ლოგიკა:** crypto token → SHA-256 hash DB-ში → Resend-ით email გაგზავნა → 1 საათი ვადა.
 
 ### POST `/auth/reset-password`
+ახალი პაროლის დაყენება reset token-ით.
 ```json
 // Request
-{ "token": "reset_token", "newPassword": "newSecure123" }
+{
+  "token": "64-char hex token from email link",
+  "newPassword": "NewSecure123"
+}
+
 // Response 200
 { "message": "Password updated" }
+
+// Response 400 (expired)
+{ "statusCode": 400, "message": "Token expired, please request a new one" }
+
+// Response 400 (invalid)
+{ "statusCode": 400, "message": "Invalid token" }
+```
+**პაროლის მოთხოვნები:** min 8 სიმბოლო, uppercase + lowercase + ციფრი.
+
+### GET `/auth/verify-email?token={token}`
+Email-ის ვერიფიკაცია რეგისტრაციის შემდეგ.
+```json
+// Response 200
+{ "message": "Email verified successfully" }
+
+// Response 400 (expired — 24 საათის შემდეგ)
+{ "statusCode": 400, "message": "Verification link expired" }
 ```
 
 ### POST `/auth/logout`

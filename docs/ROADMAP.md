@@ -152,12 +152,26 @@
 
 ---
 
-## ფაზა 9: Email/Push ნოტიფიკაციები
-**მიზანი:** ნოტიფიკაციების სისტემა
+## ფაზა 2.5: Email სერვისი & პაროლის აღდგენა
+**მიზანი:** Resend ინტეგრაცია, პაროლის აღდგენა, email ვერიფიკაცია
+**დეტალური გეგმა:** [`docs/PASSWORD-RESET.md`](./PASSWORD-RESET.md)
 
 ### ამოცანები:
-- [ ] Email სერვისის ინტეგრაცია (Resend/SendGrid)
-- [ ] Email templates (რეგისტრაცია, პაროლის აღდგენა, თარგმნა დასრულდა)
+- [ ] Resend ინტეგრაცია (EmailModule + EmailService)
+- [ ] Prisma schema — password reset & email verification ველები + მიგრაცია
+- [ ] პაროლის აღდგენა (forgot-password + reset-password endpoints)
+- [ ] Email ვერიფიკაცია (verify-email endpoint + register() განახლება)
+- [ ] HTML email ტემპლეიტები (ქართული + ინგლისური)
+- [ ] Frontend გვერდები: forgot-password, reset-password, verify-email
+- [ ] ტესტები (unit + integration)
+
+---
+
+## ფაზა 9: Push ნოტიფიკაციები & დამატებითი Email-ები
+**მიზანი:** ნოტიფიკაციების სისტემის გაფართოება
+
+### ამოცანები:
+- [ ] დამატებითი email templates (თარგმნა დასრულდა, გადახდის ქვითარი)
 - [ ] Push notifications სერვისი
 - [ ] In-app ნოტიფიკაციები
 

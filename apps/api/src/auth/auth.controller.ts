@@ -1,6 +1,9 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto, GoogleAuthDto, SendOtpDto, VerifyOtpDto } from './dto';
+import {
+  RegisterDto, LoginDto, RefreshTokenDto, GoogleAuthDto,
+  SendOtpDto, VerifyOtpDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto,
+} from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -39,5 +42,28 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
+  }
+
+  @Get('verify-email')
+  async verifyEmail(@Query() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@Body() dto: ForgotPasswordDto) {
+    return this.authService.resendVerificationEmail(dto.email);
   }
 }

@@ -28,6 +28,8 @@
   --remove-bg: #fee2e2;
   --remove-hover: #fecaca;
   --remove-text: #dc2626;
+  --input-border-error: #dc2626;
+  --input-border-valid: #16a34a;
   color-scheme: light;
 }
 
@@ -61,6 +63,8 @@
   --remove-bg: #450a0a;
   --remove-hover: #7f1d1d;
   --remove-text: #f87171;
+  --input-border-error: #f87171;
+  --input-border-valid: #4ade80;
   color-scheme: dark;
 }
 

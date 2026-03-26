@@ -24,7 +24,7 @@ Book-Translator/
 ├── packages/
 │   ├── config/           # ESLint, Prettier, TSConfig
 │   └── shared/           # Shared types & interfaces
-├── docs/                 # დოკუმენტაცია (7 ფაილი)
+├── docs/                 # დოკუმენტაცია (8 ფაილი)
 ├── docker-compose.yml    # PostgreSQL 16 + Redis 7
 └── .claude/
     └── agents/
@@ -44,6 +44,9 @@ Book-Translator/
 
 ### Security Auditor (`security-auditor`)
 უსაფრთხოების აუდიტორი. Auth bypass, input sanitization, secrets, OWASP Top 10.
+
+### SEO Auditor (`seo-auditor`)
+SEO ოპტიმიზაციის მცველი. Meta tags, structured data (JSON-LD), hreflang, sitemap, robots.txt, Core Web Vitals, ქართულენოვანი SEO.
 
 ### Doc Sync (`doc-sync`)
 დოკუმენტაციის სინქრონიზატორი. კოდის ცვლილებები → docs/ განახლება.

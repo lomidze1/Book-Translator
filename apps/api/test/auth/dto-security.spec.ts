@@ -18,28 +18,32 @@ describe('DTO Security & Edge Case Validation', () => {
       const dto = plainToInstance(RegisterDto, {
         email: "'; DROP TABLE users; --",
         password: 'securePassword123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('email');
+      const emailError = errors.find((e) => e.property === 'email');
+      expect(emailError).toBeDefined();
     });
 
-    it('should accept SQL injection in name (no SQL filtering on name)', async () => {
+    it('should reject SQL injection in name (name only allows letters and spaces)', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 'securePassword123',
         name: "'; DROP TABLE users; --",
       });
       const errors = await validate(dto);
-      // Name is just a string with max length, SQL injection strings are valid strings
-      // Protection should be at the ORM level (Prisma parameterized queries)
-      expect(errors.length).toBe(0);
+      // Name now has @Matches(/^[\p{L}\s]+$/u) — SQL injection chars are rejected
+      expect(errors.length).toBeGreaterThan(0);
+      const nameError = errors.find((e) => e.property === 'name');
+      expect(nameError).toBeDefined();
     });
 
     it('should accept SQL injection in password (password is just a string)', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
-        password: "' OR '1'='1'; DROP TABLE users;",
+        password: "' OR '1'='1'; DROP TABLE users;A1",
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
@@ -50,21 +54,24 @@ describe('DTO Security & Edge Case Validation', () => {
   // XSS Payloads
   // ============================================================
   describe('XSS Payload Handling', () => {
-    it('should accept XSS in name field (validation only checks type/length)', async () => {
+    it('should reject XSS in name field (name only allows letters and spaces)', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 'securePassword123',
         name: '<script>alert("XSS")</script>',
       });
       const errors = await validate(dto);
-      // XSS prevention should be handled at output encoding level
-      expect(errors.length).toBe(0);
+      // Name now has @Matches(/^[\p{L}\s]+$/u) — XSS chars are rejected
+      expect(errors.length).toBeGreaterThan(0);
+      const nameError = errors.find((e) => e.property === 'name');
+      expect(nameError).toBeDefined();
     });
 
     it('should reject XSS in email because it fails email format', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: '<script>alert("XSS")</script>',
         password: 'securePassword123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -88,7 +95,8 @@ describe('DTO Security & Edge Case Validation', () => {
       it('should pass with exactly 8 character password (minimum)', async () => {
         const dto = plainToInstance(RegisterDto, {
           email: 'test@example.com',
-          password: '12345678',
+          password: 'Abcdefg1',
+          name: 'Test User',
         });
         const errors = await validate(dto);
         expect(errors.length).toBe(0);
@@ -97,7 +105,8 @@ describe('DTO Security & Edge Case Validation', () => {
       it('should fail with 7 character password (below minimum)', async () => {
         const dto = plainToInstance(RegisterDto, {
           email: 'test@example.com',
-          password: '1234567',
+          password: 'Abcde1z',
+          name: 'Test User',
         });
         const errors = await validate(dto);
         expect(errors.length).toBeGreaterThan(0);
@@ -106,7 +115,8 @@ describe('DTO Security & Edge Case Validation', () => {
       it('should pass with exactly 128 character password (maximum)', async () => {
         const dto = plainToInstance(RegisterDto, {
           email: 'test@example.com',
-          password: 'a'.repeat(128),
+          password: 'A1' + 'a'.repeat(126),
+          name: 'Test User',
         });
         const errors = await validate(dto);
         expect(errors.length).toBe(0);
@@ -115,40 +125,51 @@ describe('DTO Security & Edge Case Validation', () => {
       it('should fail with 129 character password (above maximum)', async () => {
         const dto = plainToInstance(RegisterDto, {
           email: 'test@example.com',
-          password: 'a'.repeat(129),
+          password: 'A1' + 'a'.repeat(127),
+          name: 'Test User',
         });
         const errors = await validate(dto);
         expect(errors.length).toBeGreaterThan(0);
       });
 
-      it('should pass with exactly 100 character name (maximum)', async () => {
+      it('should pass with exactly 50 character name (maximum)', async () => {
         const dto = plainToInstance(RegisterDto, {
           email: 'test@example.com',
-          password: 'password123',
-          name: 'ა'.repeat(100),
+          password: 'securePassword123',
+          name: 'ა'.repeat(50),
         });
         const errors = await validate(dto);
         expect(errors.length).toBe(0);
       });
 
-      it('should fail with 101 character name (above maximum)', async () => {
+      it('should fail with 51 character name (above maximum)', async () => {
         const dto = plainToInstance(RegisterDto, {
           email: 'test@example.com',
-          password: 'password123',
-          name: 'ა'.repeat(101),
+          password: 'securePassword123',
+          name: 'ა'.repeat(51),
         });
         const errors = await validate(dto);
         expect(errors.length).toBeGreaterThan(0);
       });
 
-      it('should pass with single character name', async () => {
+      it('should pass with exactly 3 character name (minimum)', async () => {
         const dto = plainToInstance(RegisterDto, {
           email: 'test@example.com',
-          password: 'password123',
-          name: 'ა',
+          password: 'securePassword123',
+          name: 'ანა',
         });
         const errors = await validate(dto);
         expect(errors.length).toBe(0);
+      });
+
+      it('should fail with 2 character name (below minimum)', async () => {
+        const dto = plainToInstance(RegisterDto, {
+          email: 'test@example.com',
+          password: 'securePassword123',
+          name: 'ან',
+        });
+        const errors = await validate(dto);
+        expect(errors.length).toBeGreaterThan(0);
       });
     });
 
@@ -232,30 +253,60 @@ describe('DTO Security & Edge Case Validation', () => {
       expect(errors.length).toBe(0);
     });
 
-    it('should accept mixed Georgian and Latin in name', async () => {
+    it('should accept mixed Georgian and Latin in name (letters and spaces only)', async () => {
+      const dto = plainToInstance(RegisterDto, {
+        email: 'test@example.com',
+        password: 'securePassword123',
+        name: 'გიორგი George',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should reject parentheses in name (only letters and spaces allowed)', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 'securePassword123',
         name: 'გიორგი (George)',
       });
       const errors = await validate(dto);
-      expect(errors.length).toBe(0);
+      expect(errors.length).toBeGreaterThan(0);
+      const nameError = errors.find((e) => e.property === 'name');
+      expect(nameError).toBeDefined();
     });
 
-    it('should accept emoji in name', async () => {
+    it('should reject emoji in name (only letters and spaces allowed)', async () => {
       const dto = plainToInstance(RegisterDto, {
+        email: 'test@example.com',
+        password: 'securePassword123',
+        name: 'Test User',
+      });
+      const dtoEmoji = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 'securePassword123',
         name: '😀 Test User',
       });
-      const errors = await validate(dto);
-      expect(errors.length).toBe(0);
+      const errors = await validate(dtoEmoji);
+      // Emoji are not \p{L} (letters), so they fail the Matches regex
+      expect(errors.length).toBeGreaterThan(0);
     });
 
-    it('should accept Unicode password', async () => {
+    it('should reject Unicode password without uppercase and digit', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 'პაროლი123456',
+        name: 'Test User',
+      });
+      const errors = await validate(dto);
+      // Password requires at least 1 uppercase letter and 1 digit
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('should accept Unicode password with uppercase and digit', async () => {
+      const dto = plainToInstance(RegisterDto, {
+        email: 'test@example.com',
+        password: 'პაროლიA123456',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
@@ -270,6 +321,7 @@ describe('DTO Security & Edge Case Validation', () => {
       const dto = plainToInstance(RegisterDto, {
         email: 12345,
         password: 'securePassword123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -279,6 +331,7 @@ describe('DTO Security & Edge Case Validation', () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 12345678,
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -379,20 +432,22 @@ describe('DTO Security & Edge Case Validation', () => {
     it('should fail RegisterDto with whitespace-only email', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: '   ',
-        password: 'password123',
+        password: 'securePassword123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
     });
 
-    it('should handle whitespace-only password (8+ spaces pass MinLength)', async () => {
+    it('should fail whitespace-only password (missing uppercase and digit)', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: '        ', // 8 spaces
+        name: 'Test User',
       });
       const errors = await validate(dto);
-      // MinLength(8) passes for 8 spaces since it's length-based
-      expect(errors.length).toBe(0);
+      // Password requires at least 1 uppercase letter and 1 digit
+      expect(errors.length).toBeGreaterThan(0);
     });
 
     it('should handle empty string refreshToken', async () => {
@@ -433,7 +488,8 @@ describe('DTO Security & Edge Case Validation', () => {
     it('should accept standard email', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'user@example.com',
-        password: 'password123',
+        password: 'Password123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
@@ -442,7 +498,8 @@ describe('DTO Security & Edge Case Validation', () => {
     it('should accept email with subdomain', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'user@mail.example.com',
-        password: 'password123',
+        password: 'Password123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
@@ -451,7 +508,8 @@ describe('DTO Security & Edge Case Validation', () => {
     it('should accept email with plus tag', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'user+tag@example.com',
-        password: 'password123',
+        password: 'Password123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
@@ -460,7 +518,8 @@ describe('DTO Security & Edge Case Validation', () => {
     it('should reject email without domain', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'user@',
-        password: 'password123',
+        password: 'Password123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -469,7 +528,8 @@ describe('DTO Security & Edge Case Validation', () => {
     it('should reject email without local part', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: '@example.com',
-        password: 'password123',
+        password: 'Password123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -478,7 +538,8 @@ describe('DTO Security & Edge Case Validation', () => {
     it('should reject email without @ symbol', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'userexample.com',
-        password: 'password123',
+        password: 'Password123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);

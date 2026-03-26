@@ -62,7 +62,15 @@
     "error_server": "Could not connect to server",
     "success": "Registration successful! Please check your email.",
     "has_account": "Already have an account?",
-    "login_link": "Login"
+    "login_link": "Login",
+    "error_name_required": "Name is required",
+    "error_name_min": "Minimum 3 characters",
+    "error_name_letters": "Only letters and spaces",
+    "error_email_required": "Email is required",
+    "error_email_format": "Invalid email format",
+    "error_password_min": "Minimum 8 characters",
+    "error_password_strength": "At least 1 uppercase letter and 1 number",
+    "error_confirm_required": "Password confirmation is required"
   },
   "search": {
     "title": "Book Search",

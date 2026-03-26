@@ -4,3 +4,6 @@ export { RefreshTokenDto } from './refresh-token.dto';
 export { GoogleAuthDto } from './google-auth.dto';
 export { SendOtpDto } from './send-otp.dto';
 export { VerifyOtpDto } from './verify-otp.dto';
+export { ForgotPasswordDto } from './forgot-password.dto';
+export { ResetPasswordDto } from './reset-password.dto';
+export { VerifyEmailDto } from './verify-email.dto';

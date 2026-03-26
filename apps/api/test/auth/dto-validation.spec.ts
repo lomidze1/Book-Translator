@@ -23,19 +23,22 @@ describe('Auth DTOs Validation', () => {
       expect(errors.length).toBe(0);
     });
 
-    it('should pass validation without optional name', async () => {
+    it('should fail validation without required name', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 'securePassword123',
       });
       const errors = await validate(dto);
-      expect(errors.length).toBe(0);
+      expect(errors.length).toBeGreaterThan(0);
+      const nameError = errors.find((e) => e.property === 'name');
+      expect(nameError).toBeDefined();
     });
 
     it('should fail with invalid email', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'not-an-email',
         password: 'securePassword123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -46,6 +49,7 @@ describe('Auth DTOs Validation', () => {
       const dto = plainToInstance(RegisterDto, {
         email: '',
         password: 'securePassword123',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -55,6 +59,7 @@ describe('Auth DTOs Validation', () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 'short',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -64,17 +69,18 @@ describe('Auth DTOs Validation', () => {
     it('should fail with password longer than 128 characters', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
-        password: 'a'.repeat(129),
+        password: 'A'.repeat(128) + '1',
+        name: 'Test User',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
     });
 
-    it('should fail with name longer than 100 characters', async () => {
+    it('should fail with name longer than 50 characters', async () => {
       const dto = plainToInstance(RegisterDto, {
         email: 'test@example.com',
         password: 'securePassword123',
-        name: 'a'.repeat(101),
+        name: 'ა'.repeat(51),
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
