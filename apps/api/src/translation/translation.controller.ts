@@ -20,12 +20,12 @@ export class TranslationController {
   }
 
   @Get(':id')
-  async getTranslation(@Param('id') id: string) {
-    return this.translationService.getTranslation(id);
+  async getTranslation(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.translationService.getTranslation(id, userId);
   }
 
   @Get('book/:bookId')
-  async getByBook(@Param('bookId') bookId: string) {
-    return this.translationService.getTranslationsByBook(bookId);
+  async getByBook(@Param('bookId') bookId: string, @CurrentUser('id') userId: string) {
+    return this.translationService.getTranslationsByBook(bookId, userId);
   }
 }

@@ -1,19 +1,19 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Worker, Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ClaudeService } from './claude.service';
 import { TranslationService } from './translation.service';
+import { TRANSLATION_QUEUE, getRedisConnection } from './translation.constants';
 
 interface TranslationJobData {
   translationId: string;
   bookId: string;
 }
 
-const TRANSLATION_QUEUE = 'translation';
-
 @Injectable()
 export class TranslationProcessor implements OnModuleInit {
+  private readonly logger = new Logger(TranslationProcessor.name);
   private worker: Worker | null = null;
 
   constructor(
@@ -31,23 +31,20 @@ export class TranslationProcessor implements OnModuleInit {
           await this.processTranslation(job);
         },
         {
-          connection: {
-            host: process.env.REDIS_HOST || 'localhost',
-            port: parseInt(process.env.REDIS_PORT || '6379'),
-          },
-          concurrency: 1, // One translation at a time
+          connection: getRedisConnection(),
+          concurrency: 1,
         },
       );
 
       this.worker.on('failed', (job, err) => {
-        console.error(`Translation job ${job?.id} failed:`, err.message);
+        this.logger.error(`Translation job ${job?.id} failed: ${err.message}`);
       });
 
       this.worker.on('completed', (job) => {
-        console.log(`Translation job ${job.id} completed`);
+        this.logger.log(`Translation job ${job.id} completed`);
       });
     } catch {
-      console.warn('⚠️  Translation worker not started — Redis may be unavailable');
+      this.logger.warn('Translation worker not started — Redis may be unavailable');
     }
   }
 
@@ -120,19 +117,19 @@ export class TranslationProcessor implements OnModuleInit {
         // Update total tokens
         await this.prisma.translation.update({
           where: { id: translationId },
-          data: { totalTokensUsed: totalTokens, aiModel: this.claude['model'] },
+          data: { totalTokensUsed: totalTokens, aiModel: this.claude.getModel() },
         });
 
         // Update job progress for BullMQ
         await job.updateProgress(progress);
       } catch (error) {
-        console.error(`Failed to translate chapter ${chapter.number}:`, error);
+        this.logger.error(`Failed to translate chapter ${chapter.number}: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
         await this.prisma.translation.update({
           where: { id: translationId },
           data: {
             status: 'FAILED',
-            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            errorMessage: error instanceof Error ? error.message : 'Translation failed',
           },
         });
 

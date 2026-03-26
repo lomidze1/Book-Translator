@@ -1,6 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import pdfParseModule from 'pdf-parse';
 import * as mammoth from 'mammoth';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import * as crypto from 'crypto';
 
 export interface ParsedChapter {
   number: number;
@@ -14,9 +18,15 @@ export interface ParsedBook {
   totalWordCount: number;
 }
 
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
 @Injectable()
 export class ParsingService {
   async parse(buffer: Buffer, format: string): Promise<ParsedBook> {
+    if (buffer.length > MAX_FILE_SIZE) {
+      throw new BadRequestException('File size exceeds maximum limit (50MB)');
+    }
+
     switch (format.toUpperCase()) {
       case 'PDF':
         return this.parsePdf(buffer);
@@ -43,75 +53,77 @@ export class ParsingService {
   }
 
   private async parseEpub(buffer: Buffer): Promise<ParsedBook> {
-    // Dynamic import for epub2 (ESM module)
     const EPub = (await import('epub2')).default;
 
-    return new Promise((resolve, reject) => {
-      // epub2 requires a file path, write to temp file
-      const fs = require('fs');
-      const os = require('os');
-      const path = require('path');
-      const tmpFile = path.join(os.tmpdir(), `epub-${Date.now()}.epub`);
-      fs.writeFileSync(tmpFile, buffer);
+    // Use secure random filename in temp directory
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'epub-'));
+    const tmpFile = path.join(tmpDir, `${crypto.randomUUID()}.epub`);
 
-      const epub = new EPub(tmpFile);
+    fs.writeFileSync(tmpFile, buffer);
 
-      epub.on('end', async () => {
-        try {
-          const chapters: ParsedChapter[] = [];
-          let chapterNum = 0;
+    try {
+      return await new Promise<ParsedBook>((resolve, reject) => {
+        const epub = new EPub(tmpFile);
 
-          for (const item of epub.flow) {
-            try {
-              const chapterId = item.id as string;
-              if (!chapterId) continue;
-              const text = await new Promise<string>((res, rej) => {
-                epub.getChapter(chapterId, (err: Error, data?: string) => {
-                  if (err) rej(err);
-                  else res(data || '');
+        epub.on('end', async () => {
+          try {
+            const chapters: ParsedChapter[] = [];
+            let chapterNum = 0;
+
+            for (const item of epub.flow) {
+              try {
+                const chapterId = item.id as string;
+                if (!chapterId) continue;
+                const text = await new Promise<string>((res, rej) => {
+                  epub.getChapter(chapterId, (err: Error, data?: string) => {
+                    if (err) rej(err);
+                    else res(data || '');
+                  });
                 });
-              });
 
-              // Strip HTML tags
-              const plainText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-              if (plainText.length < 50) continue; // Skip TOC, copyright pages
+                // Strip HTML tags
+                const plainText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                if (plainText.length < 50) continue;
 
-              chapterNum++;
-              chapters.push({
-                number: chapterNum,
-                title: item.title || null,
-                content: plainText,
-                wordCount: plainText.split(/\s+/).length,
-              });
-            } catch {
-              // Skip unreadable chapters
+                chapterNum++;
+                chapters.push({
+                  number: chapterNum,
+                  title: item.title || null,
+                  content: plainText,
+                  wordCount: plainText.split(/\s+/).length,
+                });
+              } catch {
+                // Skip unreadable chapters
+              }
             }
+
+            if (chapters.length === 0) {
+              reject(new BadRequestException('EPUB file contains no extractable chapters'));
+              return;
+            }
+
+            resolve({
+              chapters,
+              totalWordCount: chapters.reduce((sum, ch) => sum + ch.wordCount, 0),
+            });
+          } catch (err) {
+            reject(err);
           }
+        });
 
-          fs.unlinkSync(tmpFile);
+        epub.on('error', (err: Error) => {
+          reject(new BadRequestException(`Failed to parse EPUB: ${err.message}`));
+        });
 
-          if (chapters.length === 0) {
-            reject(new BadRequestException('EPUB file contains no extractable chapters'));
-            return;
-          }
-
-          resolve({
-            chapters,
-            totalWordCount: chapters.reduce((sum, ch) => sum + ch.wordCount, 0),
-          });
-        } catch (err) {
-          fs.unlinkSync(tmpFile);
-          reject(err);
-        }
+        epub.parse();
       });
-
-      epub.on('error', (err: Error) => {
-        try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-        reject(new BadRequestException(`Failed to parse EPUB: ${err.message}`));
-      });
-
-      epub.parse();
-    });
+    } finally {
+      // Always clean up temp file
+      try {
+        fs.unlinkSync(tmpFile);
+        fs.rmdirSync(tmpDir);
+      } catch { /* ignore cleanup errors */ }
+    }
   }
 
   private async parseDocx(buffer: Buffer): Promise<ParsedBook> {

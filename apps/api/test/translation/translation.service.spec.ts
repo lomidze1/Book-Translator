@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { TranslationService } from '../../src/translation/translation.service';
 
 // Mock BullMQ
@@ -30,6 +30,7 @@ describe('TranslationService', () => {
     chapter: {
       create: vi.fn(),
     },
+    $transaction: vi.fn(),
   };
 
   const mockS3 = {
@@ -53,6 +54,7 @@ describe('TranslationService', () => {
         id: 'book-1',
         title: 'Test',
         chapters: [{ id: 'ch-1' }],
+        userBooks: [{ userId: 'user-1' }],
       });
       mockPrisma.translation.findFirst.mockResolvedValue(null);
       mockPrisma.translation.create.mockResolvedValue({
@@ -83,10 +85,21 @@ describe('TranslationService', () => {
       await expect(service.createTranslation('no-book', 'user-1')).rejects.toThrow(NotFoundException);
     });
 
+    it('should throw ForbiddenException if user does not own the book', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue({
+        id: 'book-1',
+        chapters: [{ id: 'ch-1' }],
+        userBooks: [{ userId: 'other-user' }],
+      });
+
+      await expect(service.createTranslation('book-1', 'user-1')).rejects.toThrow(ForbiddenException);
+    });
+
     it('should throw BadRequestException if translation already exists', async () => {
       mockPrisma.book.findUnique.mockResolvedValue({
         id: 'book-1',
         chapters: [{ id: 'ch-1' }],
+        userBooks: [{ userId: 'user-1' }],
       });
       mockPrisma.translation.findFirst.mockResolvedValue({ id: 'existing-tr' });
 
@@ -97,6 +110,7 @@ describe('TranslationService', () => {
       mockPrisma.book.findUnique.mockResolvedValue({
         id: 'book-1',
         chapters: [{ id: 'ch-1' }],
+        userBooks: [{ userId: 'user-1' }],
       });
       mockPrisma.translation.findFirst.mockResolvedValue(null);
       mockPrisma.translation.create.mockResolvedValue({ id: 'tr-1' });
@@ -118,12 +132,12 @@ describe('TranslationService', () => {
         bookId: 'book-1',
         status: 'IN_PROGRESS',
         progress: 50,
-        book: { id: 'book-1', title: 'Test', author: 'Author' },
+        book: { id: 'book-1', title: 'Test', author: 'Author', userBooks: [{ userId: 'user-1' }] },
         translatedChapters: [],
       };
       mockPrisma.translation.findUnique.mockResolvedValue(mockTranslation);
 
-      const result = await service.getTranslation('tr-1');
+      const result = await service.getTranslation('tr-1', 'user-1');
       expect(result.id).toBe('tr-1');
       expect(result.book.title).toBe('Test');
     });
@@ -131,7 +145,48 @@ describe('TranslationService', () => {
     it('should throw NotFoundException if not found', async () => {
       mockPrisma.translation.findUnique.mockResolvedValue(null);
 
-      await expect(service.getTranslation('no-id')).rejects.toThrow(NotFoundException);
+      await expect(service.getTranslation('no-id', 'user-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if user does not own the translation', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        book: { id: 'book-1', title: 'Test', author: 'A', userBooks: [{ userId: 'other-user' }] },
+        translatedChapters: [],
+      });
+
+      await expect(service.getTranslation('tr-1', 'user-1')).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('getTranslationsByBook', () => {
+    it('should return all translations for a book the user owns', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue({
+        id: 'book-1',
+        userBooks: [{ userId: 'user-1' }],
+      });
+      mockPrisma.translation.findMany.mockResolvedValue([
+        { id: 'tr-1' },
+        { id: 'tr-2' },
+      ]);
+
+      const result = await service.getTranslationsByBook('book-1', 'user-1');
+      expect(result).toHaveLength(2);
+    });
+
+    it('should throw NotFoundException if book does not exist', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue(null);
+
+      await expect(service.getTranslationsByBook('no-book', 'user-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if user does not own the book', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue({
+        id: 'book-1',
+        userBooks: [{ userId: 'other-user' }],
+      });
+
+      await expect(service.getTranslationsByBook('book-1', 'user-1')).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -198,18 +253,6 @@ describe('TranslationService', () => {
           where: { book: { userBooks: { some: { userId: 'user-1' } } } },
         }),
       );
-    });
-  });
-
-  describe('getTranslationsByBook', () => {
-    it('should return all translations for a book', async () => {
-      mockPrisma.translation.findMany.mockResolvedValue([
-        { id: 'tr-1' },
-        { id: 'tr-2' },
-      ]);
-
-      const result = await service.getTranslationsByBook('book-1');
-      expect(result).toHaveLength(2);
     });
   });
 });

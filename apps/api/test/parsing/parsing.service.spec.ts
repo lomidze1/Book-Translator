@@ -86,12 +86,12 @@ describe('ParsingService', () => {
   });
 
   describe('parseTxt', () => {
-    it('should throw for empty TXT', () => {
-      expect(() => service.parse(Buffer.from(''), 'TXT')).rejects.toThrow('empty');
+    it('should throw for empty TXT', async () => {
+      await expect(service.parse(Buffer.from(''), 'TXT')).rejects.toThrow('empty');
     });
 
-    it('should handle whitespace-only TXT', () => {
-      expect(() => service.parse(Buffer.from('   \n\n  '), 'TXT')).rejects.toThrow('empty');
+    it('should handle whitespace-only TXT', async () => {
+      await expect(service.parse(Buffer.from('   \n\n  '), 'TXT')).rejects.toThrow('empty');
     });
   });
 

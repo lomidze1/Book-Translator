@@ -1,10 +1,11 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, IsIn } from 'class-validator';
 
 export class CreateTranslationDto {
   @IsString()
+  @IsNotEmpty()
   bookId: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(['ka', 'en'])
   targetLanguage?: string = 'ka';
 }

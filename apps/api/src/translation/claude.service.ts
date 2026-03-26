@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 
 export interface TranslationResult {
@@ -8,18 +8,23 @@ export interface TranslationResult {
 
 @Injectable()
 export class ClaudeService {
+  private readonly logger = new Logger(ClaudeService.name);
   private client: Anthropic | null;
-  private model: string;
+  private readonly _model: string;
 
   constructor() {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (apiKey) {
       this.client = new Anthropic({ apiKey });
     } else {
-      console.warn('⚠️  ANTHROPIC_API_KEY not set — translation disabled');
+      this.logger.warn('ANTHROPIC_API_KEY not set — translation disabled');
       this.client = null;
     }
-    this.model = process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
+    this._model = process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
+  }
+
+  getModel(): string {
+    return this._model;
   }
 
   async translateChapter(
@@ -39,7 +44,7 @@ export class ClaudeService {
     const systemPrompt = this.buildSystemPrompt(options);
 
     const response = await this.client.messages.create({
-      model: this.model,
+      model: this._model,
       max_tokens: 16000,
       system: systemPrompt,
       messages: [
@@ -64,7 +69,7 @@ export class ClaudeService {
     if (!this.client) return '';
 
     const response = await this.client.messages.create({
-      model: this.model,
+      model: this._model,
       max_tokens: 500,
       messages: [
         {
@@ -87,9 +92,12 @@ export class ClaudeService {
     glossary?: Record<string, string>;
     previousSummary?: string;
   }): string {
+    // Sanitize user-controlled strings to prevent prompt injection
+    const sanitizedTitle = options.bookTitle.replace(/[\n\r]/g, ' ').slice(0, 200);
+
     let prompt = `You are a professional literary translator specializing in English to Georgian translation.
 
-BOOK: "${options.bookTitle}"
+BOOK: "${sanitizedTitle}"
 CHAPTER: ${options.chapterNumber} of ${options.totalChapters}
 
 RULES:
@@ -106,12 +114,15 @@ RULES:
     if (options.glossary && Object.keys(options.glossary).length > 0) {
       prompt += '\n\nGLOSSARY (use these translations consistently):';
       for (const [english, georgian] of Object.entries(options.glossary)) {
-        prompt += `\n- "${english}" → "${georgian}"`;
+        // Sanitize glossary entries
+        const cleanEng = english.replace(/[\n\r]/g, ' ').slice(0, 100);
+        const cleanGeo = georgian.replace(/[\n\r]/g, ' ').slice(0, 100);
+        prompt += `\n- "${cleanEng}" → "${cleanGeo}"`;
       }
     }
 
     if (options.previousSummary) {
-      prompt += `\n\nPREVIOUS CHAPTER CONTEXT:\n${options.previousSummary}`;
+      prompt += `\n\nPREVIOUS CHAPTER CONTEXT:\n${options.previousSummary.slice(0, 1000)}`;
     }
 
     return prompt;

@@ -3,12 +3,16 @@ import { ClaudeService } from '../../src/translation/claude.service';
 
 // Mock Anthropic SDK
 vi.mock('@anthropic-ai/sdk', () => {
+  const MockAnthropic = vi.fn().mockImplementation(() => ({
+    messages: {
+      create: vi.fn(),
+    },
+  }));
+  // Make it work as both `new Anthropic()` and `import Anthropic from ...`
+  MockAnthropic.prototype.constructor = MockAnthropic;
   return {
-    default: vi.fn().mockImplementation(() => ({
-      messages: {
-        create: vi.fn(),
-      },
-    })),
+    default: MockAnthropic,
+    Anthropic: MockAnthropic,
   };
 });
 
@@ -112,7 +116,8 @@ describe('ClaudeService', () => {
     it('should use correct model from environment', () => {
       process.env.CLAUDE_MODEL = 'claude-opus-4-20250514';
       const customService = new ClaudeService();
-      expect((customService as any).model).toBe('claude-opus-4-20250514');
+      expect(customService.getModel()).toBe('claude-opus-4-20250514');
+      delete process.env.CLAUDE_MODEL;
     });
   });
 

@@ -1,13 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ParsingService } from '../parsing/parsing.service';
-
-const TRANSLATION_QUEUE = 'translation';
+import { TRANSLATION_QUEUE, getRedisConnection } from './translation.constants';
 
 @Injectable()
 export class TranslationService {
+  private readonly logger = new Logger(TranslationService.name);
   private queue: Queue | null = null;
 
   constructor(
@@ -17,13 +17,10 @@ export class TranslationService {
   ) {
     try {
       this.queue = new Queue(TRANSLATION_QUEUE, {
-        connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379'),
-        },
+        connection: getRedisConnection(),
       });
     } catch {
-      console.warn('⚠️  BullMQ queue not initialized — Redis may be unavailable');
+      this.logger.warn('BullMQ queue not initialized — Redis may be unavailable');
     }
   }
 
@@ -31,11 +28,17 @@ export class TranslationService {
     // Check book exists
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
-      include: { chapters: true },
+      include: { chapters: true, userBooks: true },
     });
 
     if (!book) {
       throw new NotFoundException('Book not found');
+    }
+
+    // Verify ownership
+    const isOwner = book.userBooks.some((ub) => ub.userId === userId);
+    if (!isOwner) {
+      throw new ForbiddenException('You do not have access to this book');
     }
 
     // Check if translation already exists
@@ -81,11 +84,13 @@ export class TranslationService {
     return translation;
   }
 
-  async getTranslation(translationId: string) {
+  async getTranslation(translationId: string, userId: string) {
     const translation = await this.prisma.translation.findUnique({
       where: { id: translationId },
       include: {
-        book: { select: { id: true, title: true, author: true } },
+        book: {
+          select: { id: true, title: true, author: true, userBooks: true },
+        },
         translatedChapters: {
           include: { chapter: { select: { number: true, title: true } } },
           orderBy: { chapter: { number: 'asc' } },
@@ -97,10 +102,31 @@ export class TranslationService {
       throw new NotFoundException('Translation not found');
     }
 
+    // Verify ownership
+    const isOwner = translation.book.userBooks.some((ub) => ub.userId === userId);
+    if (!isOwner) {
+      throw new ForbiddenException('You do not have access to this translation');
+    }
+
     return translation;
   }
 
-  async getTranslationsByBook(bookId: string) {
+  async getTranslationsByBook(bookId: string, userId: string) {
+    // Verify book ownership first
+    const book = await this.prisma.book.findUnique({
+      where: { id: bookId },
+      include: { userBooks: true },
+    });
+
+    if (!book) {
+      throw new NotFoundException('Book not found');
+    }
+
+    const isOwner = book.userBooks.some((ub) => ub.userId === userId);
+    if (!isOwner) {
+      throw new ForbiddenException('You do not have access to this book');
+    }
+
     return this.prisma.translation.findMany({
       where: { bookId },
       orderBy: { createdAt: 'desc' },
@@ -122,7 +148,7 @@ export class TranslationService {
   }
 
   async updateProgress(translationId: string, progress: number, status?: string) {
-    const data: Record<string, unknown> = { progress };
+    const data: { progress: number; status?: string; startedAt?: Date; completedAt?: Date } = { progress };
     if (status) data.status = status;
     if (status === 'IN_PROGRESS' && progress === 0) data.startedAt = new Date();
     if (status === 'COMPLETED') data.completedAt = new Date();
@@ -156,18 +182,20 @@ export class TranslationService {
     // Parse
     const parsed = await this.parsing.parse(buffer, format);
 
-    // Save chapters
-    for (const ch of parsed.chapters) {
-      await this.prisma.chapter.create({
-        data: {
-          bookId,
-          number: ch.number,
-          title: ch.title,
-          originalContent: ch.content,
-          wordCount: ch.wordCount,
-        },
-      });
-    }
+    // Save chapters in transaction
+    await this.prisma.$transaction(
+      parsed.chapters.map((ch) =>
+        this.prisma.chapter.create({
+          data: {
+            bookId,
+            number: ch.number,
+            title: ch.title,
+            originalContent: ch.content,
+            wordCount: ch.wordCount,
+          },
+        }),
+      ),
+    );
 
     // Update book page count estimate
     await this.prisma.book.update({

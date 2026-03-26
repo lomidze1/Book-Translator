@@ -36,14 +36,14 @@ describe('TranslationController', () => {
   });
 
   describe('GET /translations/:id', () => {
-    it('should return translation by id', async () => {
+    it('should return translation by id with ownership check', async () => {
       const expected = { id: 'tr-1', status: 'COMPLETED', progress: 100 };
       mockTranslationService.getTranslation.mockResolvedValue(expected);
 
-      const result = await controller.getTranslation('tr-1');
+      const result = await controller.getTranslation('tr-1', 'user-1');
 
       expect(result).toEqual(expected);
-      expect(mockTranslationService.getTranslation).toHaveBeenCalledWith('tr-1');
+      expect(mockTranslationService.getTranslation).toHaveBeenCalledWith('tr-1', 'user-1');
     });
   });
 
@@ -60,14 +60,14 @@ describe('TranslationController', () => {
   });
 
   describe('GET /translations/book/:bookId', () => {
-    it('should return translations for a book', async () => {
+    it('should return translations for a book with ownership check', async () => {
       const expected = [{ id: 'tr-1' }];
       mockTranslationService.getTranslationsByBook.mockResolvedValue(expected);
 
-      const result = await controller.getByBook('book-1');
+      const result = await controller.getByBook('book-1', 'user-1');
 
       expect(result).toEqual(expected);
-      expect(mockTranslationService.getTranslationsByBook).toHaveBeenCalledWith('book-1');
+      expect(mockTranslationService.getTranslationsByBook).toHaveBeenCalledWith('book-1', 'user-1');
     });
   });
 });
