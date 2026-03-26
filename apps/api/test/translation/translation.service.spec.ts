@@ -1,0 +1,215 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { TranslationService } from '../../src/translation/translation.service';
+
+// Mock BullMQ
+vi.mock('bullmq', () => ({
+  Queue: vi.fn().mockImplementation(() => ({
+    add: vi.fn().mockResolvedValue({ id: 'job-1' }),
+  })),
+}));
+
+describe('TranslationService', () => {
+  let service: TranslationService;
+
+  const mockPrisma = {
+    book: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
+    translation: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    translatedChapter: {
+      upsert: vi.fn(),
+    },
+    chapter: {
+      create: vi.fn(),
+    },
+  };
+
+  const mockS3 = {
+    getPresignedUrl: vi.fn(),
+    generateTranslationKey: vi.fn(),
+    upload: vi.fn(),
+  };
+
+  const mockParsing = {
+    parse: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service = new (TranslationService as any)(mockPrisma, mockS3, mockParsing);
+  });
+
+  describe('createTranslation', () => {
+    it('should create a translation for an existing book', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue({
+        id: 'book-1',
+        title: 'Test',
+        chapters: [{ id: 'ch-1' }],
+      });
+      mockPrisma.translation.findFirst.mockResolvedValue(null);
+      mockPrisma.translation.create.mockResolvedValue({
+        id: 'tr-1',
+        bookId: 'book-1',
+        status: 'PENDING',
+        progress: 0,
+      });
+
+      const result = await service.createTranslation('book-1', 'user-1');
+
+      expect(result.id).toBe('tr-1');
+      expect(result.status).toBe('PENDING');
+      expect(mockPrisma.translation.create).toHaveBeenCalledWith({
+        data: {
+          bookId: 'book-1',
+          sourceLanguage: 'en',
+          targetLanguage: 'ka',
+          status: 'PENDING',
+          progress: 0,
+        },
+      });
+    });
+
+    it('should throw NotFoundException if book does not exist', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue(null);
+
+      await expect(service.createTranslation('no-book', 'user-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if translation already exists', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue({
+        id: 'book-1',
+        chapters: [{ id: 'ch-1' }],
+      });
+      mockPrisma.translation.findFirst.mockResolvedValue({ id: 'existing-tr' });
+
+      await expect(service.createTranslation('book-1', 'user-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should default targetLanguage to Georgian', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue({
+        id: 'book-1',
+        chapters: [{ id: 'ch-1' }],
+      });
+      mockPrisma.translation.findFirst.mockResolvedValue(null);
+      mockPrisma.translation.create.mockResolvedValue({ id: 'tr-1' });
+
+      await service.createTranslation('book-1', 'user-1');
+
+      expect(mockPrisma.translation.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ targetLanguage: 'ka' }),
+        }),
+      );
+    });
+  });
+
+  describe('getTranslation', () => {
+    it('should return translation with chapters', async () => {
+      const mockTranslation = {
+        id: 'tr-1',
+        bookId: 'book-1',
+        status: 'IN_PROGRESS',
+        progress: 50,
+        book: { id: 'book-1', title: 'Test', author: 'Author' },
+        translatedChapters: [],
+      };
+      mockPrisma.translation.findUnique.mockResolvedValue(mockTranslation);
+
+      const result = await service.getTranslation('tr-1');
+      expect(result.id).toBe('tr-1');
+      expect(result.book.title).toBe('Test');
+    });
+
+    it('should throw NotFoundException if not found', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue(null);
+
+      await expect(service.getTranslation('no-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateProgress', () => {
+    it('should update progress and status', async () => {
+      mockPrisma.translation.update.mockResolvedValue({ id: 'tr-1', progress: 50 });
+
+      await service.updateProgress('tr-1', 50, 'IN_PROGRESS');
+
+      expect(mockPrisma.translation.update).toHaveBeenCalledWith({
+        where: { id: 'tr-1' },
+        data: expect.objectContaining({ progress: 50, status: 'IN_PROGRESS' }),
+      });
+    });
+
+    it('should set startedAt when status is IN_PROGRESS and progress is 0', async () => {
+      mockPrisma.translation.update.mockResolvedValue({});
+
+      await service.updateProgress('tr-1', 0, 'IN_PROGRESS');
+
+      const callData = mockPrisma.translation.update.mock.calls[0][0].data;
+      expect(callData.startedAt).toBeInstanceOf(Date);
+    });
+
+    it('should set completedAt when status is COMPLETED', async () => {
+      mockPrisma.translation.update.mockResolvedValue({});
+
+      await service.updateProgress('tr-1', 100, 'COMPLETED');
+
+      const callData = mockPrisma.translation.update.mock.calls[0][0].data;
+      expect(callData.completedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('saveTranslatedChapter', () => {
+    it('should upsert translated chapter', async () => {
+      mockPrisma.translatedChapter.upsert.mockResolvedValue({
+        id: 'tc-1',
+        translatedContent: 'ქართული ტექსტი',
+      });
+
+      await service.saveTranslatedChapter('tr-1', 'ch-1', 'ქართული ტექსტი');
+
+      expect(mockPrisma.translatedChapter.upsert).toHaveBeenCalledWith({
+        where: {
+          translationId_chapterId: { translationId: 'tr-1', chapterId: 'ch-1' },
+        },
+        create: { translationId: 'tr-1', chapterId: 'ch-1', translatedContent: 'ქართული ტექსტი' },
+        update: { translatedContent: 'ქართული ტექსტი' },
+      });
+    });
+  });
+
+  describe('getMyTranslations', () => {
+    it('should return translations for user books', async () => {
+      mockPrisma.translation.findMany.mockResolvedValue([
+        { id: 'tr-1', book: { title: 'Book 1' } },
+      ]);
+
+      const result = await service.getMyTranslations('user-1');
+      expect(result).toHaveLength(1);
+      expect(mockPrisma.translation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { book: { userBooks: { some: { userId: 'user-1' } } } },
+        }),
+      );
+    });
+  });
+
+  describe('getTranslationsByBook', () => {
+    it('should return all translations for a book', async () => {
+      mockPrisma.translation.findMany.mockResolvedValue([
+        { id: 'tr-1' },
+        { id: 'tr-2' },
+      ]);
+
+      const result = await service.getTranslationsByBook('book-1');
+      expect(result).toHaveLength(2);
+    });
+  });
+});
