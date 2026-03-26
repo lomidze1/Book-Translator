@@ -177,5 +177,19 @@
   "theme": {
     "light": "Light mode",
     "dark": "Dark mode"
+  },
+  "seo": {
+    "home_title": "AI Book Translation to Georgian",
+    "home_description": "Upload English books in PDF, EPUB, or DOCX format and get high-quality Georgian translations powered by Claude AI.",
+    "search_title": "Book Search",
+    "search_description": "Search for English books by title, author, or ISBN and translate them to Georgian.",
+    "login_title": "Login",
+    "register_title": "Register",
+    "upload_title": "Upload Book",
+    "upload_description": "Upload an English book in PDF, EPUB, TXT, or DOCX format for AI translation to Georgian.",
+    "forgot_password_title": "Reset Password",
+    "reset_password_title": "New Password",
+    "verify_email_title": "Email Verification",
+    "site_name": "Book Translator"
   }
 }

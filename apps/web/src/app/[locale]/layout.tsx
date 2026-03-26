@@ -2,18 +2,58 @@ import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import Script from 'next/script';
+import type { Metadata, Viewport } from 'next';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://booktranslator.ge';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#1a1a1a' },
+  ],
+};
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'metadata' });
+  const seo = await getTranslations({ locale, namespace: 'seo' });
+
+  const otherLocale = locale === 'ka' ? 'en' : 'ka';
 
   return {
-    title: t('title'),
+    metadataBase: new URL(BASE_URL),
+    title: {
+      template: `%s | ${seo('site_name')}`,
+      default: t('title'),
+    },
     description: t('description'),
+    alternates: {
+      canonical: `${BASE_URL}/${locale}`,
+      languages: {
+        ka: `${BASE_URL}/ka`,
+        en: `${BASE_URL}/en`,
+      },
+    },
+    openGraph: {
+      siteName: seo('site_name'),
+      locale: locale === 'ka' ? 'ka_GE' : 'en_US',
+      alternateLocale: locale === 'ka' ? 'en_US' : 'ka_GE',
+      type: 'website',
+      url: `${BASE_URL}/${locale}`,
+    },
+    twitter: {
+      card: 'summary_large_image',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
   };
 }
 
@@ -40,6 +80,22 @@ export default async function LocaleLayout({
         </Script>
       </head>
       <body suppressHydrationWarning>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebSite',
+              name: 'Book Translator',
+              url: BASE_URL,
+              potentialAction: {
+                '@type': 'SearchAction',
+                target: `${BASE_URL}/${locale}/search?q={search_term_string}`,
+                'query-input': 'required name=search_term_string',
+              },
+            }),
+          }}
+        />
         <NextIntlClientProvider>
           <AuthProvider>
             <Navbar />

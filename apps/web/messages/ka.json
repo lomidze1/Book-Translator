@@ -177,5 +177,19 @@
   "theme": {
     "light": "ნათელი რეჟიმი",
     "dark": "მუქი რეჟიმი"
+  },
+  "seo": {
+    "home_title": "წიგნების AI თარგმანი ქართულად",
+    "home_description": "ატვირთე ინგლისურენოვანი წიგნი PDF, EPUB ან DOCX ფორმატში და მიიღე ხარისხიანი ქართული თარგმანი Claude AI-ის მეშვეობით.",
+    "search_title": "წიგნის ძებნა",
+    "search_description": "მოძებნე ინგლისურენოვანი წიგნი სახელით, ავტორით ან ISBN-ით და გადათარგმნე ქართულად.",
+    "login_title": "შესვლა",
+    "register_title": "რეგისტრაცია",
+    "upload_title": "წიგნის ატვირთვა",
+    "upload_description": "ატვირთე ინგლისურენოვანი წიგნი PDF, EPUB, TXT ან DOCX ფორმატში AI თარგმანისთვის.",
+    "forgot_password_title": "პაროლის აღდგენა",
+    "reset_password_title": "ახალი პაროლი",
+    "verify_email_title": "ელ-ფოსტის დადასტურება",
+    "site_name": "Book Translator"
   }
 }
