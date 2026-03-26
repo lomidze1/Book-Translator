@@ -6,6 +6,7 @@ dist/
 coverage/
 *.tsbuildinfo
 .next/
+.turbo/
 apps/api/.env
 apps/api/test/**/*.js
 apps/api/test/**/*.d.ts
