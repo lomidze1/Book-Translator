@@ -45,6 +45,8 @@
     "loading": "იტვირთება...",
     "error_default": "შესვლა ვერ მოხერხდა",
     "error_server": "სერვერთან კავშირი ვერ მოხერხდა",
+    "show_password": "პაროლის ჩვენება",
+    "hide_password": "პაროლის დამალვა",
     "forgot_password": "პაროლი დაგავიწყდა?",
     "no_account": "არ გაქვს ანგარიში?",
     "register_link": "რეგისტრაცია"
@@ -155,7 +157,10 @@
     "error_invalid_token": "ლინკი არასწორია ან ვადაგასულია",
     "error_password_mismatch": "პაროლები არ ემთხვევა",
     "error_password_min": "მინიმუმ 8 სიმბოლო",
-    "error_password_strength": "მინიმუმ 1 დიდი ასო და 1 რიცხვი"
+    "error_password_strength": "მინიმუმ 1 დიდი ასო და 1 რიცხვი",
+    "request_new_link": "ახალი ლინკის მოთხოვნა",
+    "show_password": "პაროლის ჩვენება",
+    "hide_password": "პაროლის დამალვა"
   },
   "verify_email": {
     "title": "ელ-ფოსტის დადასტურება",

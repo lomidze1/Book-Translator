@@ -219,8 +219,8 @@ export class AuthService {
       throw new BadRequestException('Please wait before requesting a new OTP');
     }
 
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 6-digit OTP (cryptographically secure)
+    const otp = crypto.randomInt(100000, 1000000).toString();
 
     // Store OTP in Redis with 5 minute TTL
     const otpKey = `otp:${dto.phone}`;

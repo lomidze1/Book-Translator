@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
@@ -9,11 +9,12 @@ import styles from './Navbar.module.scss';
 
 export default function Navbar() {
   const t = useTranslations('navbar');
+  const router = useRouter();
   const { user, isLoggedIn, isLoading, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/';
+    router.push('/');
   };
 
   return (

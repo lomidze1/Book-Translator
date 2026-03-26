@@ -45,6 +45,8 @@
     "loading": "Loading...",
     "error_default": "Login failed",
     "error_server": "Could not connect to server",
+    "show_password": "Show password",
+    "hide_password": "Hide password",
     "forgot_password": "Forgot password?",
     "no_account": "Don't have an account?",
     "register_link": "Register"
@@ -155,7 +157,10 @@
     "error_invalid_token": "Link is invalid or expired",
     "error_password_mismatch": "Passwords do not match",
     "error_password_min": "Minimum 8 characters",
-    "error_password_strength": "At least 1 uppercase letter and 1 number"
+    "error_password_strength": "At least 1 uppercase letter and 1 number",
+    "request_new_link": "Request a new link",
+    "show_password": "Show password",
+    "hide_password": "Hide password"
   },
   "verify_email": {
     "title": "Email Verification",

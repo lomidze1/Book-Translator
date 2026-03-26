@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import styles from '../../reset-password/page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function ResetPasswordPage() {
   const t = useTranslations('reset_password');
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -19,6 +21,12 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   const validatePassword = (pw: string): string | null => {
     if (pw.length < 8) return t('error_password_min');
@@ -58,8 +66,8 @@ export default function ResetPasswordPage() {
       }
 
       setSuccess(true);
-      setTimeout(() => {
-        window.location.href = '/login';
+      timeoutRef.current = setTimeout(() => {
+        router.push('/login');
       }, 3000);
     } catch {
       setError(t('error_server'));
@@ -75,7 +83,7 @@ export default function ResetPasswordPage() {
           <h1 className={styles.title}>{t('title')}</h1>
           <p className={styles.errorBox}>{t('error_invalid_token')}</p>
           <Link href="/forgot-password" className={styles.backLink}>
-            {t('error_default')}
+            {t('request_new_link')}
           </Link>
         </div>
       </div>
@@ -113,7 +121,7 @@ export default function ResetPasswordPage() {
                     type="button"
                     className={styles.eyeBtn}
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('hide_password') : t('show_password')}
                   >
                     {showPassword ? (
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

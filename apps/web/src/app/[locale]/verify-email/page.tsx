@@ -21,7 +21,7 @@ export default function VerifyEmailPage() {
       return;
     }
 
-    fetch(`${API_URL}/api/auth/verify-email?token=${token}`)
+    fetch(`${API_URL}/api/auth/verify-email?token=${encodeURIComponent(token)}`)
       .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
         if (!ok) {

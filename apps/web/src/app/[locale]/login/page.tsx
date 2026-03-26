@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import styles from '../../login/page.module.scss';
 
 export default function LoginPage() {
   const t = useTranslations('login');
+  const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +36,7 @@ export default function LoginPage() {
       }
 
       login(data.accessToken, data.refreshToken, data.user);
-      window.location.href = '/';
+      router.push('/');
     } catch {
       setError(t('error_server'));
     } finally {
@@ -79,7 +80,7 @@ export default function LoginPage() {
                 type="button"
                 className={styles.eyeBtn}
                 onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? t('hide_password') : t('show_password')}
               >
                 {showPassword ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
