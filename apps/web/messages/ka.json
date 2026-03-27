@@ -126,6 +126,7 @@
     "description": "აღწერა",
     "translation_georgian": "ქართული თარგმანი — 5₾",
     "translation_in_progress": "თარგმნა მიმდინარეობს...",
+    "translation_pending": "გადახდა მოლოდინში...",
     "translate": "გადათარგმნე — 10₾",
     "english_version": "ინგლისური ვერსია — 1$",
     "chapters": "თავები ({count})",
@@ -180,6 +181,26 @@
     "light": "ნათელი რეჟიმი",
     "dark": "მუქი რეჟიმი"
   },
+  "payment": {
+    "title": "გადახდა",
+    "close": "დახურვა",
+    "choose_provider": "აირჩიეთ გადახდის მეთოდი:",
+    "provider_bog": "საქართველოს ბანკი (BOG)",
+    "provider_tbc": "თიბისი ბანკი",
+    "pay_button": "გადაიხადე {amount}{currency}",
+    "processing": "მუშავდება...",
+    "error_default": "გადახდა ვერ მოხერხდა. სცადეთ თავიდან.",
+    "success_title": "გადახდა წარმატებულია!",
+    "success_message": "გადახდა დამუშავდა. თარგმანი მალე დაიწყება.",
+    "failure_title": "გადახდა ვერ მოხერხდა",
+    "failure_message": "რაღაც შეცდომა მოხდა. სცადეთ თავიდან.",
+    "back_to_books": "წიგნებზე დაბრუნება",
+    "try_again": "სცადე თავიდან",
+    "mock_title": "სატესტო გადახდა",
+    "mock_description": "ეს არის სიმულაციური გადახდის გვერდი დეველოპმენტისთვის.",
+    "mock_pay_success": "წარმატების სიმულაცია",
+    "mock_pay_fail": "წარუმატებლობის სიმულაცია"
+  },
   "seo": {
     "home_title": "წიგნების AI თარგმანი ქართულად",
     "home_description": "ატვირთე ინგლისურენოვანი წიგნი PDF, EPUB ან DOCX ფორმატში და მიიღე ხარისხიანი ქართული თარგმანი Claude AI-ის მეშვეობით.",
@@ -192,6 +213,8 @@
     "forgot_password_title": "პაროლის აღდგენა",
     "reset_password_title": "ახალი პაროლი",
     "verify_email_title": "ელ-ფოსტის დადასტურება",
+    "payment_success_title": "გადახდა წარმატებულია",
+    "payment_failure_title": "გადახდა ვერ მოხერხდა",
     "site_name": "Book Translator"
   }
 }

@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { BooksModule } from './books/books.module';
 import { TranslationModule } from './translation/translation.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { TranslationModule } from './translation/translation.module';
     UsersModule,
     BooksModule,
     TranslationModule,
+    PaymentModule,
   ],
   providers: [
     {

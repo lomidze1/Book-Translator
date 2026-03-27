@@ -59,7 +59,7 @@ export class TranslationService {
       await this.parseAndSaveChapters(book.id, book.originalFileUrl, book.originalFormat || 'PDF');
     }
 
-    // Create translation record
+    // Create translation record (PENDING — waits for payment)
     const translation = await this.prisma.translation.create({
       data: {
         bookId,
@@ -70,15 +70,35 @@ export class TranslationService {
       },
     });
 
-    // Add to queue (skip payment for now — Phase 4)
+    return translation;
+  }
+
+  async startTranslation(translationId: string) {
+    const translation = await this.prisma.translation.findUnique({
+      where: { id: translationId },
+    });
+
+    if (!translation) {
+      throw new NotFoundException('Translation not found');
+    }
+
+    if (translation.status !== 'PAID') {
+      this.logger.warn(`Cannot start translation ${translationId}: status is ${translation.status}`);
+      return translation;
+    }
+
+    // Add to queue
     if (this.queue) {
       await this.queue.add('translate-book', {
         translationId: translation.id,
-        bookId,
+        bookId: translation.bookId,
       }, {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
       });
+      this.logger.log(`Translation ${translationId} added to queue`);
+    } else {
+      this.logger.warn(`Queue unavailable — cannot process translation ${translationId}`);
     }
 
     return translation;

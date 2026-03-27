@@ -126,6 +126,7 @@
     "description": "Description",
     "translation_georgian": "Georgian Translation — 5₾",
     "translation_in_progress": "Translation in progress...",
+    "translation_pending": "Payment pending...",
     "translate": "Translate — 10₾",
     "english_version": "English Version — $1",
     "chapters": "Chapters ({count})",
@@ -180,6 +181,26 @@
     "light": "Light mode",
     "dark": "Dark mode"
   },
+  "payment": {
+    "title": "Payment",
+    "close": "Close",
+    "choose_provider": "Choose payment method:",
+    "provider_bog": "Bank of Georgia (BOG)",
+    "provider_tbc": "TBC Bank",
+    "pay_button": "Pay {amount}{currency}",
+    "processing": "Processing...",
+    "error_default": "Payment failed. Please try again.",
+    "success_title": "Payment Successful!",
+    "success_message": "Your payment has been processed. Translation will begin shortly.",
+    "failure_title": "Payment Failed",
+    "failure_message": "Something went wrong. Please try again.",
+    "back_to_books": "Back to Books",
+    "try_again": "Try Again",
+    "mock_title": "Test Payment",
+    "mock_description": "This is a simulated payment page for development.",
+    "mock_pay_success": "Simulate Success",
+    "mock_pay_fail": "Simulate Failure"
+  },
   "seo": {
     "home_title": "AI Book Translation to Georgian",
     "home_description": "Upload English books in PDF, EPUB, or DOCX format and get high-quality Georgian translations powered by Claude AI.",
@@ -192,6 +213,8 @@
     "forgot_password_title": "Reset Password",
     "reset_password_title": "New Password",
     "verify_email_title": "Email Verification",
+    "payment_success_title": "Payment Successful",
+    "payment_failure_title": "Payment Failed",
     "site_name": "Book Translator"
   }
 }

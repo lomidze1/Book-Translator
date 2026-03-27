@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
+import PaymentModal from '@/components/PaymentModal';
 import styles from '../../../books/[id]/page.module.scss';
 
 interface BookDetails {
@@ -80,8 +81,49 @@ export default function BookDetailsPage() {
     );
   }
 
+  const [paymentModal, setPaymentModal] = useState<{
+    type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
+    amount: number;
+    currency: string;
+    translationId?: string;
+  } | null>(null);
+
+  const handleTranslateClick = async () => {
+    try {
+      // First create the translation record
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`${API_URL}/api/translations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ bookId: book.id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || 'Failed to create translation');
+        return;
+      }
+
+      const translation = await res.json();
+
+      // Open payment modal for the translation
+      setPaymentModal({
+        type: 'TRANSLATION',
+        amount: 10,
+        currency: 'GEL',
+        translationId: translation.id,
+      });
+    } catch {
+      setError('Network error');
+    }
+  };
+
   const completedTranslation = book.translations.find(t => t.status === 'COMPLETED');
   const inProgressTranslation = book.translations.find(t => t.status === 'IN_PROGRESS');
+  const pendingTranslation = book.translations.find(t => t.status === 'PENDING' || t.status === 'PAID');
 
   return (
     <div className={styles.main}>
@@ -142,11 +184,39 @@ export default function BookDetailsPage() {
                   </div>
                   <span>{Math.round(inProgressTranslation.progress)}%</span>
                 </div>
+              ) : pendingTranslation ? (
+                <button className={styles.btnPrimary} disabled>{t('translation_pending')}</button>
               ) : (
-                <button className={styles.btnPrimary}>{t('translate')}</button>
+                <button
+                  className={styles.btnPrimary}
+                  onClick={() => handleTranslateClick()}
+                >
+                  {t('translate')}
+                </button>
               )}
-              <button className={styles.btnSecondary}>{t('english_version')}</button>
+              <button
+                className={styles.btnSecondary}
+                onClick={() => setPaymentModal({
+                  type: 'PURCHASE_ORIGINAL',
+                  amount: 1,
+                  currency: 'USD',
+                })}
+              >
+                {t('english_version')}
+              </button>
             </div>
+
+            {paymentModal && (
+              <PaymentModal
+                bookId={book.id}
+                bookTitle={book.title}
+                type={paymentModal.type}
+                translationId={paymentModal.translationId}
+                amount={paymentModal.amount}
+                currency={paymentModal.currency}
+                onClose={() => setPaymentModal(null)}
+              />
+            )}
 
             {book.chapters.length > 0 && (
               <div className={styles.chapters}>
