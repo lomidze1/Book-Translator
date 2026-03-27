@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PaymentService } from '../../src/payment/payment.service';
-import { BogProvider } from '../../src/payment/providers/bog.provider';
-import { TbcProvider } from '../../src/payment/providers/tbc.provider';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 
 describe('PaymentService', () => {
@@ -20,6 +18,7 @@ describe('PaymentService', () => {
         findUnique: vi.fn(),
         findMany: vi.fn(),
         update: vi.fn(),
+        updateMany: vi.fn(),
         count: vi.fn(),
       },
       translation: {
@@ -47,7 +46,12 @@ describe('PaymentService', () => {
         orderId: 'tbc_order_123',
         paymentUrl: 'https://tbc.ge/pay/test',
       }),
-      validateCallback: vi.fn(),
+      validateCallback: vi.fn().mockReturnValue({
+        orderId: 'tbc_order_123',
+        transactionId: 'tx_tbc_456',
+        status: 'COMPLETED',
+        amount: 5,
+      }),
     };
 
     translationService = {
@@ -77,10 +81,7 @@ describe('PaymentService', () => {
         type: 'TRANSLATION',
         provider: 'BOG',
       });
-      prisma.payment.update.mockResolvedValue({
-        id: 'pay-1',
-        status: 'PROCESSING',
-      });
+      prisma.payment.update.mockResolvedValue({ id: 'pay-1', status: 'PROCESSING' });
     });
 
     it('should create a payment with BOG provider', async () => {
@@ -139,7 +140,7 @@ describe('PaymentService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should set correct price for TRANSLATION type', async () => {
+    it('should set correct price for TRANSLATION type (10 GEL)', async () => {
       await service.createPayment(userId, bookId, 'TRANSLATION', 'BOG');
 
       expect(prisma.payment.create).toHaveBeenCalledWith(
@@ -149,7 +150,7 @@ describe('PaymentService', () => {
       );
     });
 
-    it('should set correct price for PURCHASE_TRANSLATION type', async () => {
+    it('should set correct price for PURCHASE_TRANSLATION type (5 GEL)', async () => {
       await service.createPayment(userId, bookId, 'PURCHASE_TRANSLATION', 'BOG');
 
       expect(prisma.payment.create).toHaveBeenCalledWith(
@@ -159,7 +160,7 @@ describe('PaymentService', () => {
       );
     });
 
-    it('should set correct price for PURCHASE_ORIGINAL type', async () => {
+    it('should set correct price for PURCHASE_ORIGINAL type (1 USD)', async () => {
       prisma.book.findUnique.mockResolvedValue({
         id: bookId,
         title: 'Test Book',
@@ -187,6 +188,20 @@ describe('PaymentService', () => {
         }),
       );
     });
+
+    it('should sanitize book title in description', async () => {
+      prisma.book.findUnique.mockResolvedValue({
+        id: bookId,
+        title: 'Title\nWith\rNewlines' + 'x'.repeat(300),
+        userBooks: [{ userId }],
+      });
+
+      await service.createPayment(userId, bookId, 'TRANSLATION', 'BOG');
+
+      const callArgs = prisma.payment.create.mock.calls[0][0];
+      expect(callArgs.data.description).not.toContain('\n');
+      expect(callArgs.data.description.length).toBeLessThanOrEqual(220); // type + ": " + 200 chars
+    });
   });
 
   describe('handleCallback', () => {
@@ -199,14 +214,9 @@ describe('PaymentService', () => {
         status: 'PROCESSING',
         type: 'TRANSLATION',
         translationId: 'trans-1',
+        amount: 10,
       });
-      prisma.payment.update.mockResolvedValue({
-        id: 'pay-1',
-        userId: 'user-1',
-        status: 'COMPLETED',
-        type: 'TRANSLATION',
-        translationId: 'trans-1',
-      });
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
       prisma.translation.update.mockResolvedValue({});
     });
 
@@ -214,14 +224,33 @@ describe('PaymentService', () => {
       const result = await service.handleCallback('BOG', payload);
 
       expect(result.status).toBe('COMPLETED');
-      expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'COMPLETED' }),
+          where: expect.objectContaining({
+            id: 'pay-1',
+            status: { in: ['PENDING', 'PROCESSING'] },
+          }),
         }),
       );
     });
 
-    it('should update translation to PAID and start translation on TRANSLATION type', async () => {
+    it('should process TBC callback', async () => {
+      const tbcPayload = { PaymentId: 'tbc_order_123', Status: 'Succeeded', Amount: 5 };
+      prisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-2',
+        userId: 'user-1',
+        status: 'PROCESSING',
+        type: 'PURCHASE_TRANSLATION',
+        translationId: 'trans-2',
+        amount: 5,
+      });
+
+      const result = await service.handleCallback('TBC', tbcPayload);
+      expect(result.status).toBe('COMPLETED');
+      expect(tbcProvider.validateCallback).toHaveBeenCalledWith(tbcPayload, undefined);
+    });
+
+    it('should update translation to PAID and start translation', async () => {
       await service.handleCallback('BOG', payload);
 
       expect(prisma.translation.update).toHaveBeenCalledWith({
@@ -244,11 +273,25 @@ describe('PaymentService', () => {
         id: 'pay-1',
         status: 'COMPLETED',
         type: 'TRANSLATION',
+        amount: 10,
       });
 
       const result = await service.handleCallback('BOG', payload);
       expect(result.status).toBe('COMPLETED');
-      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('should skip already failed payments', async () => {
+      prisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        status: 'FAILED',
+        type: 'TRANSLATION',
+        amount: 10,
+      });
+
+      const result = await service.handleCallback('BOG', payload);
+      expect(result.status).toBe('FAILED');
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException on invalid signature', async () => {
@@ -268,16 +311,129 @@ describe('PaymentService', () => {
         status: 'FAILED',
         amount: 10,
       });
-      prisma.payment.update.mockResolvedValue({
-        id: 'pay-1',
-        status: 'FAILED',
-        type: 'TRANSLATION',
-        translationId: 'trans-1',
-      });
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.handleCallback('BOG', payload);
       expect(result.status).toBe('FAILED');
       expect(translationService.startTranslation).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException on amount mismatch', async () => {
+      bogProvider.validateCallback.mockReturnValue({
+        orderId: 'bog_order_123',
+        transactionId: 'tx_123',
+        status: 'COMPLETED',
+        amount: 5, // expected 10
+      });
+
+      await expect(
+        service.handleCallback('BOG', payload),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should skip amount check when validation amount is 0', async () => {
+      bogProvider.validateCallback.mockReturnValue({
+        orderId: 'bog_order_123',
+        transactionId: 'tx_123',
+        status: 'COMPLETED',
+        amount: 0, // no amount in callback
+      });
+
+      const result = await service.handleCallback('BOG', payload);
+      expect(result.status).toBe('COMPLETED');
+    });
+
+    it('should handle concurrent callback (updateMany returns 0)', async () => {
+      prisma.payment.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.handleCallback('BOG', payload);
+      expect(result.status).toBe('PROCESSING');
+      expect(translationService.startTranslation).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException for unknown provider', async () => {
+      await expect(
+        service.handleCallback('UNKNOWN' as any, payload),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create userBook on PURCHASE_TRANSLATION completion', async () => {
+      bogProvider.validateCallback.mockReturnValue({
+        orderId: 'bog_order_123',
+        transactionId: 'tx_123',
+        status: 'COMPLETED',
+        amount: 5,
+      });
+      prisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        userId: 'user-1',
+        status: 'PROCESSING',
+        type: 'PURCHASE_TRANSLATION',
+        translationId: 'trans-1',
+        amount: 5,
+      });
+      prisma.translation.findUnique.mockResolvedValue({ bookId: 'book-1' });
+
+      await service.handleCallback('BOG', payload);
+
+      expect(prisma.userBook.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_bookId_type: {
+              userId: 'user-1',
+              bookId: 'book-1',
+              type: 'PURCHASED_TRANSLATION',
+            },
+          },
+        }),
+      );
+    });
+
+    it('should create userBook on PURCHASE_ORIGINAL completion', async () => {
+      bogProvider.validateCallback.mockReturnValue({
+        orderId: 'bog_order_123',
+        transactionId: 'tx_123',
+        status: 'COMPLETED',
+        amount: 1,
+      });
+      prisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        userId: 'user-1',
+        status: 'PROCESSING',
+        type: 'PURCHASE_ORIGINAL',
+        translationId: 'trans-1',
+        amount: 1,
+      });
+      prisma.translation.findUnique.mockResolvedValue({ bookId: 'book-1' });
+
+      await service.handleCallback('BOG', payload);
+
+      expect(prisma.userBook.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ type: 'PURCHASED_ORIGINAL' }),
+        }),
+      );
+    });
+
+    it('should skip userBook creation when translationId is null for PURCHASE type', async () => {
+      bogProvider.validateCallback.mockReturnValue({
+        orderId: 'bog_order_123',
+        transactionId: 'tx_123',
+        status: 'COMPLETED',
+        amount: 5,
+      });
+      prisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        userId: 'user-1',
+        status: 'PROCESSING',
+        type: 'PURCHASE_TRANSLATION',
+        translationId: null,
+        amount: 5,
+      });
+
+      await service.handleCallback('BOG', payload);
+
+      expect(prisma.userBook.upsert).not.toHaveBeenCalled();
     });
   });
 
@@ -303,14 +459,28 @@ describe('PaymentService', () => {
         expect.objectContaining({ skip: 10, take: 10 }),
       );
     });
+
+    it('should clamp limit to max 100', async () => {
+      prisma.payment.findMany.mockResolvedValue([]);
+      prisma.payment.count.mockResolvedValue(0);
+
+      const result = await service.getPaymentHistory('user-1', 1, 500);
+      expect(result.limit).toBe(100);
+    });
+
+    it('should handle page 0 and negative values', async () => {
+      prisma.payment.findMany.mockResolvedValue([]);
+      prisma.payment.count.mockResolvedValue(0);
+
+      const result = await service.getPaymentHistory('user-1', 0, -5);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(1);
+    });
   });
 
   describe('getPaymentById', () => {
     it('should return payment for owner', async () => {
-      prisma.payment.findUnique.mockResolvedValue({
-        id: 'pay-1',
-        userId: 'user-1',
-      });
+      prisma.payment.findUnique.mockResolvedValue({ id: 'pay-1', userId: 'user-1' });
 
       const result = await service.getPaymentById('pay-1', 'user-1');
       expect(result.id).toBe('pay-1');
@@ -325,10 +495,7 @@ describe('PaymentService', () => {
     });
 
     it('should throw ForbiddenException if user does not own payment', async () => {
-      prisma.payment.findUnique.mockResolvedValue({
-        id: 'pay-1',
-        userId: 'other-user',
-      });
+      prisma.payment.findUnique.mockResolvedValue({ id: 'pay-1', userId: 'other-user' });
 
       await expect(
         service.getPaymentById('pay-1', 'user-1'),
@@ -337,6 +504,17 @@ describe('PaymentService', () => {
   });
 
   describe('simulatePayment', () => {
+    it('should block in production', async () => {
+      const origEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      await expect(
+        service.simulatePayment('pay-1', 'user-1'),
+      ).rejects.toThrow(ForbiddenException);
+
+      process.env.NODE_ENV = origEnv;
+    });
+
     it('should simulate successful payment', async () => {
       prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
@@ -353,6 +531,26 @@ describe('PaymentService', () => {
         translationId: 'trans-1',
       });
       prisma.translation.update.mockResolvedValue({});
+
+      const result = await service.simulatePayment('pay-1', 'user-1');
+      expect(result.status).toBe('COMPLETED');
+    });
+
+    it('should simulate PROCESSING payment', async () => {
+      prisma.payment.findUnique.mockResolvedValue({
+        id: 'pay-1',
+        userId: 'user-1',
+        status: 'PROCESSING',
+        type: 'TRANSLATION',
+        translationId: null,
+      });
+      prisma.payment.update.mockResolvedValue({
+        id: 'pay-1',
+        userId: 'user-1',
+        status: 'COMPLETED',
+        type: 'TRANSLATION',
+        translationId: null,
+      });
 
       const result = await service.simulatePayment('pay-1', 'user-1');
       expect(result.status).toBe('COMPLETED');
@@ -378,11 +576,23 @@ describe('PaymentService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should throw if payment already completed', async () => {
+    it('should throw if payment already COMPLETED', async () => {
       prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
         userId: 'user-1',
         status: 'COMPLETED',
+      });
+
+      await expect(
+        service.simulatePayment('pay-1', 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw if payment already FAILED', async () => {
+      prisma.payment.findUnique.mockResolvedValue({
+        id: 'pay-1',
+        userId: 'user-1',
+        status: 'FAILED',
       });
 
       await expect(

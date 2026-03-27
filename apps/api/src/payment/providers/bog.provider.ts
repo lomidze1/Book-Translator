@@ -19,6 +19,10 @@ export class BogProvider implements PaymentProviderInterface {
     }
   }
 
+  isMockMode(): boolean {
+    return !this.clientId || !this.clientSecret;
+  }
+
   async createOrder(
     amount: number,
     currency: string,
@@ -26,7 +30,7 @@ export class BogProvider implements PaymentProviderInterface {
     callbackUrl: string,
   ): Promise<PaymentResult> {
     // Mock mode when no credentials
-    if (!this.clientId || !this.clientSecret) {
+    if (this.isMockMode()) {
       const mockOrderId = `bog_mock_${crypto.randomUUID()}`;
       this.logger.warn(`Mock BOG order created: ${mockOrderId} — ${amount} ${currency}`);
       return {
@@ -46,7 +50,7 @@ export class BogProvider implements PaymentProviderInterface {
         intent: 'CAPTURE',
         items: [{
           amount: amount.toFixed(2),
-          description,
+          description: description.slice(0, 200),
           quantity: '1',
           product_id: 'book_translation',
         }],
@@ -59,8 +63,8 @@ export class BogProvider implements PaymentProviderInterface {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      this.logger.error(`BOG order creation failed: ${errorText}`);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      this.logger.error(`BOG order creation failed: ${response.status}`);
       throw new Error(`BOG payment failed: ${response.status}`);
     }
 
@@ -73,7 +77,7 @@ export class BogProvider implements PaymentProviderInterface {
 
   validateCallback(payload: Record<string, unknown>, signature?: string): CallbackValidation {
     // Mock mode — accept anything
-    if (!this.clientSecret) {
+    if (this.isMockMode()) {
       return {
         orderId: String(payload.order_id || payload.orderId || ''),
         transactionId: String(payload.payment_id || payload.transactionId || crypto.randomUUID()),
@@ -82,16 +86,18 @@ export class BogProvider implements PaymentProviderInterface {
       };
     }
 
-    // Real signature validation
-    if (signature) {
-      const expectedSignature = crypto
-        .createHmac('sha256', this.clientSecret)
-        .update(JSON.stringify(payload))
-        .digest('hex');
+    // Production mode — signature is mandatory
+    if (!signature) {
+      throw new Error('Missing BOG callback signature');
+    }
 
-      if (signature !== expectedSignature) {
-        throw new Error('Invalid BOG callback signature');
-      }
+    const expectedSignature = crypto
+      .createHmac('sha256', this.clientSecret!)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      throw new Error('Invalid BOG callback signature');
     }
 
     return {

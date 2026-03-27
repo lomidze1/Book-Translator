@@ -240,6 +240,36 @@ describe('TranslationService', () => {
     });
   });
 
+  describe('startTranslation', () => {
+    it('should start translation when status is PAID', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        bookId: 'book-1',
+        status: 'PAID',
+      });
+
+      const result = await service.startTranslation('tr-1');
+      expect(result.status).toBe('PAID');
+    });
+
+    it('should throw NotFoundException if translation not found', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue(null);
+
+      await expect(service.startTranslation('no-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should not add to queue if status is not PAID', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        bookId: 'book-1',
+        status: 'PENDING',
+      });
+
+      const result = await service.startTranslation('tr-1');
+      expect(result.status).toBe('PENDING');
+    });
+  });
+
   describe('getMyTranslations', () => {
     it('should return translations for user books', async () => {
       mockPrisma.translation.findMany.mockResolvedValue([

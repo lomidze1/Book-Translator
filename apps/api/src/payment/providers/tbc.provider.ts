@@ -19,6 +19,10 @@ export class TbcProvider implements PaymentProviderInterface {
     }
   }
 
+  isMockMode(): boolean {
+    return !this.apiKey || !this.apiSecret;
+  }
+
   async createOrder(
     amount: number,
     currency: string,
@@ -26,7 +30,7 @@ export class TbcProvider implements PaymentProviderInterface {
     callbackUrl: string,
   ): Promise<PaymentResult> {
     // Mock mode when no credentials
-    if (!this.apiKey || !this.apiSecret) {
+    if (this.isMockMode()) {
       const mockOrderId = `tbc_mock_${crypto.randomUUID()}`;
       this.logger.warn(`Mock TBC order created: ${mockOrderId} — ${amount} ${currency}`);
       return {
@@ -40,13 +44,13 @@ export class TbcProvider implements PaymentProviderInterface {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apiKey': this.apiKey,
+        'apiKey': this.apiKey!,
       },
       body: JSON.stringify({
         amount: { currency, total: amount, subTotal: amount, tax: 0, shipping: 0 },
         returnurl: `${process.env.FRONTEND_URL}/payment/success`,
-        extra: description,
-        methods: [5], // card payment
+        extra: description.slice(0, 200),
+        methods: [5],
         callbackUrl,
         preAuth: false,
         language: 'KA',
@@ -56,8 +60,8 @@ export class TbcProvider implements PaymentProviderInterface {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      this.logger.error(`TBC order creation failed: ${errorText}`);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      this.logger.error(`TBC order creation failed: ${response.status}`);
       throw new Error(`TBC payment failed: ${response.status}`);
     }
 
@@ -70,7 +74,7 @@ export class TbcProvider implements PaymentProviderInterface {
 
   validateCallback(payload: Record<string, unknown>, signature?: string): CallbackValidation {
     // Mock mode — accept anything
-    if (!this.apiSecret) {
+    if (this.isMockMode()) {
       return {
         orderId: String(payload.PaymentId || payload.orderId || ''),
         transactionId: String(payload.TransactionId || payload.transactionId || crypto.randomUUID()),
@@ -79,16 +83,18 @@ export class TbcProvider implements PaymentProviderInterface {
       };
     }
 
-    // Real signature validation
-    if (signature) {
-      const expectedSignature = crypto
-        .createHmac('sha256', this.apiSecret)
-        .update(JSON.stringify(payload))
-        .digest('hex');
+    // Production mode — signature is mandatory
+    if (!signature) {
+      throw new Error('Missing TBC callback signature');
+    }
 
-      if (signature !== expectedSignature) {
-        throw new Error('Invalid TBC callback signature');
-      }
+    const expectedSignature = crypto
+      .createHmac('sha256', this.apiSecret!)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      throw new Error('Invalid TBC callback signature');
     }
 
     return {

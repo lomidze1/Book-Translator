@@ -92,7 +92,7 @@ export class PaymentService {
         status: 'PENDING',
         provider: providerName,
         type,
-        description: `${type}: ${book.title}`,
+        description: `${type}: ${book.title.replace(/[\n\r]/g, ' ').slice(0, 200)}`,
       },
     });
 
@@ -168,9 +168,20 @@ export class PaymentService {
       return { status: payment.status };
     }
 
-    // Update payment status
-    const updatedPayment = await this.prisma.payment.update({
-      where: { id: payment.id },
+    // Verify amount matches what we expect
+    if (validation.amount > 0 && Number(payment.amount) !== validation.amount) {
+      this.logger.error(
+        `Amount mismatch for payment ${payment.id}: expected ${payment.amount}, got ${validation.amount}`,
+      );
+      throw new BadRequestException('Payment amount mismatch');
+    }
+
+    // Atomic update with status guard to prevent double-processing
+    const updated = await this.prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: { in: ['PENDING', 'PROCESSING'] },
+      },
       data: {
         status: validation.status,
         providerTxId: validation.transactionId,
@@ -178,23 +189,36 @@ export class PaymentService {
       },
     });
 
-    // If payment completed, trigger post-payment actions
-    if (validation.status === 'COMPLETED') {
-      await this.onPaymentCompleted(updatedPayment);
+    // If no rows updated, another request already processed this callback
+    if (updated.count === 0) {
+      this.logger.warn(`Payment ${payment.id} was already processed by concurrent request`);
+      return { status: payment.status };
     }
 
-    return { status: updatedPayment.status };
+    // If payment completed, trigger post-payment actions
+    if (validation.status === 'COMPLETED') {
+      await this.onPaymentCompleted({
+        id: payment.id,
+        userId: payment.userId,
+        type: payment.type,
+        translationId: payment.translationId,
+      });
+    }
+
+    return { status: validation.status };
   }
 
   async getPaymentHistory(userId: string, page = 1, limit = 20) {
-    const skip = (page - 1) * limit;
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const skip = (safePage - 1) * safeLimit;
 
     const [payments, total] = await Promise.all([
       this.prisma.payment.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: limit,
+        take: safeLimit,
         select: {
           id: true,
           amount: true,
@@ -210,10 +234,14 @@ export class PaymentService {
       this.prisma.payment.count({ where: { userId } }),
     ]);
 
-    return { payments, total, page, limit };
+    return { payments, total, page: safePage, limit: safeLimit };
   }
 
   async getPaymentById(paymentId: string, userId: string) {
+    return this.findPaymentForUser(paymentId, userId);
+  }
+
+  private async findPaymentForUser(paymentId: string, userId: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
     });
@@ -229,19 +257,13 @@ export class PaymentService {
     return payment;
   }
 
-  // Mock: simulate successful payment (for development without real providers)
+  // Mock: simulate successful payment (development only)
   async simulatePayment(paymentId: string, userId: string) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-    });
-
-    if (!payment) {
-      throw new NotFoundException('Payment not found');
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Payment simulation is not available in production');
     }
 
-    if (payment.userId !== userId) {
-      throw new ForbiddenException('You do not have access to this payment');
-    }
+    const payment = await this.findPaymentForUser(paymentId, userId);
 
     if (payment.status !== 'PENDING' && payment.status !== 'PROCESSING') {
       throw new BadRequestException(`Payment is already ${payment.status}`);
