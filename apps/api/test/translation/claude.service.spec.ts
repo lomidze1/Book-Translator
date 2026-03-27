@@ -119,6 +119,107 @@ describe('ClaudeService', () => {
       expect(customService.getModel()).toBe('claude-opus-4-20250514');
       delete process.env.CLAUDE_MODEL;
     });
+
+    it('should propagate API errors (network, rate limit)', async () => {
+      mockCreate.mockRejectedValue(new Error('429 Rate limit exceeded'));
+
+      await expect(
+        service.translateChapter('text', {
+          bookTitle: 'Book',
+          chapterNumber: 1,
+          totalChapters: 1,
+        }),
+      ).rejects.toThrow('429 Rate limit exceeded');
+    });
+
+    it('should return empty translatedText for empty response content', async () => {
+      mockCreate.mockResolvedValue({
+        content: [],
+        usage: { input_tokens: 10, output_tokens: 0 },
+      });
+
+      const result = await service.translateChapter('text', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(result.translatedText).toBe('');
+      expect(result.tokensUsed).toBe(10);
+    });
+
+    it('should filter out non-text blocks', async () => {
+      mockCreate.mockResolvedValue({
+        content: [
+          { type: 'tool_use', id: 'tool1', name: 'fn', input: {} },
+          { type: 'text', text: 'ტექსტი' },
+        ],
+        usage: { input_tokens: 50, output_tokens: 30 },
+      });
+
+      const result = await service.translateChapter('text', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(result.translatedText).toBe('ტექსტი');
+    });
+
+    it('should handle missing usage field gracefully', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'text' }],
+        usage: undefined,
+      });
+
+      const result = await service.translateChapter('text', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(result.tokensUsed).toBe(0);
+    });
+
+    it('should not include GLOSSARY section when glossary is empty', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'translated' }],
+        usage: { input_tokens: 50, output_tokens: 30 },
+      });
+
+      await service.translateChapter('text', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+        glossary: {},
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.system).not.toContain('GLOSSARY');
+    });
+
+    it('should sanitize book title (strip newlines, truncate)', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'translated' }],
+        usage: { input_tokens: 50, output_tokens: 30 },
+      });
+
+      await service.translateChapter('text', {
+        bookTitle: 'Title\nWith\rNewlines',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.system).not.toContain('\n"Title');
+      expect(callArgs.system).toContain('Title With Newlines');
+    });
+
+    it('should use default model when CLAUDE_MODEL not set', () => {
+      delete process.env.CLAUDE_MODEL;
+      const defaultService = new ClaudeService();
+      expect(defaultService.getModel()).toBe('claude-sonnet-4-20250514');
+    });
   });
 
   describe('generateChapterSummary', () => {
@@ -153,6 +254,12 @@ describe('ClaudeService', () => {
       const userContent = callArgs.messages[0].content;
       // The input should be truncated (content after slice should be ~3000 chars, not 10000)
       expect(userContent.length).toBeLessThan(10000);
+    });
+
+    it('should propagate API errors from generateChapterSummary', async () => {
+      mockCreate.mockRejectedValue(new Error('API timeout'));
+
+      await expect(service.generateChapterSummary('some text')).rejects.toThrow('API timeout');
     });
   });
 });

@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
+import Image from 'next/image';
 import styles from '../../search/page.module.scss';
 
 interface ExternalBook {
@@ -101,7 +102,7 @@ export default function SearchPage() {
                   <Link href={`/books/${book.id}`} key={book.id} className={styles.card}>
                     <div className={styles.cardCover}>
                       {book.coverUrl ? (
-                        <img src={book.coverUrl} alt={book.title} />
+                        <Image src={book.coverUrl} alt={book.title} width={128} height={192} style={{ objectFit: 'cover' }} />
                       ) : (
                         <div className={styles.noCover}>📚</div>
                       )}
@@ -129,7 +130,7 @@ export default function SearchPage() {
                   <div key={`${book.source}-${book.isbn || i}`} className={styles.card}>
                     <div className={styles.cardCover}>
                       {book.coverUrl ? (
-                        <img src={book.coverUrl} alt={book.title} />
+                        <Image src={book.coverUrl} alt={book.title} width={128} height={192} style={{ objectFit: 'cover' }} />
                       ) : (
                         <div className={styles.noCover}>📖</div>
                       )}

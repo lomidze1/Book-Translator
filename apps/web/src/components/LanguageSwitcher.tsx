@@ -18,6 +18,8 @@ export default function LanguageSwitcher() {
       <button
         className={`${styles.btn} ${locale === 'ka' ? styles.active : ''}`}
         onClick={() => switchLocale('ka')}
+        aria-label="ქართული ენა"
+        aria-current={locale === 'ka' ? 'true' : undefined}
       >
         ქარ
       </button>
@@ -25,6 +27,8 @@ export default function LanguageSwitcher() {
       <button
         className={`${styles.btn} ${locale === 'en' ? styles.active : ''}`}
         onClick={() => switchLocale('en')}
+        aria-label="English language"
+        aria-current={locale === 'en' ? 'true' : undefined}
       >
         Eng
       </button>

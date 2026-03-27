@@ -75,7 +75,9 @@
     "error_email_format": "Invalid email format",
     "error_password_min": "Minimum 8 characters",
     "error_password_strength": "At least 1 uppercase letter and 1 number",
-    "error_confirm_required": "Password confirmation is required"
+    "error_confirm_required": "Password confirmation is required",
+    "show_password": "Show password",
+    "hide_password": "Hide password"
   },
   "search": {
     "title": "Book Search",

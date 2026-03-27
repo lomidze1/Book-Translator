@@ -206,6 +206,7 @@ export default function RegisterPage() {
                 className={styles.eyeButton}
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
+                aria-label={showPassword ? t('hide_password') : t('show_password')}
               >
                 {showPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
@@ -231,6 +232,7 @@ export default function RegisterPage() {
                 className={styles.eyeButton}
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 tabIndex={-1}
+                aria-label={showConfirmPassword ? t('hide_password') : t('show_password')}
               >
                 {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>

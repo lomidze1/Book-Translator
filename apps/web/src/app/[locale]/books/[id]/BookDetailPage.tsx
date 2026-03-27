@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import styles from '../../../books/[id]/page.module.scss';
 
@@ -90,7 +91,7 @@ export default function BookDetailsPage() {
         <div className={styles.bookLayout}>
           <div className={styles.coverSection}>
             {book.coverUrl ? (
-              <img src={book.coverUrl} alt={book.title} className={styles.cover} />
+              <Image src={book.coverUrl} alt={book.title} width={300} height={450} className={styles.cover} style={{ objectFit: 'cover' }} />
             ) : (
               <div className={styles.noCover}>📚</div>
             )}

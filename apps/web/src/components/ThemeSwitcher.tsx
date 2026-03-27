@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import styles from './ThemeSwitcher.module.scss';
 
 export default function ThemeSwitcher() {
+  const t = useTranslations('theme');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
 
@@ -31,7 +33,7 @@ export default function ThemeSwitcher() {
     <button
       className={styles.toggle}
       onClick={toggle}
-      aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+      aria-label={theme === 'light' ? t('dark') : t('light')}
     >
       {theme === 'light' ? (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

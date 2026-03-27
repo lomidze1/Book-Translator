@@ -75,7 +75,9 @@
     "error_email_format": "არასწორი ელ-ფოსტის ფორმატი",
     "error_password_min": "მინიმუმ 8 სიმბოლო",
     "error_password_strength": "მინიმუმ 1 დიდი ასო და 1 რიცხვი",
-    "error_confirm_required": "პაროლის დადასტურება აუცილებელია"
+    "error_confirm_required": "პაროლის დადასტურება აუცილებელია",
+    "show_password": "პაროლის ჩვენება",
+    "hide_password": "პაროლის დამალვა"
   },
   "search": {
     "title": "წიგნის ძებნა",
