@@ -1,41 +1,83 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import BookDetailPage from './BookDetailPage';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://booktranslator.ge';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string; id: string }> }): Promise<Metadata> {
-  const { locale, id } = await params;
-
+async function fetchBook(id: string) {
   try {
     const res = await fetch(`${API_URL}/api/books/${id}`, { next: { revalidate: 3600 } });
-    if (!res.ok) return { title: 'Book Not Found' };
-
-    const book = await res.json();
-
-    return {
-      title: `${book.title} — ${book.author || ''}`.trim(),
-      description: book.description?.substring(0, 160) || `${book.title} by ${book.author}`,
-      alternates: {
-        canonical: `${BASE_URL}/${locale}/books/${id}`,
-        languages: {
-          ka: `${BASE_URL}/ka/books/${id}`,
-          en: `${BASE_URL}/en/books/${id}`,
-        },
-      },
-      openGraph: {
-        title: book.title,
-        description: book.description?.substring(0, 160) || `${book.title} by ${book.author}`,
-        images: book.coverUrl ? [{ url: book.coverUrl }] : [],
-        type: 'book' as const,
-        url: `${BASE_URL}/${locale}/books/${id}`,
-      },
-    };
+    if (!res.ok) return null;
+    return res.json();
   } catch {
-    return { title: 'Book Not Found' };
+    return null;
   }
 }
 
-export default function Page() {
-  return <BookDetailPage />;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; id: string }> }): Promise<Metadata> {
+  const { locale, id } = await params;
+  const book = await fetchBook(id);
+
+  if (!book) return { title: 'Book Not Found' };
+
+  const description = book.description?.substring(0, 160) || `${book.title} by ${book.author}`;
+  const ogImage = book.coverUrl || `${BASE_URL}/og-image.png`;
+
+  return {
+    title: `${book.title} — ${book.author || ''}`.trim(),
+    description,
+    alternates: {
+      canonical: `${BASE_URL}/${locale}/books/${id}`,
+      languages: {
+        ka: `${BASE_URL}/ka/books/${id}`,
+        en: `${BASE_URL}/en/books/${id}`,
+      },
+    },
+    openGraph: {
+      title: book.title,
+      description,
+      images: [{ url: ogImage, width: 1200, height: 630, alt: book.title }],
+      type: 'book' as const,
+      url: `${BASE_URL}/${locale}/books/${id}`,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: book.title,
+      description,
+      images: [ogImage],
+    },
+  };
+}
+
+export default async function Page({ params }: { params: Promise<{ locale: string; id: string }> }) {
+  const { locale, id } = await params;
+  const book = await fetchBook(id);
+
+  const jsonLd = book ? Object.fromEntries(
+    Object.entries({
+      '@context': 'https://schema.org',
+      '@type': 'Book',
+      name: book.title,
+      author: book.author ? { '@type': 'Person', name: book.author } : null,
+      isbn: book.isbn || null,
+      description: book.description || null,
+      image: book.coverUrl || null,
+      inLanguage: book.language || 'en',
+      numberOfPages: book.pageCount || null,
+      url: `${BASE_URL}/${locale}/books/${id}`,
+    }).filter(([, v]) => v != null)
+  ) : null;
+
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      <BookDetailPage />
+    </>
+  );
 }

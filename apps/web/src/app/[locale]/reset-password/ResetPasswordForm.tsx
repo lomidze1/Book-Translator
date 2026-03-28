@@ -99,10 +99,13 @@ export default function ResetPasswordPage() {
         {success ? (
           <div className={styles.successBox}>
             <p>{t('success')}</p>
+            <div className={styles.progressBar}>
+              <div className={styles.progressFill} />
+            </div>
           </div>
         ) : (
           <>
-            {error && <p className={styles.error}>{error}</p>}
+            {error && <p className={styles.error} role="alert">{error}</p>}
 
             <form onSubmit={handleSubmit} className={styles.form}>
               <label className={styles.label}>
@@ -115,6 +118,7 @@ export default function ResetPasswordPage() {
                     placeholder={t('password_placeholder')}
                     required
                     minLength={8}
+                    autoComplete="new-password"
                     className={styles.input}
                   />
                   <button
@@ -148,6 +152,7 @@ export default function ResetPasswordPage() {
                   placeholder={t('confirm_placeholder')}
                   required
                   minLength={8}
+                  autoComplete="new-password"
                   className={styles.input}
                 />
               </label>

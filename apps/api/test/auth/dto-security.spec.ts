@@ -77,13 +77,13 @@ describe('DTO Security & Edge Case Validation', () => {
       expect(errors.length).toBeGreaterThan(0);
     });
 
-    it('should accept XSS in avatar URL (UpdateProfileDto)', async () => {
+    it('should reject XSS in avatar URL (UpdateProfileDto)', async () => {
       const dto = plainToInstance(UpdateProfileDto, {
         avatar: 'javascript:alert("XSS")',
       });
       const errors = await validate(dto);
-      // Avatar is just @IsString — no URL validation
-      expect(errors.length).toBe(0);
+      // Avatar has @IsUrl validation — rejects non-URL strings
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 
@@ -201,14 +201,13 @@ describe('DTO Security & Edge Case Validation', () => {
         expect(errors.length).toBeGreaterThan(0);
       });
 
-      it('should accept non-numeric 6 character code (Length only checks length)', async () => {
+      it('should reject non-numeric 6 character code', async () => {
         const dto = plainToInstance(VerifyOtpDto, {
           phone: '+995599123456',
           code: 'abcdef',
         });
         const errors = await validate(dto);
-        // @Length(6,6) only checks string length, not numeric content
-        expect(errors.length).toBe(0);
+        expect(errors.length).toBeGreaterThan(0);
       });
     });
 
@@ -398,15 +397,15 @@ describe('DTO Security & Edge Case Validation', () => {
 
     it('should reject name over 100 characters', async () => {
       const dto = plainToInstance(UpdateProfileDto, {
-        name: 'გ'.repeat(101),
+        name: 'გ'.repeat(51),
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
     });
 
-    it('should accept name with 100 characters exactly', async () => {
+    it('should accept name with 50 characters exactly', async () => {
       const dto = plainToInstance(UpdateProfileDto, {
-        name: 'გ'.repeat(100),
+        name: 'გ'.repeat(50),
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);

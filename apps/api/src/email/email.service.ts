@@ -24,7 +24,7 @@ export class EmailService {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
     await this.resend.emails.send({
-      from: process.env.EMAIL_FROM || 'noreply@book-translator.ge',
+      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
       to,
       subject: 'პაროლის აღდგენა — Book Translator',
       html: this.getPasswordResetTemplate(resetUrl, name),
@@ -40,7 +40,7 @@ export class EmailService {
     const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
     await this.resend.emails.send({
-      from: process.env.EMAIL_FROM || 'noreply@book-translator.ge',
+      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
       to,
       subject: 'ემაილის დადასტურება — Book Translator',
       html: this.getEmailVerificationTemplate(verifyUrl, name),

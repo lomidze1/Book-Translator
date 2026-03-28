@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
 import styles from '../../register/page.module.scss';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 function EyeIcon() {
   return (
@@ -25,26 +28,65 @@ function EyeOffIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  );
+}
+
+type Step = 'form' | 'loading' | 'verify' | 'exists';
+
+function getInitialStep(searchParams: URLSearchParams): Step {
+  const s = searchParams.get('step');
+  if (s === 'verify' || s === 'exists') return s;
+  return 'form';
+}
+
 export default function RegisterPage() {
   const t = useTranslations('register');
+  const searchParams = useSearchParams();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(searchParams.get('email') || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [serverError, setServerError] = useState('');
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [step, setStep] = useState<Step>(() => getInitialStep(searchParams));
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendSent, setResendSent] = useState(false);
+  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateStep = useCallback((newStep: Step) => {
+    setStep(newStep);
+    const url = new URL(window.location.href);
+    if (newStep === 'form' || newStep === 'loading') {
+      url.searchParams.delete('step');
+      url.searchParams.delete('email');
+    } else {
+      url.searchParams.set('step', newStep);
+      if (email) url.searchParams.set('email', email);
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, [email]);
 
   useEffect(() => {
     return () => {
-      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const validateField = (field: string, value: string): string => {
     switch (field) {
@@ -94,10 +136,25 @@ export default function RegisterPage() {
     return `${styles.input} ${styles.inputValid}`;
   };
 
+  const handleResend = useCallback(async () => {
+    if (resendCooldown > 0) return;
+    setResendSent(false);
+    try {
+      await fetch(`${API_URL}/api/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      setResendSent(true);
+      setResendCooldown(60);
+    } catch {
+      // silently fail
+    }
+  }, [email, resendCooldown]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError('');
-    setSuccess('');
 
     const errors: Record<string, string> = {
       name: validateField('name', name),
@@ -114,7 +171,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/register`, {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, name }),
@@ -123,20 +180,23 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setServerError(data.message || t('error_default'));
+        if (res.status === 409 && data.message === 'EMAIL_ALREADY_EXISTS') {
+          updateStep('exists');
+          return;
+        }
+        if (res.status === 429) {
+          setServerError(t('error_rate_limit'));
+        } else {
+          setServerError(t('error_default'));
+        }
         return;
       }
 
-      setSuccess(t('success'));
-      setName('');
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
-      setFieldErrors({});
-      setTouched({});
-      successTimerRef.current = setTimeout(() => {
-        setSuccess('');
-      }, 5000);
+      // Show loading step with progress bar, then verify step
+      setStep('loading');
+      loadingTimerRef.current = setTimeout(() => {
+        updateStep('verify');
+      }, 3000);
     } catch {
       setServerError(t('error_server'));
     } finally {
@@ -144,20 +204,94 @@ export default function RegisterPage() {
     }
   };
 
+  // Step: Loading with progress bar
+  if (step === 'loading') {
+    return (
+      <div className={styles.container}>
+        <div className={styles.formCard}>
+          <h1 className={styles.title}>{t('title')}</h1>
+          <p className={styles.success}>{t('success_loading')}</p>
+          <div className={styles.progressBar}>
+            <div className={styles.progressFill} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step: Email already exists
+  if (step === 'exists') {
+    return (
+      <div className={styles.container}>
+        <div className={styles.formCard}>
+          <div className={styles.verifyScreen}>
+            <h2 className={styles.verifyTitle}>{t('error_email_exists')}</h2>
+            <p className={styles.verifySubtitle}>{t('error_email_exists_hint')}</p>
+
+            <Link href="/forgot-password" className={styles.submitBtn} style={{ display: 'block', width: '100%', textAlign: 'center', textDecoration: 'none' }}>
+              {t('reset_password')}
+            </Link>
+
+            <Link href="/" className={styles.secondaryBtn}>
+              {t('back_home')}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step: Verify email
+  if (step === 'verify') {
+    return (
+      <div className={styles.container}>
+        <div className={styles.formCard}>
+          <div className={styles.verifyScreen}>
+            <div className={styles.verifyIcon}>
+              <CheckIcon />
+            </div>
+            <h2 className={styles.verifyTitle}>{t('success')}</h2>
+            <p className={styles.verifySubtitle}>{t('success_verify')}</p>
+
+            <a
+              href="https://mail.google.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.submitBtn}
+            >
+              {t('open_email')}
+            </a>
+
+            <Link href="/" className={styles.secondaryBtn}>
+              {t('back_home')}
+            </Link>
+
+            <div className={styles.resendRow}>
+              {resendSent && <span className={styles.resendSent}>{t('resend_sent')}</span>}
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resendCooldown > 0}
+                className={styles.resendLink}
+              >
+                {resendCooldown > 0
+                  ? t('resend_cooldown', { seconds: resendCooldown })
+                  : t('resend_verification')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step: Registration form
   return (
     <div className={styles.container}>
       <div className={styles.formCard}>
         <h1 className={styles.title}>{t('title')}</h1>
 
-        {serverError && <p className={styles.error}>{serverError}</p>}
-        {success && (
-          <>
-            <p className={styles.success}>{success}</p>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} />
-            </div>
-          </>
-        )}
+        {serverError && <p className={styles.error} role="alert">{serverError}</p>}
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <label className={styles.label}>
@@ -168,6 +302,7 @@ export default function RegisterPage() {
               onChange={(e) => handleChange('name', e.target.value, setName)}
               onBlur={() => handleBlur('name', name)}
               placeholder={t('name_placeholder')}
+              autoComplete="name"
               className={inputClassName('name')}
             />
             {touched.name && fieldErrors.name && (
@@ -183,6 +318,7 @@ export default function RegisterPage() {
               onChange={(e) => handleChange('email', e.target.value, setEmail)}
               onBlur={() => handleBlur('email', email)}
               placeholder="you@example.com"
+              autoComplete="email"
               className={inputClassName('email')}
             />
             {touched.email && fieldErrors.email && (
@@ -199,6 +335,7 @@ export default function RegisterPage() {
                 onChange={(e) => handleChange('password', e.target.value, setPassword)}
                 onBlur={() => handleBlur('password', password)}
                 placeholder={t('password_placeholder')}
+                autoComplete="new-password"
                 className={`${inputClassName('password')} ${styles.inputWithIcon}`}
               />
               <button
@@ -225,6 +362,7 @@ export default function RegisterPage() {
                 onChange={(e) => handleChange('confirmPassword', e.target.value, setConfirmPassword)}
                 onBlur={() => handleBlur('confirmPassword', confirmPassword)}
                 placeholder={t('confirm_placeholder')}
+                autoComplete="new-password"
                 className={`${inputClassName('confirmPassword')} ${styles.inputWithIcon}`}
               />
               <button

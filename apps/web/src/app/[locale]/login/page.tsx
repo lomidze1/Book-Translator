@@ -10,9 +10,16 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
   return {
     title: t('login_title'),
+    description: t('login_description'),
     alternates: {
       canonical: `${BASE_URL}/${locale}/login`,
       languages: { ka: `${BASE_URL}/ka/login`, en: `${BASE_URL}/en/login` },
+    },
+    openGraph: {
+      title: t('login_title'),
+      description: t('login_description'),
+      url: `${BASE_URL}/${locale}/login`,
+      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: 'Book Translator' }],
     },
   };
 }

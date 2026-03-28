@@ -54,13 +54,21 @@ export default function ForgotPasswordPage() {
         {success ? (
           <div className={styles.successBox}>
             <p>{t('success')}</p>
-            <Link href="/login" className={styles.backLink}>
-              {t('back_to_login')}
+            <a
+              href="https://mail.google.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.emailBtn}
+            >
+              {t('open_email')}
+            </a>
+            <Link href="/" className={styles.backLink}>
+              {t('back_home')}
             </Link>
           </div>
         ) : (
           <>
-            {error && <p className={styles.error}>{error}</p>}
+            {error && <p className={styles.error} role="alert">{error}</p>}
 
             <form onSubmit={handleSubmit} className={styles.form}>
               <label className={styles.label}>
@@ -71,6 +79,7 @@ export default function ForgotPasswordPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
+                  autoComplete="email"
                   className={styles.input}
                 />
               </label>

@@ -208,7 +208,7 @@ describe('PaymentService', () => {
     const payload = { order_id: 'bog_order_123', status: 'success', amount: 10 };
 
     beforeEach(() => {
-      prisma.payment.findFirst.mockResolvedValue({
+      prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
         userId: 'user-1',
         status: 'PROCESSING',
@@ -236,7 +236,7 @@ describe('PaymentService', () => {
 
     it('should process TBC callback', async () => {
       const tbcPayload = { PaymentId: 'tbc_order_123', Status: 'Succeeded', Amount: 5 };
-      prisma.payment.findFirst.mockResolvedValue({
+      prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-2',
         userId: 'user-1',
         status: 'PROCESSING',
@@ -261,7 +261,7 @@ describe('PaymentService', () => {
     });
 
     it('should throw NotFoundException if payment not found by orderId', async () => {
-      prisma.payment.findFirst.mockResolvedValue(null);
+      prisma.payment.findUnique.mockResolvedValue(null);
 
       await expect(
         service.handleCallback('BOG', payload),
@@ -269,7 +269,7 @@ describe('PaymentService', () => {
     });
 
     it('should skip already completed payments', async () => {
-      prisma.payment.findFirst.mockResolvedValue({
+      prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
         status: 'COMPLETED',
         type: 'TRANSLATION',
@@ -282,7 +282,7 @@ describe('PaymentService', () => {
     });
 
     it('should skip already failed payments', async () => {
-      prisma.payment.findFirst.mockResolvedValue({
+      prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
         status: 'FAILED',
         type: 'TRANSLATION',
@@ -364,7 +364,7 @@ describe('PaymentService', () => {
         status: 'COMPLETED',
         amount: 5,
       });
-      prisma.payment.findFirst.mockResolvedValue({
+      prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
         userId: 'user-1',
         status: 'PROCESSING',
@@ -396,7 +396,7 @@ describe('PaymentService', () => {
         status: 'COMPLETED',
         amount: 1,
       });
-      prisma.payment.findFirst.mockResolvedValue({
+      prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
         userId: 'user-1',
         status: 'PROCESSING',
@@ -422,7 +422,7 @@ describe('PaymentService', () => {
         status: 'COMPLETED',
         amount: 5,
       });
-      prisma.payment.findFirst.mockResolvedValue({
+      prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
         userId: 'user-1',
         status: 'PROCESSING',

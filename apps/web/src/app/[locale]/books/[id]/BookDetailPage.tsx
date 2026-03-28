@@ -43,6 +43,12 @@ export default function BookDetailsPage() {
   const [book, setBook] = useState<BookDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [paymentModal, setPaymentModal] = useState<{
+    type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
+    amount: number;
+    currency: string;
+    translationId?: string;
+  } | null>(null);
 
   useEffect(() => {
     async function fetchBook() {
@@ -74,24 +80,21 @@ export default function BookDetailsPage() {
     return (
       <div className={styles.main}>
         <div className={styles.container}>
-          <p className={styles.error}>{error || t('not_found')}</p>
+          <p className={styles.error} role="alert">{error || t('not_found')}</p>
           <Link href="/search" className={styles.backLink}>{t('back_to_search')}</Link>
         </div>
       </div>
     );
   }
 
-  const [paymentModal, setPaymentModal] = useState<{
-    type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
-    amount: number;
-    currency: string;
-    translationId?: string;
-  } | null>(null);
-
   const handleTranslateClick = async () => {
     try {
       // First create the translation record
       const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setError(t('error_login_required'));
+        return;
+      }
       const res = await fetch(`${API_URL}/api/translations`, {
         method: 'POST',
         headers: {
@@ -103,7 +106,7 @@ export default function BookDetailsPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.message || 'Failed to create translation');
+        setError(data.message || t('error_translation_failed'));
         return;
       }
 
@@ -117,7 +120,7 @@ export default function BookDetailsPage() {
         translationId: translation.id,
       });
     } catch {
-      setError('Network error');
+      setError(t('error_network'));
     }
   };
 

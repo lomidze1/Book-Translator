@@ -18,7 +18,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className={styles.navbar}>
+    <nav className={styles.navbar} aria-label="Main navigation">
       <div className={styles.container}>
         <Link href="/" className={styles.logo}>
           Book Translator

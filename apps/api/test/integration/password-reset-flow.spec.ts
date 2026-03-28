@@ -45,6 +45,9 @@ describe('Integration — Password Reset & Email Verification Flows', () => {
     del: vi.fn().mockResolvedValue(undefined),
     incr: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(undefined),
+    secureGet: vi.fn().mockResolvedValue(null),
+    secureSet: vi.fn().mockResolvedValue(undefined),
+    secureIncr: vi.fn().mockResolvedValue(1),
     isConnected: true,
   };
 
@@ -55,8 +58,11 @@ describe('Integration — Password Reset & Email Verification Flows', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.JWT_ACCESS_SECRET = 'test-access-secret';
+    process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
     mockRedis.get.mockResolvedValue(null);
     mockRedis.incr.mockResolvedValue(1);
+    mockRedis.secureIncr.mockResolvedValue(1);
     dbUsers = {};
     authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedis, mockEmailService);
   });

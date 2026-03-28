@@ -10,7 +10,13 @@ import { EmailModule } from '../email/email.module';
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET || 'default-secret',
+      secret: (() => {
+        const secret = process.env.JWT_ACCESS_SECRET;
+        if (!secret) {
+          throw new Error('JWT_ACCESS_SECRET environment variable is required');
+        }
+        return secret;
+      })(),
       signOptions: { expiresIn: '15m' },
     }),
     EmailModule,

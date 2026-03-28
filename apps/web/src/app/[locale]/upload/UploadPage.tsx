@@ -123,7 +123,7 @@ export default function UploadPage() {
         xhr.addEventListener('error', () => reject(new Error(t('error_network'))));
         xhr.addEventListener('abort', () => reject(new Error(t('error_aborted'))));
 
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessToken');
         xhr.open('POST', `${API_URL}/api/books/upload`);
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.send(formData);
@@ -170,6 +170,10 @@ export default function UploadPage() {
           onDragOver={handleDrag}
           onDrop={handleDrop}
           onClick={() => !file && fileInputRef.current?.click()}
+          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !file) { e.preventDefault(); fileInputRef.current?.click(); } }}
+          role="button"
+          tabIndex={0}
+          aria-label={t('drag_text')}
         >
           <input
             ref={fileInputRef}
@@ -177,6 +181,8 @@ export default function UploadPage() {
             accept={ACCEPTED_EXTENSIONS.join(',')}
             onChange={handleInputChange}
             className={styles.fileInput}
+            tabIndex={-1}
+            aria-hidden="true"
           />
 
           {!file ? (
@@ -203,7 +209,7 @@ export default function UploadPage() {
           )}
         </div>
 
-        {error && <p className={styles.error}>{error}</p>}
+        {error && <p className={styles.error} role="alert">{error}</p>}
 
         {uploading && (
           <div className={styles.progressSection}>

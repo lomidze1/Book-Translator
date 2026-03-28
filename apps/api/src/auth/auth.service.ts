@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import * as bcrypt from 'bcrypt';
@@ -29,14 +29,23 @@ const OTP_TTL_SECONDS = 300; // 5 minutes
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_RATE_LIMIT_SECONDS = 60; // 1 request per minute per phone
 
+// Login brute-force protection
+const LOGIN_RATE_LIMIT_SECONDS = 900; // 15 minutes
+const LOGIN_MAX_ATTEMPTS = 10;
+
 // Password reset constants
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FORGOT_PASSWORD_RATE_LIMIT_SECONDS = 900; // 15 minutes
 const FORGOT_PASSWORD_MAX_REQUESTS = 3;
 
+// Email verification resend rate limiting
+const RESEND_VERIFICATION_RATE_LIMIT_SECONDS = 900; // 15 minutes
+const RESEND_VERIFICATION_MAX_REQUESTS = 3;
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private googleClient: OAuth2Client;
 
   constructor(
@@ -53,19 +62,20 @@ export class AuthService {
   // ========================
 
   async register(dto: RegisterDto): Promise<{ message: string; userId: string }> {
+    const email = dto.email.toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
     });
 
     if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+      throw new ConflictException('EMAIL_ALREADY_EXISTS');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
+        email,
         passwordHash,
         name: dto.name,
       },
@@ -73,8 +83,7 @@ export class AuthService {
 
     // Send verification email
     try {
-      const verificationToken = crypto.randomBytes(32).toString('hex');
-      const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+      const { token: verificationToken, hashedToken } = this.generateHashedToken();
 
       await this.prisma.user.update({
         where: { id: user.id },
@@ -84,9 +93,10 @@ export class AuthService {
         },
       });
 
-      await this.emailService.sendEmailVerification(dto.email, verificationToken, dto.name);
-    } catch {
-      // Email sending failure should not block registration
+      await this.emailService.sendEmailVerification(email, verificationToken, dto.name);
+    } catch (error) {
+      // Email failure should not block registration, but log the issue
+      this.logger.error(`Failed to send verification email: ${error instanceof Error ? error.message : error}`);
     }
 
     return {
@@ -96,11 +106,25 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
+    const email = dto.email.toLowerCase();
+
+    // Brute-force protection (fail-closed: blocks login if Redis is down)
+    const rateLimitKey = `login:attempts:${email}`;
+    const attempts = await this.redis.secureIncr(rateLimitKey);
+    if (attempts === 1) {
+      await this.redis.expire(rateLimitKey, LOGIN_RATE_LIMIT_SECONDS);
+    }
+    if (attempts > LOGIN_MAX_ATTEMPTS) {
+      throw new BadRequestException('Too many login attempts. Please try again later.');
+    }
+
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
     });
 
     if (!user || !user.passwordHash) {
+      // Constant-time: always run bcrypt to prevent timing-based email enumeration
+      await bcrypt.compare(dto.password, '$2b$12$invalidhashfortimingattak.padding');
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -109,7 +133,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email!);
+    // Block login if email is not verified
+    if (!user.emailVerified) {
+      throw new ForbiddenException('EMAIL_NOT_VERIFIED');
+    }
+
+    // Reset attempts on successful login
+    await this.redis.del(rateLimitKey);
+
+    const tokens = await this.generateTokens(user.id, user.email!, user.tokenVersion);
 
     return {
       ...tokens,
@@ -123,9 +155,13 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (!refreshSecret) {
+      throw new UnauthorizedException('Server configuration error');
+    }
     try {
       const payload = this.jwtService.verify(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: refreshSecret,
       });
 
       const user = await this.prisma.user.findUnique({
@@ -136,7 +172,12 @@ export class AuthService {
         throw new UnauthorizedException('User not found');
       }
 
-      return this.generateTokens(user.id, user.email);
+      // Verify token version — rejects tokens issued before password change or logout-all
+      if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+
+      return this.generateTokens(user.id, user.email, user.tokenVersion);
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -152,15 +193,17 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Google token');
     }
 
+    const email = googlePayload.email.toLowerCase();
+
     // Find or create user
     let user = await this.prisma.user.findUnique({
-      where: { email: googlePayload.email },
+      where: { email },
     });
 
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          email: googlePayload.email,
+          email,
           emailVerified: new Date(),
           name: googlePayload.name,
           avatar: googlePayload.picture,
@@ -184,6 +227,10 @@ export class AuthService {
       });
 
       if (!existingAccount) {
+        // Only link Google account if email is verified (prevent account takeover)
+        if (!user.emailVerified) {
+          throw new UnauthorizedException('Please verify your email before linking a Google account');
+        }
         await this.prisma.account.create({
           data: {
             userId: user.id,
@@ -194,7 +241,7 @@ export class AuthService {
       }
     }
 
-    const tokens = await this.generateTokens(user.id, user.email);
+    const tokens = await this.generateTokens(user.id, user.email, user.tokenVersion);
 
     return {
       ...tokens,
@@ -212,9 +259,9 @@ export class AuthService {
   // ========================
 
   async sendOtp(dto: SendOtpDto): Promise<{ message: string }> {
-    // Rate limiting — 1 request per minute per phone
+    // Rate limiting — 1 request per minute per phone (fail-closed)
     const rateLimitKey = `otp:rate:${dto.phone}`;
-    const recentRequest = await this.redis.get(rateLimitKey);
+    const recentRequest = await this.redis.secureGet(rateLimitKey);
     if (recentRequest) {
       throw new BadRequestException('Please wait before requesting a new OTP');
     }
@@ -222,22 +269,19 @@ export class AuthService {
     // Generate 6-digit OTP (cryptographically secure)
     const otp = crypto.randomInt(100000, 1000000).toString();
 
-    // Store OTP in Redis with 5 minute TTL
+    // Store OTP in Redis with 5 minute TTL (fail-closed)
     const otpKey = `otp:${dto.phone}`;
-    await this.redis.set(otpKey, otp, OTP_TTL_SECONDS);
+    await this.redis.secureSet(otpKey, otp, OTP_TTL_SECONDS);
 
     // Reset attempt counter
     const attemptKey = `otp:attempts:${dto.phone}`;
-    await this.redis.set(attemptKey, '0', OTP_TTL_SECONDS);
+    await this.redis.secureSet(attemptKey, '0', OTP_TTL_SECONDS);
 
     // Set rate limit
-    await this.redis.set(rateLimitKey, '1', OTP_RATE_LIMIT_SECONDS);
+    await this.redis.secureSet(rateLimitKey, '1', OTP_RATE_LIMIT_SECONDS);
 
     // TODO: Send SMS via Twilio/MessageBird
-    // For development, log the OTP
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[DEV] OTP for ${dto.phone}: ${otp}`);
-    }
+    // OTP is never logged — it is only sent via SMS
 
     return { message: 'OTP sent successfully' };
   }
@@ -271,7 +315,7 @@ export class AuthService {
       });
     }
 
-    const tokens = await this.generateTokens(user.id, user.email);
+    const tokens = await this.generateTokens(user.id, user.email, user.tokenVersion);
 
     return {
       ...tokens,
@@ -289,9 +333,9 @@ export class AuthService {
   // ========================
 
   async forgotPassword(email: string): Promise<{ message: string }> {
-    // Rate limiting
+    // Rate limiting (fail-closed: blocks if Redis is down)
     const rateLimitKey = `password-reset:rate:${email.toLowerCase()}`;
-    const rateLimitCount = await this.redis.incr(rateLimitKey);
+    const rateLimitCount = await this.redis.secureIncr(rateLimitKey);
     if (rateLimitCount === 1) {
       await this.redis.expire(rateLimitKey, FORGOT_PASSWORD_RATE_LIMIT_SECONDS);
     }
@@ -313,8 +357,7 @@ export class AuthService {
       return { message: 'Reset link sent to email' };
     }
 
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const { token: resetToken, hashedToken } = this.generateHashedToken();
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -330,7 +373,7 @@ export class AuthService {
   }
 
   async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = this.hashToken(token);
 
     const user = await this.prisma.user.findFirst({
       where: {
@@ -351,6 +394,11 @@ export class AuthService {
         passwordHash,
         passwordResetToken: null,
         passwordResetExpires: null,
+        tokenVersion: { increment: 1 },
+        // Password reset via email proves email ownership
+        ...(!user.emailVerified && { emailVerified: new Date() }),
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
       },
     });
 
@@ -362,7 +410,7 @@ export class AuthService {
   // ========================
 
   async verifyEmail(token: string): Promise<{ message: string }> {
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = this.hashToken(token);
 
     const user = await this.prisma.user.findFirst({
       where: {
@@ -392,6 +440,16 @@ export class AuthService {
   }
 
   async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    // Rate limiting (fail-closed: blocks if Redis is down)
+    const rateLimitKey = `resend-verification:rate:${email.toLowerCase()}`;
+    const rateLimitCount = await this.redis.secureIncr(rateLimitKey);
+    if (rateLimitCount === 1) {
+      await this.redis.expire(rateLimitKey, RESEND_VERIFICATION_RATE_LIMIT_SECONDS);
+    }
+    if (rateLimitCount > RESEND_VERIFICATION_MAX_REQUESTS) {
+      throw new BadRequestException('Too many requests. Please try again later.');
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
@@ -404,8 +462,7 @@ export class AuthService {
       throw new BadRequestException('Email is already verified');
     }
 
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    const { token: verificationToken, hashedToken } = this.generateHashedToken();
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -424,21 +481,37 @@ export class AuthService {
   // Private Helpers
   // ========================
 
-  private async generateTokens(userId: string, email: string | null): Promise<AuthTokens> {
-    const payload = { sub: userId, email };
+  private async generateTokens(userId: string, email: string | null, tokenVersion = 0): Promise<AuthTokens> {
+    const accessSecret = process.env.JWT_ACCESS_SECRET;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (!accessSecret || !refreshSecret) {
+      throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET environment variables are required');
+    }
+
+    const payload = { sub: userId, email, tokenVersion };
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: process.env.JWT_ACCESS_SECRET,
+        secret: accessSecret,
         expiresIn: '15m',
       }),
       this.jwtService.signAsync(payload, {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: '30d',
+        secret: refreshSecret,
+        expiresIn: '7d',
       }),
     ]);
 
     return { accessToken, refreshToken };
+  }
+
+  private generateHashedToken(): { token: string; hashedToken: string } {
+    const token = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    return { token, hashedToken };
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private async verifyGoogleToken(idToken: string): Promise<{
@@ -470,9 +543,9 @@ export class AuthService {
   }
 
   private async validateOtp(phone: string, code: string): Promise<boolean> {
-    // Check attempt limit
+    // Check attempt limit (fail-closed)
     const attemptKey = `otp:attempts:${phone}`;
-    const attempts = await this.redis.incr(attemptKey);
+    const attempts = await this.redis.secureIncr(attemptKey);
     if (attempts > OTP_MAX_ATTEMPTS) {
       // Too many attempts — delete OTP
       await this.redis.del(`otp:${phone}`);
@@ -480,14 +553,16 @@ export class AuthService {
       throw new BadRequestException('Too many attempts. Please request a new OTP.');
     }
 
-    // Get stored OTP
+    // Get stored OTP (fail-closed)
     const otpKey = `otp:${phone}`;
-    const storedOtp = await this.redis.get(otpKey);
+    const storedOtp = await this.redis.secureGet(otpKey);
 
     if (!storedOtp) {
       return false; // Expired or never sent
     }
 
-    return storedOtp === code;
+    // Timing-safe comparison to prevent timing attacks
+    if (storedOtp.length !== code.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(storedOtp), Buffer.from(code));
   }
 }

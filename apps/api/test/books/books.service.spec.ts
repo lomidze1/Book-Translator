@@ -26,6 +26,7 @@ describe('BooksService', () => {
       create: vi.fn(),
       findFirst: vi.fn(),
     },
+    $transaction: vi.fn().mockResolvedValue([]),
   };
 
   const mockS3Service = {
@@ -136,16 +137,17 @@ describe('BooksService', () => {
   describe('update', () => {
     it('should update a book', async () => {
       mockPrismaService.book.findUnique.mockResolvedValue({ id: 'b1', title: 'Old' });
+      mockPrismaService.userBook.findFirst.mockResolvedValue({ id: 'ub1', userId: 'user-1', bookId: 'b1' });
       mockPrismaService.book.update.mockResolvedValue({ id: 'b1', title: 'New Title' });
 
-      const result = await booksService.update('b1', { title: 'New Title' });
+      const result = await booksService.update('b1', { title: 'New Title' }, 'user-1');
       expect(result.title).toBe('New Title');
     });
 
     it('should throw NotFoundException when updating non-existent book', async () => {
       mockPrismaService.book.findUnique.mockResolvedValue(null);
 
-      await expect(booksService.update('nonexistent', { title: 'X' })).rejects.toThrow(
+      await expect(booksService.update('nonexistent', { title: 'X' }, 'user-1')).rejects.toThrow(
         NotFoundException,
       );
     });

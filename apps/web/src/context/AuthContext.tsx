@@ -21,6 +21,15 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+function getStoredUser(): User | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem('cachedUser');
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,34 +37,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('cachedUser');
     setUser(null);
   }, []);
 
   const login = useCallback((accessToken: string, refreshToken: string, userData: User) => {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('cachedUser', JSON.stringify(userData));
     setUser(userData);
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
+    // Restore cached user immediately (avoids flash of logged-out state)
+    const cached = getStoredUser();
+    if (cached) setUser(cached);
 
-    fetch(`${API_URL}/api/users/profile`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Unauthorized');
-        return res.json();
-      })
-      .then((data) => setUser(data))
-      .catch(() => {
-        logout();
-      })
-      .finally(() => setIsLoading(false));
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+
+      try {
+        const res = await fetch(`${API_URL}/api/users/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401) {
+          logout();
+          return;
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        localStorage.setItem('cachedUser', JSON.stringify(data));
+        setUser(data);
+      } catch {
+        // Don't logout on network errors or non-401 failures
+      }
+    };
+
+    fetchProfile().finally(() => setIsLoading(false));
   }, [logout]);
 
   return (

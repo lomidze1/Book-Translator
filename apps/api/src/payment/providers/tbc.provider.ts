@@ -20,6 +20,9 @@ export class TbcProvider implements PaymentProviderInterface {
   }
 
   isMockMode(): boolean {
+    if (process.env.NODE_ENV === 'production' && (!this.apiKey || !this.apiSecret)) {
+      throw new Error('TBC credentials are required in production');
+    }
     return !this.apiKey || !this.apiSecret;
   }
 
@@ -65,7 +68,7 @@ export class TbcProvider implements PaymentProviderInterface {
       throw new Error(`TBC payment failed: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, any>;
     return {
       orderId: data.payId,
       paymentUrl: data.links?.[1]?.uri || data.uri,
@@ -93,7 +96,9 @@ export class TbcProvider implements PaymentProviderInterface {
       .update(JSON.stringify(payload))
       .digest('hex');
 
-    if (signature !== expectedSignature) {
+    const sigBuffer = Buffer.from(signature, 'hex');
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
       throw new Error('Invalid TBC callback signature');
     }
 

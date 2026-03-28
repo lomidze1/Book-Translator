@@ -154,7 +154,7 @@ export class PaymentService {
     }
 
     // Find payment by provider order ID
-    const payment = await this.prisma.payment.findFirst({
+    const payment = await this.prisma.payment.findUnique({
       where: { providerOrderId: validation.orderId },
     });
 

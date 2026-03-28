@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -33,7 +34,10 @@ export class UsersController {
 
   @Delete('profile')
   @HttpCode(HttpStatus.OK)
-  async deleteAccount(@CurrentUser('id') userId: string) {
-    return this.usersService.deleteAccount(userId);
+  async deleteAccount(
+    @CurrentUser('id') userId: string,
+    @Body() dto: DeleteAccountDto,
+  ) {
+    return this.usersService.deleteAccount(userId, dto?.password);
   }
 }

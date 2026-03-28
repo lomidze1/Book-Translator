@@ -59,14 +59,14 @@ describe('UsersController', () => {
 
   describe('deleteAccount', () => {
     it('should delete account and return success message', async () => {
-      const result = await controller.deleteAccount('user-1');
+      const result = await controller.deleteAccount('user-1', { password: 'test123' });
       expect(result).toEqual({ message: 'Account deleted successfully' });
-      expect(usersService.deleteAccount).toHaveBeenCalledWith('user-1');
+      expect(usersService.deleteAccount).toHaveBeenCalledWith('user-1', 'test123');
     });
 
     it('should throw NotFoundException for invalid user', async () => {
       vi.mocked(usersService.deleteAccount!).mockRejectedValue(new NotFoundException('User not found'));
-      await expect(controller.deleteAccount('invalid-id')).rejects.toThrow(NotFoundException);
+      await expect(controller.deleteAccount('invalid-id', {})).rejects.toThrow(NotFoundException);
     });
   });
 });

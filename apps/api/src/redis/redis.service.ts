@@ -1,8 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, ServiceUnavailableException, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(RedisService.name);
   private client: Redis;
 
   async onModuleInit() {
@@ -14,8 +15,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.client.connect();
     } catch {
-      // Redis is optional in dev — OTP won't work but app still runs
-      console.warn('Redis connection failed — OTP features disabled');
+      this.logger.warn('Redis connection failed — OTP and rate limiting features disabled');
     }
   }
 
@@ -28,6 +28,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   get isConnected(): boolean {
     return this.client?.status === 'ready';
   }
+
+  // --- Standard methods (silent fail for non-critical operations) ---
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
     if (!this.isConnected) return;
@@ -56,5 +58,32 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async expire(key: string, ttlSeconds: number): Promise<void> {
     if (!this.isConnected) return;
     await this.client.expire(key, ttlSeconds);
+  }
+
+  // --- Secure methods (fail-closed for security-critical operations) ---
+
+  private requireConnected(): void {
+    if (!this.isConnected) {
+      throw new ServiceUnavailableException('Security service temporarily unavailable');
+    }
+  }
+
+  async secureSet(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    this.requireConnected();
+    if (ttlSeconds) {
+      await this.client.setex(key, ttlSeconds, value);
+    } else {
+      await this.client.set(key, value);
+    }
+  }
+
+  async secureGet(key: string): Promise<string | null> {
+    this.requireConnected();
+    return this.client.get(key);
+  }
+
+  async secureIncr(key: string): Promise<number> {
+    this.requireConnected();
+    return this.client.incr(key);
   }
 }

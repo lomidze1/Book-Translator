@@ -29,6 +29,9 @@ model User {
   passwordResetToken       String?   @unique
   passwordResetExpires     DateTime?
 
+  // Token versioning (increment to invalidate all sessions)
+  tokenVersion  Int       @default(0)
+
   // Relations
   accounts        Account[]
   books           UserBook[]
@@ -40,6 +43,9 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([passwordResetToken, passwordResetExpires])
+  @@index([emailVerificationToken, emailVerificationExpires])
 }
 
 enum Role {
@@ -80,16 +86,22 @@ model Book {
   openLibraryId  String?
   buyLinks       Json?
 
-  translations Translation[]
-  userBooks    UserBook[]
-  chapters     Chapter[]
-  audioBooks   AudioBook[]
+  translations    Translation[]
+  userBooks       UserBook[]
+  chapters        Chapter[]
+  audioBooks      AudioBook[]
+  bookmarks       Bookmark[]
+  highlights      Highlight[]
+  notes           Note[]
+  readingProgress ReadingProgress[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([googleBooksId])
   @@index([openLibraryId])
+  @@index([title])
+  @@index([author])
 }
 
 enum FileFormat {
@@ -112,12 +124,13 @@ model Chapter {
   audioChapters      AudioChapter[]
 
   @@unique([bookId, number])
+  @@index([bookId])
 }
 
 model Translation {
   id             String            @id @default(cuid())
   bookId         String
-  book           Book              @relation(fields: [bookId], references: [id])
+  book           Book              @relation(fields: [bookId], references: [id], onDelete: Cascade)
   sourceLanguage String            @default("en")
   targetLanguage String            @default("ka")
   status         TranslationStatus @default(PENDING)
@@ -139,6 +152,7 @@ model Translation {
 
   @@index([bookId])
   @@index([status])
+  @@index([bookId, status])
 }
 
 enum TranslationStatus {
@@ -154,7 +168,7 @@ model TranslatedChapter {
   translationId     String
   translation       Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
   chapterId         String
-  chapter           Chapter     @relation(fields: [chapterId], references: [id])
+  chapter           Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   translatedContent String
   editedContent     String?
   isEdited          Boolean     @default(false)
@@ -172,7 +186,7 @@ model UserBook {
   userId        String
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookId        String
-  book          Book         @relation(fields: [bookId], references: [id])
+  book          Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
   type          UserBookType
   translationId String?
 
@@ -192,14 +206,14 @@ enum UserBookType {
 model Payment {
   id              String         @id @default(cuid())
   userId          String
-  user            User           @relation(fields: [userId], references: [id])
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   translationId   String?        @unique
-  translation     Translation?   @relation(fields: [translationId], references: [id])
-  amount          Decimal
+  translation     Translation?   @relation(fields: [translationId], references: [id], onDelete: SetNull)
+  amount          Decimal        @db.Decimal(10, 2)
   currency        String         @default("GEL")
   status          PaymentStatus  @default(PENDING)
   provider        PaymentProvider
-  providerOrderId String?
+  providerOrderId String?        @unique
   providerTxId    String?
   type            PaymentType
   description     String?
@@ -211,6 +225,7 @@ model Payment {
   @@index([userId])
   @@index([status])
   @@index([provider])
+  @@index([userId, status])
 }
 
 enum PaymentStatus {
@@ -237,6 +252,7 @@ model Bookmark {
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookId        String
+  book          Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
   chapterNumber Int
   position      Int
   label         String?
@@ -253,6 +269,7 @@ model Highlight {
   userId        String
   user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookId        String
+  book          Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
   chapterNumber Int
   startPosition Int
   endPosition   Int
@@ -274,6 +291,7 @@ model Note {
   highlightId   String?
   highlight     Highlight? @relation(fields: [highlightId], references: [id], onDelete: Cascade)
   bookId        String
+  book          Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
   chapterNumber Int
   content       String
 
@@ -282,6 +300,7 @@ model Note {
 
   @@index([userId])
   @@index([bookId])
+  @@index([highlightId])
 }
 
 model ReadingProgress {
@@ -289,6 +308,7 @@ model ReadingProgress {
   userId          String
   user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookId          String
+  book            Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
   currentChapter  Int    @default(1)
   currentPosition Int    @default(0)
   percentage      Float  @default(0)
@@ -298,6 +318,7 @@ model ReadingProgress {
 
   @@unique([userId, bookId])
   @@index([userId])
+  @@index([bookId])
 }
 
 model AudioBook {
@@ -305,7 +326,7 @@ model AudioBook {
   bookId          String
   book            Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
   translationId   String
-  translation     Translation @relation(fields: [translationId], references: [id])
+  translation     Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
   language        String      @default("ka")
   voiceId         String
   status          AudioStatus @default(PENDING)
@@ -343,7 +364,7 @@ model AudioChapter {
   audioBookId   String
   audioBook     AudioBook          @relation(fields: [audioBookId], references: [id], onDelete: Cascade)
   chapterId     String
-  chapter       Chapter            @relation(fields: [chapterId], references: [id])
+  chapter       Chapter            @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   chapterNumber Int
   audioUrl      String?
   duration      Int?
@@ -357,6 +378,7 @@ model AudioChapter {
 
   @@unique([audioBookId, chapterNumber])
   @@index([audioBookId])
+  @@index([chapterId])
   @@index([status])
 }
 

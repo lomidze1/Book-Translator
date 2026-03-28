@@ -1,0 +1,159 @@
+@use '../../../styles/variables' as *;
+
+.container {
+  min-height: 80vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+}
+
+.loading {
+  color: var(--text-secondary);
+}
+
+.card {
+  width: 100%;
+  max-width: 500px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2rem;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+
+  h1 {
+    margin: 0.5rem 0 0;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+  }
+}
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--accent-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  span {
+    font-size: 2rem;
+    color: white;
+    font-weight: 600;
+  }
+}
+
+.role {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  span {
+    color: var(--text-primary);
+  }
+}
+
+.verified {
+  font-size: 0.75rem;
+  color: #22c55e;
+}
+
+.editRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.input {
+  flex: 1;
+  padding: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.saveBtn,
+.cancelBtn,
+.editBtn {
+  padding: 0.4rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.saveBtn {
+  background: var(--accent-color);
+  color: white;
+}
+
+.cancelBtn {
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.editBtn {
+  background: transparent;
+  color: var(--accent-color);
+  border: 1px solid var(--accent-color);
+}
+
+.message {
+  margin-top: 1rem;
+  text-align: center;
+  color: var(--accent-color);
+  font-size: 0.875rem;
+}
+
+.logoutBtn {
+  margin-top: 2rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.1);
+  }
+}

@@ -49,6 +49,25 @@
   line-height: 1.5;
 }
 
+.emailBtn {
+  display: block;
+  margin-top: $spacing-md;
+  padding: $spacing-sm + 2 $spacing-md;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: $radius-md;
+  font-size: 0.925rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--primary-hover);
+  }
+}
+
 .backLink {
   display: inline-block;
   margin-top: $spacing-md;

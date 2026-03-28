@@ -42,13 +42,20 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
     del: vi.fn().mockResolvedValue(undefined),
     incr: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(undefined),
+    secureGet: vi.fn().mockResolvedValue(null),
+    secureSet: vi.fn().mockResolvedValue(undefined),
+    secureIncr: vi.fn().mockResolvedValue(1),
     isConnected: true,
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.JWT_ACCESS_SECRET = 'test-access-secret';
+    process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
     mockRedisService.get.mockResolvedValue(null);
     mockRedisService.incr.mockResolvedValue(1);
+    mockRedisService.secureGet.mockResolvedValue(null);
+    mockRedisService.secureIncr.mockResolvedValue(1);
     authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedisService);
   });
 
@@ -96,6 +103,7 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
         email: googlePayload.email,
         name: googlePayload.name,
         avatar: googlePayload.picture,
+        tokenVersion: 0,
       });
       mockJwt.signAsync
         .mockResolvedValueOnce('access-token')
@@ -135,6 +143,8 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
         email: googlePayload.email,
         name: 'Existing Name',
         avatar: null,
+        emailVerified: new Date(),
+        tokenVersion: 0,
       };
 
       (authService as any).verifyGoogleToken = vi.fn().mockResolvedValue(googlePayload);
@@ -171,6 +181,8 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
         email: googlePayload.email,
         name: 'Existing Name',
         avatar: 'https://example.com/avatar.jpg',
+        emailVerified: new Date(),
+        tokenVersion: 0,
       };
 
       (authService as any).verifyGoogleToken = vi.fn().mockResolvedValue(googlePayload);
@@ -207,18 +219,19 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
         email: googlePayload.email,
         name: null,
         avatar: null,
+        tokenVersion: 0,
       });
       mockJwt.signAsync.mockResolvedValue('token');
 
       await authService.googleAuth(googleAuthDto);
 
       expect(mockJwt.signAsync).toHaveBeenCalledWith(
-        { sub: 'user-1', email: googlePayload.email },
+        { sub: 'user-1', email: googlePayload.email, tokenVersion: 0 },
         expect.objectContaining({ expiresIn: '15m' }),
       );
       expect(mockJwt.signAsync).toHaveBeenCalledWith(
-        { sub: 'user-1', email: googlePayload.email },
-        expect.objectContaining({ expiresIn: '30d' }),
+        { sub: 'user-1', email: googlePayload.email, tokenVersion: 0 },
+        expect.objectContaining({ expiresIn: '7d' }),
       );
     });
   });
@@ -231,8 +244,8 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
 
     it('should throw BadRequestException when OTP is invalid', async () => {
       // validateOtp: incr returns 1 (under limit), get returns null (no stored OTP)
-      mockRedisService.incr.mockResolvedValue(1);
-      mockRedisService.get.mockResolvedValue(null);
+      mockRedisService.secureIncr.mockResolvedValue(1);
+      mockRedisService.secureGet.mockResolvedValue(null);
 
       await expect(authService.verifyOtp(verifyOtpDto)).rejects.toThrow(
         BadRequestException,
@@ -244,8 +257,8 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
 
     it('should create new user when phone does not exist', async () => {
       // Mock validateOtp to succeed: stored OTP matches
-      mockRedisService.incr.mockResolvedValue(1);
-      mockRedisService.get.mockResolvedValue('123456');
+      mockRedisService.secureIncr.mockResolvedValue(1);
+      mockRedisService.secureGet.mockResolvedValue('123456');
 
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({
@@ -289,8 +302,8 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
         avatar: null,
       };
 
-      mockRedisService.incr.mockResolvedValue(1);
-      mockRedisService.get.mockResolvedValue('123456');
+      mockRedisService.secureIncr.mockResolvedValue(1);
+      mockRedisService.secureGet.mockResolvedValue('123456');
 
       mockPrisma.user.findUnique.mockResolvedValue(existingUser);
       mockPrisma.user.update.mockResolvedValue({
@@ -319,8 +332,8 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
         avatar: null,
       };
 
-      mockRedisService.incr.mockResolvedValue(1);
-      mockRedisService.get.mockResolvedValue('123456');
+      mockRedisService.secureIncr.mockResolvedValue(1);
+      mockRedisService.secureGet.mockResolvedValue('123456');
 
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue(user);
@@ -334,8 +347,8 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
     it('should handle Georgian phone numbers', async () => {
       const georgianDto = { phone: '+995577123456', code: '654321' };
 
-      mockRedisService.incr.mockResolvedValue(1);
-      mockRedisService.get.mockResolvedValue('654321');
+      mockRedisService.secureIncr.mockResolvedValue(1);
+      mockRedisService.secureGet.mockResolvedValue('654321');
 
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({

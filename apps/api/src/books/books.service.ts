@@ -51,7 +51,7 @@ export class BooksService {
   // ========================
 
   async search(dto: SearchBooksDto): Promise<SearchResult> {
-    const limit = dto.limit || 10;
+    const limit = Math.min(dto.limit || 10, 50);
 
     // Run all searches in parallel
     const [googleResults, openLibraryResults, dbResults] = await Promise.all([
@@ -75,18 +75,25 @@ export class BooksService {
       }
     }
 
-    // Mark which external books are already in our database
+    // Mark which external books are already in our database (batch query)
     const external = Array.from(externalMap.values());
-    for (const book of external) {
-      if (book.isbn) {
-        const dbBook = await this.prisma.book.findUnique({
-          where: { isbn: book.isbn },
-          include: { translations: { where: { status: 'COMPLETED' } } },
-        });
-        if (dbBook) {
-          book.inDatabase = true;
-          book.databaseBookId = dbBook.id;
-          book.translationAvailable = dbBook.translations.length > 0;
+    const isbnList = external.map(b => b.isbn).filter((isbn): isbn is string => !!isbn);
+
+    if (isbnList.length > 0) {
+      const dbBooks = await this.prisma.book.findMany({
+        where: { isbn: { in: isbnList } },
+        include: { translations: { where: { status: 'COMPLETED' } } },
+      });
+      const bookMap = new Map(dbBooks.map(b => [b.isbn, b]));
+
+      for (const book of external) {
+        if (book.isbn) {
+          const dbBook = bookMap.get(book.isbn);
+          if (dbBook) {
+            book.inDatabase = true;
+            book.databaseBookId = dbBook.id;
+            book.translationAvailable = dbBook.translations.length > 0;
+          }
         }
       }
     }
@@ -180,12 +187,15 @@ export class BooksService {
   // ========================
 
   async searchDatabase(query: string) {
+    // Sanitize and limit query length
+    const sanitized = query.replace(/[%_\\]/g, '\\$&').slice(0, 200);
+
     return this.prisma.book.findMany({
       where: {
         OR: [
-          { title: { contains: query, mode: 'insensitive' } },
-          { author: { contains: query, mode: 'insensitive' } },
-          { isbn: { contains: query, mode: 'insensitive' } },
+          { title: { contains: sanitized, mode: 'insensitive' } },
+          { author: { contains: sanitized, mode: 'insensitive' } },
+          { isbn: { contains: sanitized, mode: 'insensitive' } },
         ],
       },
       include: {
@@ -300,12 +310,9 @@ export class BooksService {
     return book;
   }
 
-  async update(id: string, dto: UpdateBookDto, userId?: string) {
+  async update(id: string, dto: UpdateBookDto, userId: string) {
     await this.findOne(id); // throws if not found
-
-    if (userId) {
-      await this.verifyOwnership(id, userId);
-    }
+    await this.verifyOwnership(id, userId);
 
     return this.prisma.book.update({
       where: { id },
@@ -313,12 +320,9 @@ export class BooksService {
     });
   }
 
-  async remove(id: string, userId?: string) {
+  async remove(id: string, userId: string) {
     await this.findOne(id); // throws if not found
-
-    if (userId) {
-      await this.verifyOwnership(id, userId);
-    }
+    await this.verifyOwnership(id, userId);
 
     return this.prisma.book.delete({
       where: { id },
@@ -394,25 +398,25 @@ export class BooksService {
       const s3Key = this.s3.generateBookKey(book.id, file.originalname);
       await this.s3.upload(s3Key, file.buffer, contentType);
 
-      // Update book with S3 URL
-      await this.prisma.book.update({
-        where: { id: book.id },
-        data: { originalFileUrl: s3Key },
-      });
+      // Update book with S3 URL and create UserBook in a transaction
+      await this.prisma.$transaction([
+        this.prisma.book.update({
+          where: { id: book.id },
+          data: { originalFileUrl: s3Key },
+        }),
+        this.prisma.userBook.create({
+          data: {
+            userId,
+            bookId: book.id,
+            type: 'UPLOADED',
+          },
+        }),
+      ]);
     } catch (error) {
-      // Rollback: delete orphaned book record if S3 upload fails
-      await this.prisma.book.delete({ where: { id: book.id } });
+      // Rollback: delete orphaned book record if S3 upload or DB fails
+      await this.prisma.book.delete({ where: { id: book.id } }).catch(() => {});
       throw error;
     }
-
-    // Add to user's library
-    await this.prisma.userBook.create({
-      data: {
-        userId,
-        bookId: book.id,
-        type: 'UPLOADED',
-      },
-    });
 
     return {
       duplicate: false,

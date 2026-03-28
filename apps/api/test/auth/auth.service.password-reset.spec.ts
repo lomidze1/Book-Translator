@@ -42,6 +42,9 @@ describe('AuthService — Password Reset', () => {
     del: vi.fn().mockResolvedValue(undefined),
     incr: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(undefined),
+    secureGet: vi.fn().mockResolvedValue(null),
+    secureSet: vi.fn().mockResolvedValue(undefined),
+    secureIncr: vi.fn().mockResolvedValue(1),
     isConnected: true,
   };
 
@@ -52,8 +55,11 @@ describe('AuthService — Password Reset', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.JWT_ACCESS_SECRET = 'test-access-secret';
+    process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
     mockRedis.get.mockResolvedValue(null);
     mockRedis.incr.mockResolvedValue(1);
+    mockRedis.secureIncr.mockResolvedValue(1);
     authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedis, mockEmailService);
   });
 
@@ -171,7 +177,7 @@ describe('AuthService — Password Reset', () => {
     });
 
     it('should rate limit: throw after 3 requests in 15 minutes', async () => {
-      mockRedis.incr.mockResolvedValue(4); // 4th request
+      mockRedis.secureIncr.mockResolvedValue(4); // 4th request
 
       await expect(authService.forgotPassword('user@example.com')).rejects.toThrow(
         BadRequestException,
@@ -182,7 +188,7 @@ describe('AuthService — Password Reset', () => {
     });
 
     it('should set rate limit TTL on first request', async () => {
-      mockRedis.incr.mockResolvedValue(1);
+      mockRedis.secureIncr.mockResolvedValue(1);
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
       await authService.forgotPassword('user@example.com');

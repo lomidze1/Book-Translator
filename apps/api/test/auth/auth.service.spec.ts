@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from '../../src/auth/auth.service';
 
@@ -41,11 +41,17 @@ describe('AuthService', () => {
     del: vi.fn().mockResolvedValue(undefined),
     incr: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(undefined),
+    secureGet: vi.fn().mockResolvedValue(null),
+    secureSet: vi.fn().mockResolvedValue(undefined),
+    secureIncr: vi.fn().mockResolvedValue(1),
     isConnected: true,
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set required env vars for JWT validation
+    process.env.JWT_ACCESS_SECRET = 'test-access-secret';
+    process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
     // Reset redis defaults
     mockRedisService.get.mockResolvedValue(null);
     mockRedisService.incr.mockResolvedValue(1);
@@ -98,9 +104,7 @@ describe('AuthService', () => {
       });
 
       await expect(authService.register(registerDto)).rejects.toThrow(ConflictException);
-      await expect(authService.register(registerDto)).rejects.toThrow(
-        'User with this email already exists',
-      );
+      await expect(authService.register(registerDto)).rejects.toThrow('EMAIL_ALREADY_EXISTS');
     });
 
     it('should hash the password with salt rounds of 12', async () => {
@@ -146,6 +150,8 @@ describe('AuthService', () => {
       passwordHash: 'hashedPassword',
       name: 'გიორგი',
       avatar: null,
+      tokenVersion: 0,
+      emailVerified: new Date('2024-01-01'),
     };
 
     it('should login successfully with valid credentials', async () => {
@@ -193,7 +199,18 @@ describe('AuthService', () => {
       await expect(authService.login(loginDto)).rejects.toThrow('Invalid email or password');
     });
 
-    it('should generate access token with 15m expiry and refresh token with 30d expiry', async () => {
+    it('should throw ForbiddenException if email is not verified', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        emailVerified: null,
+      });
+      (bcrypt.compare as any).mockResolvedValue(true);
+
+      await expect(authService.login(loginDto)).rejects.toThrow(ForbiddenException);
+      await expect(authService.login(loginDto)).rejects.toThrow('EMAIL_NOT_VERIFIED');
+    });
+
+    it('should generate access token with 15m expiry and refresh token with 7d expiry', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       (bcrypt.compare as any).mockResolvedValue(true);
       mockJwtService.signAsync
@@ -203,12 +220,12 @@ describe('AuthService', () => {
       await authService.login(loginDto);
 
       expect(mockJwtService.signAsync).toHaveBeenCalledWith(
-        { sub: mockUser.id, email: mockUser.email },
+        { sub: mockUser.id, email: mockUser.email, tokenVersion: 0 },
         expect.objectContaining({ expiresIn: '15m' }),
       );
       expect(mockJwtService.signAsync).toHaveBeenCalledWith(
-        { sub: mockUser.id, email: mockUser.email },
-        expect.objectContaining({ expiresIn: '30d' }),
+        { sub: mockUser.id, email: mockUser.email, tokenVersion: 0 },
+        expect.objectContaining({ expiresIn: '7d' }),
       );
     });
   });
@@ -218,10 +235,11 @@ describe('AuthService', () => {
   // ============================================================
   describe('refreshTokens', () => {
     it('should return new tokens when refresh token is valid', async () => {
-      mockJwtService.verify.mockReturnValue({ sub: 'user-123', email: 'test@example.com' });
+      mockJwtService.verify.mockReturnValue({ sub: 'user-123', email: 'test@example.com', tokenVersion: 0 });
       mockPrismaService.user.findUnique.mockResolvedValue({
         id: 'user-123',
         email: 'test@example.com',
+        tokenVersion: 0,
       });
       mockJwtService.signAsync
         .mockResolvedValueOnce('new-access-token')
@@ -256,8 +274,8 @@ describe('AuthService', () => {
 
     it('should verify refresh token with JWT_REFRESH_SECRET', async () => {
       process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
-      mockJwtService.verify.mockReturnValue({ sub: 'user-123' });
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-123', email: null });
+      mockJwtService.verify.mockReturnValue({ sub: 'user-123', tokenVersion: 0 });
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-123', email: null, tokenVersion: 0 });
       mockJwtService.signAsync.mockResolvedValue('token');
 
       await authService.refreshTokens('some-token');
@@ -289,13 +307,13 @@ describe('AuthService', () => {
     const sendOtpDto = { phone: '+995599123456' };
 
     it('should return success message when OTP is sent', async () => {
-      // redis.get returns null (no rate limit)
-      mockRedisService.get.mockResolvedValue(null);
+      // redis.secureGet returns null (no rate limit)
+      mockRedisService.secureGet.mockResolvedValue(null);
 
       const result = await authService.sendOtp(sendOtpDto);
 
       expect(result).toEqual({ message: 'OTP sent successfully' });
-      expect(mockRedisService.set).toHaveBeenCalled();
+      expect(mockRedisService.secureSet).toHaveBeenCalled();
     });
   });
 

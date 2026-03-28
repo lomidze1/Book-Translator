@@ -1,33 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useLayoutEffect, useSyncExternalStore } from 'react';
 import { useTranslations } from 'next-intl';
 import styles from './ThemeSwitcher.module.scss';
 
+function getThemeSnapshot(): 'light' | 'dark' {
+  const stored = localStorage.getItem('theme');
+  if (stored === 'dark' || stored === 'light') return stored;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function getServerSnapshot(): 'light' | 'dark' | null {
+  return null;
+}
+
+function subscribeToTheme(callback: () => void) {
+  window.addEventListener('storage', callback);
+  const mql = window.matchMedia('(prefers-color-scheme: dark)');
+  mql.addEventListener('change', callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    mql.removeEventListener('change', callback);
+  };
+}
+
 export default function ThemeSwitcher() {
   const t = useTranslations('theme');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [mounted, setMounted] = useState(false);
+  const theme = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem('theme');
-    if (stored === 'dark' || stored === 'light') {
-      setTheme(stored);
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(prefersDark ? 'dark' : 'light');
+  // Sync data-theme attribute before paint on every render/navigation
+  useLayoutEffect(() => {
+    if (theme) {
+      document.documentElement.setAttribute('data-theme', theme);
     }
-  }, []);
+  }, [theme]);
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     const next = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
     localStorage.setItem('theme', next);
     document.documentElement.setAttribute('data-theme', next);
-  };
+    window.dispatchEvent(new StorageEvent('storage', { key: 'theme' }));
+  }, [theme]);
 
-  if (!mounted) return <div className={styles.placeholder} />;
+  if (!theme) return <div className={styles.placeholder} />;
 
   return (
     <button

@@ -1,9 +1,13 @@
-import { IsString, IsOptional, MaxLength, IsIn } from 'class-validator';
+import { IsString, IsOptional, MaxLength, MinLength, IsIn, IsUrl, Matches } from 'class-validator';
 
 export class UpdateProfileDto {
   @IsString()
   @IsOptional()
-  @MaxLength(100)
+  @MinLength(3)
+  @MaxLength(50)
+  @Matches(/^[\p{L}\s]+$/u, {
+    message: 'name must contain only letters and spaces',
+  })
   name?: string;
 
   @IsString()
@@ -11,7 +15,8 @@ export class UpdateProfileDto {
   @IsIn(['ka', 'en'])
   locale?: string;
 
-  @IsString()
+  @IsUrl({}, { message: 'Avatar must be a valid URL' })
   @IsOptional()
+  @MaxLength(2048)
   avatar?: string;
 }

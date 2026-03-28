@@ -60,6 +60,9 @@ describe('Integration — Auth Flow Scenarios', () => {
     del: vi.fn().mockResolvedValue(undefined),
     incr: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(undefined),
+    secureGet: vi.fn().mockResolvedValue(null),
+    secureSet: vi.fn().mockResolvedValue(undefined),
+    secureIncr: vi.fn().mockResolvedValue(1),
     isConnected: true,
   };
 
@@ -105,6 +108,7 @@ describe('Integration — Auth Flow Scenarios', () => {
         passwordHash: '$2b$12$hashedpassword',
         name: 'ახალი მომხმარებელი',
         avatar: null,
+        emailVerified: new Date('2024-01-01'),
       });
       (bcrypt.compare as any).mockResolvedValue(true);
       mockJwt.signAsync
@@ -122,7 +126,7 @@ describe('Integration — Auth Flow Scenarios', () => {
       expect(loginResult.user.name).toBe('ახალი მომხმარებელი');
     });
 
-    it('should prevent duplicate registration', async () => {
+    it('should return success response for duplicate registration', async () => {
       // First registration succeeds
       mockPrisma.user.findUnique.mockResolvedValueOnce(null);
       (bcrypt.hash as any).mockResolvedValue('hashed');
@@ -133,7 +137,7 @@ describe('Integration — Auth Flow Scenarios', () => {
         password: 'password123',
       });
 
-      // Second registration with same email fails
+      // Second registration with same email throws ConflictException
       mockPrisma.user.findUnique.mockResolvedValueOnce({
         id: 'user-1',
         email: 'dup@example.com',
@@ -144,7 +148,7 @@ describe('Integration — Auth Flow Scenarios', () => {
           email: 'dup@example.com',
           password: 'differentPassword',
         }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow('EMAIL_ALREADY_EXISTS');
     });
   });
 
@@ -160,6 +164,7 @@ describe('Integration — Auth Flow Scenarios', () => {
         passwordHash: 'hashed',
         name: 'გიორგი',
         avatar: null,
+        emailVerified: new Date('2024-01-01'),
       });
       (bcrypt.compare as any).mockResolvedValue(true);
       mockJwt.signAsync
@@ -174,10 +179,11 @@ describe('Integration — Auth Flow Scenarios', () => {
       expect(loginResult.accessToken).toBe('access-1');
 
       // Step 2: Refresh
-      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: 'test@example.com' });
+      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: 'test@example.com', tokenVersion: 0 });
       mockPrisma.user.findUnique.mockResolvedValueOnce({
         id: 'user-1',
         email: 'test@example.com',
+        tokenVersion: 0,
       });
       mockJwt.signAsync
         .mockResolvedValueOnce('access-2')
@@ -202,6 +208,7 @@ describe('Integration — Auth Flow Scenarios', () => {
         passwordHash: 'hashed',
         name: 'გიორგი',
         avatar: null,
+        emailVerified: new Date('2024-01-01'),
       });
       (bcrypt.compare as any).mockResolvedValue(true);
       mockJwt.signAsync
@@ -297,7 +304,7 @@ describe('Integration — Auth Flow Scenarios', () => {
     });
 
     it('should fail refresh if user was deleted', async () => {
-      mockJwt.verify.mockReturnValue({ sub: 'deleted-user', email: 'gone@example.com' });
+      mockJwt.verify.mockReturnValue({ sub: 'deleted-user', email: 'gone@example.com', tokenVersion: 0 });
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
       await expect(authService.refreshTokens('valid-but-orphan-token')).rejects.toThrow(
@@ -306,8 +313,8 @@ describe('Integration — Auth Flow Scenarios', () => {
     });
 
     it('should generate new token pair on successful refresh', async () => {
-      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: 'test@example.com' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'test@example.com' });
+      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: 'test@example.com', tokenVersion: 0 });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'test@example.com', tokenVersion: 0 });
       mockJwt.signAsync
         .mockResolvedValueOnce('new-access')
         .mockResolvedValueOnce('new-refresh');

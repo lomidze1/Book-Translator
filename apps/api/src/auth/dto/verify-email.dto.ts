@@ -1,7 +1,7 @@
-import { IsString, MinLength } from 'class-validator';
+import { IsString, Length } from 'class-validator';
 
 export class VerifyEmailDto {
   @IsString()
-  @MinLength(1)
+  @Length(64, 64, { message: 'Invalid verification token' })
   token: string;
 }

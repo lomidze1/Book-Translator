@@ -20,6 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       description: t('home_description'),
       url: `${BASE_URL}/${locale}`,
       type: 'website',
+      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: 'Book Translator' }],
     },
   };
 }

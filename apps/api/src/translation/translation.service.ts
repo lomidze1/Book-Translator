@@ -25,10 +25,16 @@ export class TranslationService {
   }
 
   async createTranslation(bookId: string, userId: string, targetLanguage = 'ka') {
-    // Check book exists
+    // Check book exists and verify ownership (select only needed fields)
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
-      include: { chapters: true, userBooks: true },
+      select: {
+        id: true,
+        originalFileUrl: true,
+        originalFormat: true,
+        userBooks: { where: { userId }, select: { id: true } },
+        _count: { select: { chapters: true } },
+      },
     });
 
     if (!book) {
@@ -36,8 +42,7 @@ export class TranslationService {
     }
 
     // Verify ownership
-    const isOwner = book.userBooks.some((ub) => ub.userId === userId);
-    if (!isOwner) {
+    if (book.userBooks.length === 0) {
       throw new ForbiddenException('You do not have access to this book');
     }
 
@@ -55,7 +60,7 @@ export class TranslationService {
     }
 
     // If book has no chapters yet, parse the file
-    if (book.chapters.length === 0 && book.originalFileUrl) {
+    if (book._count.chapters === 0 && book.originalFileUrl) {
       await this.parseAndSaveChapters(book.id, book.originalFileUrl, book.originalFormat || 'PDF');
     }
 
@@ -109,7 +114,7 @@ export class TranslationService {
       where: { id: translationId },
       include: {
         book: {
-          select: { id: true, title: true, author: true, userBooks: true },
+          select: { id: true, title: true, author: true, userBooks: { where: { userId }, select: { userId: true } } },
         },
         translatedChapters: {
           include: { chapter: { select: { number: true, title: true } } },
@@ -123,8 +128,7 @@ export class TranslationService {
     }
 
     // Verify ownership
-    const isOwner = translation.book.userBooks.some((ub) => ub.userId === userId);
-    if (!isOwner) {
+    if (translation.book.userBooks.length === 0) {
       throw new ForbiddenException('You do not have access to this translation');
     }
 
@@ -135,15 +139,14 @@ export class TranslationService {
     // Verify book ownership first
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
-      include: { userBooks: true },
+      select: { id: true, userBooks: { where: { userId }, select: { id: true } } },
     });
 
     if (!book) {
       throw new NotFoundException('Book not found');
     }
 
-    const isOwner = book.userBooks.some((ub) => ub.userId === userId);
-    if (!isOwner) {
+    if (book.userBooks.length === 0) {
       throw new ForbiddenException('You do not have access to this book');
     }
 
@@ -168,7 +171,7 @@ export class TranslationService {
   }
 
   async updateProgress(translationId: string, progress: number, status?: string) {
-    const data: { progress: number; status?: string; startedAt?: Date; completedAt?: Date } = { progress };
+    const data: { progress: number; status?: any; startedAt?: Date; completedAt?: Date } = { progress };
     if (status) data.status = status;
     if (status === 'IN_PROGRESS' && progress === 0) data.startedAt = new Date();
     if (status === 'COMPLETED') data.completedAt = new Date();

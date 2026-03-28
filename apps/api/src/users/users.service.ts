@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -63,13 +64,24 @@ export class UsersService {
     return updated;
   }
 
-  async deleteAccount(userId: string): Promise<{ message: string }> {
+  async deleteAccount(userId: string, password?: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    // Require password verification for password-based accounts
+    if (user.passwordHash) {
+      if (!password) {
+        throw new UnauthorizedException('Password is required to delete your account');
+      }
+      const isValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isValid) {
+        throw new UnauthorizedException('Invalid password');
+      }
     }
 
     await this.prisma.user.delete({

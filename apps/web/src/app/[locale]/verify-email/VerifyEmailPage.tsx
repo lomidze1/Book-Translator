@@ -8,18 +8,24 @@ import styles from '../../verify-email/page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+function CheckIcon() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  );
+}
+
 export default function VerifyEmailPage() {
   const t = useTranslations('verify_email');
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  const [status, setStatus] = useState<'verifying' | 'success' | 'already' | 'error'>('verifying');
+  const [status, setStatus] = useState<'verifying' | 'success' | 'already' | 'error'>(token ? 'verifying' : 'error');
 
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      return;
-    }
+    if (!token) return;
 
     fetch(`${API_URL}/api/auth/verify-email?token=${encodeURIComponent(token)}`)
       .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
@@ -46,9 +52,16 @@ export default function VerifyEmailPage() {
 
         {status === 'success' && (
           <div className={styles.successBox}>
-            <p>{t('success')}</p>
-            <Link href="/login" className={styles.link}>
+            <div className={styles.successIcon}>
+              <CheckIcon />
+            </div>
+            <p className={styles.successTitle}>{t('success')}</p>
+            <p className={styles.successSubtitle}>{t('success_thanks')}</p>
+            <Link href="/login" className={styles.primaryBtn}>
               {t('go_to_login')}
+            </Link>
+            <Link href="/" className={styles.secondaryBtn}>
+              {t('go_home')}
             </Link>
           </div>
         )}

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import styles from '../../login/page.module.scss';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function LoginPage() {
   const t = useTranslations('login');
@@ -15,14 +17,61 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendSuccess, setResendSuccess] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const validate = (): boolean => {
+    if (!email.trim()) {
+      setError(t('email_required'));
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError(t('email_invalid'));
+      return false;
+    }
+    if (!password || password.length < 8) {
+      setError(t('password_min'));
+      return false;
+    }
+    return true;
+  };
+
+  const handleResendVerification = useCallback(async () => {
+    if (resendCooldown > 0) return;
+    setResendSuccess(false);
+
+    try {
+      await fetch(`${API_URL}/api/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      setResendSuccess(true);
+      setResendCooldown(60);
+    } catch {
+      // Silently fail — user can retry
+    }
+  }, [email, resendCooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setEmailNotVerified(false);
+    setResendSuccess(false);
+
+    if (!validate()) return;
+
     setLoading(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/login`, {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -31,7 +80,15 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || t('error_default'));
+        if (res.status === 403 && data.message === 'EMAIL_NOT_VERIFIED') {
+          setEmailNotVerified(true);
+          return;
+        }
+        if (res.status === 429) {
+          setError(t('error_rate_limit'));
+        } else {
+          setError(t('error_default'));
+        }
         return;
       }
 
@@ -49,7 +106,26 @@ export default function LoginPage() {
       <div className={styles.formCard}>
         <h1 className={styles.title}>{t('title')}</h1>
 
-        {error && <p className={styles.error}>{error}</p>}
+        {error && <p className={styles.error} role="alert">{error}</p>}
+
+        {emailNotVerified && (
+          <div className={styles.verificationNotice} role="alert">
+            <p>{t('email_not_verified')}</p>
+            {resendSuccess && (
+              <p className={styles.verificationSent}>{t('verification_sent')}</p>
+            )}
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendCooldown > 0}
+              className={styles.resendBtn}
+            >
+              {resendCooldown > 0
+                ? t('resend_cooldown', { seconds: resendCooldown })
+                : t('resend_verification')}
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <label className={styles.label}>
@@ -60,6 +136,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
+              autoComplete="email"
               className={styles.input}
             />
           </label>
@@ -74,6 +151,7 @@ export default function LoginPage() {
                 placeholder={t('password_placeholder')}
                 required
                 minLength={8}
+                autoComplete="current-password"
                 className={styles.input}
               />
               <button

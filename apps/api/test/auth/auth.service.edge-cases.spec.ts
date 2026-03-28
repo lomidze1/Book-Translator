@@ -44,11 +44,16 @@ describe('AuthService — Edge Cases & Security', () => {
     del: vi.fn().mockResolvedValue(undefined),
     incr: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(undefined),
+    secureGet: vi.fn().mockResolvedValue(null),
+    secureSet: vi.fn().mockResolvedValue(undefined),
+    secureIncr: vi.fn().mockResolvedValue(1),
     isConnected: true,
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.JWT_ACCESS_SECRET = 'test-access-secret';
+    process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
     mockRedisService.get.mockResolvedValue(null);
     mockRedisService.incr.mockResolvedValue(1);
     authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedisService);
@@ -58,7 +63,7 @@ describe('AuthService — Edge Cases & Security', () => {
   // REGISTER — Edge Cases
   // ============================================================
   describe('register — edge cases', () => {
-    it('should handle email with uppercase letters (case sensitivity)', async () => {
+    it('should normalize email to lowercase on register', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       (bcrypt.hash as any).mockResolvedValue('hashed');
       mockPrisma.user.create.mockResolvedValue({ id: 'user-1' });
@@ -69,7 +74,7 @@ describe('AuthService — Edge Cases & Security', () => {
       });
 
       expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: 'TEST@EXAMPLE.COM' },
+        where: { email: 'test@example.com' },
       });
     });
 
@@ -195,6 +200,8 @@ describe('AuthService — Edge Cases & Security', () => {
         passwordHash: 'hashed',
         name: 'Test',
         avatar: null,
+        tokenVersion: 0,
+        emailVerified: new Date('2024-01-01'),
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       (bcrypt.compare as any).mockResolvedValue(true);
@@ -203,7 +210,7 @@ describe('AuthService — Edge Cases & Security', () => {
       await authService.login({ email: 'test@example.com', password: 'password123' });
 
       expect(mockJwt.signAsync).toHaveBeenCalledWith(
-        { sub: 'user-1', email: 'test@example.com' },
+        { sub: 'user-1', email: 'test@example.com', tokenVersion: 0 },
         expect.any(Object),
       );
     });
@@ -217,6 +224,7 @@ describe('AuthService — Edge Cases & Security', () => {
         avatar: 'https://example.com/avatar.jpg',
         phone: '+995599123456',
         role: 'USER',
+        emailVerified: new Date('2024-01-01'),
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       (bcrypt.compare as any).mockResolvedValue(true);
@@ -245,6 +253,7 @@ describe('AuthService — Edge Cases & Security', () => {
         id: 'user-1',
         email: 'test@example.com',
         passwordHash: 'hashed',
+        emailVerified: new Date('2024-01-01'),
       });
       (bcrypt.compare as any).mockRejectedValue(new Error('bcrypt internal error'));
 
@@ -305,7 +314,7 @@ describe('AuthService — Edge Cases & Security', () => {
     });
 
     it('should handle database failure during token refresh', async () => {
-      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: 'test@example.com' });
+      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: 'test@example.com', tokenVersion: 0 });
       mockPrisma.user.findUnique.mockRejectedValue(new Error('DB timeout'));
 
       // The catch block should convert any error to UnauthorizedException
@@ -315,10 +324,11 @@ describe('AuthService — Edge Cases & Security', () => {
     });
 
     it('should generate new tokens with same user data', async () => {
-      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: 'test@example.com' });
+      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: 'test@example.com', tokenVersion: 0 });
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
         email: 'updated@example.com', // Email might have changed
+        tokenVersion: 0,
       });
       mockJwt.signAsync
         .mockResolvedValueOnce('new-access')
@@ -328,7 +338,7 @@ describe('AuthService — Edge Cases & Security', () => {
 
       // Should use the CURRENT email from database, not from token
       expect(mockJwt.signAsync).toHaveBeenCalledWith(
-        { sub: 'user-1', email: 'updated@example.com' },
+        { sub: 'user-1', email: 'updated@example.com', tokenVersion: 0 },
         expect.any(Object),
       );
       expect(result).toEqual({
@@ -341,8 +351,8 @@ describe('AuthService — Edge Cases & Security', () => {
       const originalSecret = process.env.JWT_REFRESH_SECRET;
       process.env.JWT_REFRESH_SECRET = 'my-refresh-secret';
 
-      mockJwt.verify.mockReturnValue({ sub: 'user-1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: null });
+      mockJwt.verify.mockReturnValue({ sub: 'user-1', tokenVersion: 0 });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: null, tokenVersion: 0 });
       mockJwt.signAsync.mockResolvedValue('token');
 
       await authService.refreshTokens('some-token');
@@ -376,17 +386,17 @@ describe('AuthService — Edge Cases & Security', () => {
   // ============================================================
   describe('sendOtp — edge cases', () => {
     it('should return success when no rate limit exists', async () => {
-      mockRedisService.get.mockResolvedValue(null);
+      mockRedisService.secureGet.mockResolvedValue(null);
       const result = await authService.sendOtp({ phone: '+995599123456' });
       expect(result).toEqual({ message: 'OTP sent successfully' });
-      expect(mockRedisService.set).toHaveBeenCalled();
+      expect(mockRedisService.secureSet).toHaveBeenCalled();
     });
 
     it('should store OTP in redis', async () => {
-      mockRedisService.get.mockResolvedValue(null);
+      mockRedisService.secureGet.mockResolvedValue(null);
       const result = await authService.sendOtp({ phone: '+995577000000' });
       expect(result.message).toBe('OTP sent successfully');
-      expect(mockRedisService.set).toHaveBeenCalled();
+      expect(mockRedisService.secureSet).toHaveBeenCalled();
     });
   });
 
@@ -395,8 +405,8 @@ describe('AuthService — Edge Cases & Security', () => {
   // ============================================================
   describe('verifyOtp — edge cases', () => {
     it('should fail when OTP not found in redis (expired or never sent)', async () => {
-      mockRedisService.get.mockResolvedValue(null);
-      mockRedisService.incr.mockResolvedValue(1);
+      mockRedisService.secureGet.mockResolvedValue(null);
+      mockRedisService.secureIncr.mockResolvedValue(1);
 
       await expect(
         authService.verifyOtp({ phone: '+995599123456', code: '123456' }),
@@ -404,8 +414,8 @@ describe('AuthService — Edge Cases & Security', () => {
     });
 
     it('should throw BadRequestException with specific message', async () => {
-      mockRedisService.get.mockResolvedValue(null);
-      mockRedisService.incr.mockResolvedValue(1);
+      mockRedisService.secureGet.mockResolvedValue(null);
+      mockRedisService.secureIncr.mockResolvedValue(1);
 
       await expect(
         authService.verifyOtp({ phone: '+995599123456', code: '000000' }),
@@ -437,6 +447,7 @@ describe('AuthService — Edge Cases & Security', () => {
         passwordHash: 'hashed',
         name: null,
         avatar: null,
+        emailVerified: new Date('2024-01-01'),
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       (bcrypt.compare as any).mockResolvedValue(true);
@@ -460,6 +471,7 @@ describe('AuthService — Edge Cases & Security', () => {
         passwordHash: 'hashed',
         name: null,
         avatar: null,
+        emailVerified: new Date('2024-01-01'),
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       (bcrypt.compare as any).mockResolvedValue(true);
@@ -491,13 +503,13 @@ describe('AuthService — Edge Cases & Security', () => {
       // but passwordHash exists so it passes the null check
       // Actually login checks !user.passwordHash, and passwordHash exists
       // Then compares password. Let's test via refreshTokens instead
-      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: null });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: null });
+      mockJwt.verify.mockReturnValue({ sub: 'user-1', email: null, tokenVersion: 0 });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: null, tokenVersion: 0 });
 
       await authService.refreshTokens('token');
 
       expect(mockJwt.signAsync).toHaveBeenCalledWith(
-        { sub: 'user-1', email: null },
+        { sub: 'user-1', email: null, tokenVersion: 0 },
         expect.any(Object),
       );
     });
@@ -509,6 +521,7 @@ describe('AuthService — Edge Cases & Security', () => {
         passwordHash: 'hashed',
         name: null,
         avatar: null,
+        emailVerified: new Date('2024-01-01'),
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       (bcrypt.compare as any).mockResolvedValue(true);

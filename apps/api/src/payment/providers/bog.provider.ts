@@ -20,6 +20,9 @@ export class BogProvider implements PaymentProviderInterface {
   }
 
   isMockMode(): boolean {
+    if (process.env.NODE_ENV === 'production' && (!this.clientId || !this.clientSecret)) {
+      throw new Error('BOG credentials are required in production');
+    }
     return !this.clientId || !this.clientSecret;
   }
 
@@ -68,7 +71,7 @@ export class BogProvider implements PaymentProviderInterface {
       throw new Error(`BOG payment failed: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, any>;
     return {
       orderId: data.order_id,
       paymentUrl: data.links?.redirect || data.redirect_url,
@@ -96,7 +99,9 @@ export class BogProvider implements PaymentProviderInterface {
       .update(JSON.stringify(payload))
       .digest('hex');
 
-    if (signature !== expectedSignature) {
+    const sigBuffer = Buffer.from(signature, 'hex');
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
       throw new Error('Invalid BOG callback signature');
     }
 

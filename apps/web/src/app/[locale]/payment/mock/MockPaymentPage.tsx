@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import styles from '../../../payment/page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function MockPaymentPage() {
   const t = useTranslations('payment');
+  const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId') || '';
   const amount = searchParams.get('amount') || '0';
@@ -33,7 +35,7 @@ export default function MockPaymentPage() {
       });
 
       const redirectPath = status === 'success' ? '/payment/success' : '/payment/failure';
-      window.location.href = redirectPath;
+      router.push(redirectPath);
     } catch {
       setProcessing(false);
     }

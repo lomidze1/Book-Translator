@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -7,8 +8,15 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
+  // Security headers
+  app.use(helmet());
+
+  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+  if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
+    throw new Error('CORS_ORIGIN environment variable is required in production');
+  }
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: corsOrigin,
     credentials: true,
   });
 

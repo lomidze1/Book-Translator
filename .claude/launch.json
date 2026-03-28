@@ -3,10 +3,11 @@
   "configurations": [
     {
       "name": "web",
-      "runtimeExecutable": "pnpm",
+      "runtimeExecutable": "/usr/local/lib/node_modules/corepack/shims/pnpm",
       "runtimeArgs": ["--filter", "web", "dev"],
       "port": 3000,
-      "autoPort": true
+      "autoPort": true,
+      "env": { "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" }
     },
     {
       "name": "api",

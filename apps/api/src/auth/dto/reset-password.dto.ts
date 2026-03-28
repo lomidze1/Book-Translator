@@ -1,8 +1,8 @@
-import { IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsString, MinLength, MaxLength, Matches, Length } from 'class-validator';
 
 export class ResetPasswordDto {
   @IsString()
-  @MinLength(1)
+  @Length(64, 64, { message: 'Invalid reset token' })
   token: string;
 
   @IsString()

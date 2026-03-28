@@ -1,7 +1,6 @@
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import Script from 'next/script';
 import type { Metadata, Viewport } from 'next';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
@@ -24,8 +23,6 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const t = await getTranslations({ locale, namespace: 'metadata' });
   const seo = await getTranslations({ locale, namespace: 'seo' });
 
-  const otherLocale = locale === 'ka' ? 'en' : 'ka';
-
   return {
     metadataBase: new URL(BASE_URL),
     title: {
@@ -46,18 +43,33 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       alternateLocale: locale === 'ka' ? 'en_US' : 'ka_GE',
       type: 'website',
       url: `${BASE_URL}/${locale}`,
+      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: seo('site_name') }],
     },
     twitter: {
       card: 'summary_large_image',
+      title: t('title'),
+      description: t('description'),
+      images: [`${BASE_URL}/og-image.png`],
     },
     robots: {
       index: true,
       follow: true,
     },
+    other: {
+      'script:ld+json': JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'Book Translator',
+        url: BASE_URL,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: `${BASE_URL}/${locale}/search?q={search_term_string}`,
+          'query-input': 'required name=search_term_string',
+        },
+      }),
+    },
   };
 }
-
-const themeScript = `(function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.setAttribute('data-theme','dark')}else{document.documentElement.setAttribute('data-theme','light')}})()`;
 
 export default async function LocaleLayout({
   children,
@@ -74,28 +86,8 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <head>
-        <Script id="theme-init" strategy="beforeInteractive">
-          {themeScript}
-        </Script>
-      </head>
+      <head />
       <body suppressHydrationWarning>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'WebSite',
-              name: 'Book Translator',
-              url: BASE_URL,
-              potentialAction: {
-                '@type': 'SearchAction',
-                target: `${BASE_URL}/${locale}/search?q={search_term_string}`,
-                'query-input': 'required name=search_term_string',
-              },
-            }),
-          }}
-        />
         <NextIntlClientProvider>
           <AuthProvider>
             <Navbar />

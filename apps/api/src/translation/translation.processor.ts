@@ -51,28 +51,29 @@ export class TranslationProcessor implements OnModuleInit {
   private async processTranslation(job: Job<TranslationJobData>) {
     const { translationId, bookId } = job.data;
 
-    // Get chapters
-    const chapters = await this.prisma.chapter.findMany({
+    // Get chapter count and metadata (without loading content)
+    const chapterMeta = await this.prisma.chapter.findMany({
       where: { bookId },
       orderBy: { number: 'asc' },
+      select: { id: true, number: true },
     });
 
-    if (chapters.length === 0) {
+    if (chapterMeta.length === 0) {
       await this.translationService.updateProgress(translationId, 0, 'FAILED');
       throw new Error('No chapters found for book');
     }
 
-    // Get book info
-    const book = await this.prisma.book.findUnique({ where: { id: bookId } });
+    // Get book info and translation glossary in parallel
+    const [book, translation] = await Promise.all([
+      this.prisma.book.findUnique({ where: { id: bookId } }),
+      this.prisma.translation.findUnique({ where: { id: translationId } }),
+    ]);
+
     if (!book) {
       await this.translationService.updateProgress(translationId, 0, 'FAILED');
       throw new Error('Book not found');
     }
 
-    // Get existing glossary
-    const translation = await this.prisma.translation.findUnique({
-      where: { id: translationId },
-    });
     const glossary = (translation?.glossary as Record<string, string>) || {};
 
     // Mark as in progress
@@ -80,16 +81,24 @@ export class TranslationProcessor implements OnModuleInit {
 
     let totalTokens = 0;
     let previousSummary: string | undefined;
+    const totalChapters = chapterMeta.length;
 
-    for (let i = 0; i < chapters.length; i++) {
-      const chapter = chapters[i];
+    for (let i = 0; i < totalChapters; i++) {
+      const meta = chapterMeta[i];
+
+      // Load chapter content one at a time to avoid memory bloat
+      const chapter = await this.prisma.chapter.findUnique({
+        where: { id: meta.id },
+      });
+
+      if (!chapter) continue;
 
       try {
         // Translate chapter
         const result = await this.claude.translateChapter(chapter.originalContent, {
           bookTitle: book.title,
           chapterNumber: chapter.number,
-          totalChapters: chapters.length,
+          totalChapters,
           glossary,
           previousSummary,
         });
@@ -111,7 +120,7 @@ export class TranslationProcessor implements OnModuleInit {
         previousSummary = await this.claude.generateChapterSummary(result.translatedText);
 
         // Update progress
-        const progress = Math.round(((i + 1) / chapters.length) * 100);
+        const progress = Math.round(((i + 1) / totalChapters) * 100);
         await this.translationService.updateProgress(translationId, progress);
 
         // Update total tokens
