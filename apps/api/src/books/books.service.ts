@@ -342,7 +342,7 @@ export class BooksService {
   // File Upload
   // ========================
 
-  async handleUpload(file: Express.Multer.File, userId: string) {
+  async handleUpload(file: Express.Multer.File, userId?: string) {
     const fileHash = this.generateFileHash(file.buffer);
 
     // Check duplicate
@@ -357,8 +357,8 @@ export class BooksService {
         book: { id: existing.id },
         translationAvailable: existing.translations.length > 0,
         message: existing.translations.length > 0
-          ? 'ეს წიგნი უკვე ნათარგმნია. შეგიძლია შეიძინო 5₾-ად.'
-          : 'ეს წიგნი უკვე ბაზაშია.',
+          ? 'DUPLICATE_TRANSLATED'
+          : 'DUPLICATE_EXISTS',
       };
     }
 
@@ -398,20 +398,27 @@ export class BooksService {
       const s3Key = this.s3.generateBookKey(book.id, file.originalname);
       await this.s3.upload(s3Key, file.buffer, contentType);
 
-      // Update book with S3 URL and create UserBook in a transaction
-      await this.prisma.$transaction([
+      // Update book with S3 URL and optionally create UserBook
+      const operations = [
         this.prisma.book.update({
           where: { id: book.id },
           data: { originalFileUrl: s3Key },
         }),
-        this.prisma.userBook.create({
-          data: {
-            userId,
-            bookId: book.id,
-            type: 'UPLOADED',
-          },
-        }),
-      ]);
+      ];
+
+      if (userId) {
+        operations.push(
+          this.prisma.userBook.create({
+            data: {
+              userId,
+              bookId: book.id,
+              type: 'UPLOADED',
+            },
+          }) as any,
+        );
+      }
+
+      await this.prisma.$transaction(operations);
     } catch (error) {
       // Rollback: delete orphaned book record if S3 upload or DB fails
       await this.prisma.book.delete({ where: { id: book.id } }).catch(() => {});
@@ -421,7 +428,7 @@ export class BooksService {
     return {
       duplicate: false,
       book,
-      message: 'წიგნი წარმატებით აიტვირთა. გადაიხადე 10₾ თარგმნის დასაწყებად.',
+      message: 'UPLOAD_SUCCESS',
     };
   }
 

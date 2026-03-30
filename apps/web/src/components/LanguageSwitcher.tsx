@@ -1,16 +1,17 @@
 'use client';
 
 import { useLocale } from 'next-intl';
-import { usePathname, useRouter } from '@/i18n/navigation';
+import { usePathname } from '@/i18n/navigation';
 import styles from './LanguageSwitcher.module.scss';
 
 export default function LanguageSwitcher() {
   const locale = useLocale();
   const pathname = usePathname();
-  const router = useRouter();
 
   const switchLocale = (newLocale: 'ka' | 'en') => {
-    router.replace(pathname, { locale: newLocale });
+    const search = window.location.search;
+    const hash = window.location.hash;
+    window.location.href = `/${newLocale}${pathname}${search}${hash}`;
   };
 
   return (

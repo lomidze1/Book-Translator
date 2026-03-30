@@ -7,7 +7,8 @@ import styles from '../../upload/page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-const ACCEPTED_EXTENSIONS = ['.pdf', '.epub', '.txt', '.docx'];
+// .zip included because macOS often reports EPUB/DOCX as .zip during drag & drop
+const ACCEPTED_EXTENSIONS = ['.pdf', '.epub', '.txt', '.docx', '.zip'];
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 function formatFileSize(bytes: number): string {
@@ -230,9 +231,13 @@ export default function UploadPage() {
           <div className={styles.success}>
             {uploadResult.duplicate ? (
               <>
-                <p>{uploadResult.message}</p>
+                <p>
+                  {uploadResult.message === 'DUPLICATE_TRANSLATED'
+                    ? t('duplicate_translated')
+                    : t('duplicate_exists')}
+                </p>
                 <button
-                  className={styles.uploadBtn}
+                  className={styles.viewBookBtn}
                   onClick={() => router.push(`/books/${uploadResult.book.id}`)}
                 >
                   {t('view_book')}

@@ -44,7 +44,7 @@ export default function BookDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [paymentModal, setPaymentModal] = useState<{
-    type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
+    type: 'TRANSLATION' | 'PURCHASE_TRANSLATION';
     amount: number;
     currency: string;
     translationId?: string;
@@ -197,16 +197,6 @@ export default function BookDetailsPage() {
                   {t('translate')}
                 </button>
               )}
-              <button
-                className={styles.btnSecondary}
-                onClick={() => setPaymentModal({
-                  type: 'PURCHASE_ORIGINAL',
-                  amount: 1,
-                  currency: 'USD',
-                })}
-              >
-                {t('english_version')}
-              </button>
             </div>
 
             {paymentModal && (

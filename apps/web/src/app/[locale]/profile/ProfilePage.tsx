@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from '@/i18n/navigation';
-import Image from 'next/image';
+import { useRouter, Link } from '@/i18n/navigation';
 import styles from './profile.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -56,14 +55,13 @@ export default function ProfilePage() {
         setName(data.name || '');
       })
       .catch(() => {
-        // Use cached auth user as fallback if API fails (e.g. rate limited)
         if (authUser) {
           setProfile({
             id: authUser.id,
             email: authUser.email,
             phone: null,
             name: authUser.name,
-            avatar: authUser.avatar,
+            avatar: null,
             role: 'USER',
             locale: 'ka',
             emailVerified: null,
@@ -112,40 +110,46 @@ export default function ProfilePage() {
   };
 
   if (isLoading || loading) {
-    return <div className={styles.container}><p className={styles.loading}>{t('loading')}</p></div>;
+    return (
+      <div className={styles.container}>
+        <p className={styles.loading}>{t('loading')}</p>
+      </div>
+    );
   }
 
   if (!profile) {
-    return <div className={styles.container}><p role="alert">{t('load_error')}</p></div>;
+    return (
+      <div className={styles.container}>
+        <p role="alert">{t('load_error')}</p>
+      </div>
+    );
   }
+
+  const roleKey = `role_${profile.role.toLowerCase()}` as 'role_user' | 'role_admin';
+  const memberDate = new Date(profile.createdAt).toLocaleDateString('ka-GE', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
   return (
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <div className={styles.avatar}>
-            {profile.avatar ? (
-              <Image src={profile.avatar} alt={profile.name || 'Avatar'} width={80} height={80} />
-            ) : (
-              <span>{(profile.name || profile.email || '?')[0].toUpperCase()}</span>
-            )}
-          </div>
           <h1>{profile.name || profile.email || 'User'}</h1>
-          <p className={styles.role}>{profile.role}</p>
+          <span className={styles.roleBadge}>{t(roleKey)}</span>
         </div>
 
         <div className={styles.info}>
           <div className={styles.field}>
             <label>{t('email')}</label>
             <span>{profile.email || '—'}</span>
-            {profile.emailVerified && <span className={styles.verified}>{t('verified')}</span>}
           </div>
 
           {profile.phone && (
             <div className={styles.field}>
               <label>{t('phone')}</label>
               <span>{profile.phone}</span>
-              {profile.phoneVerified && <span className={styles.verified}>{t('verified')}</span>}
             </div>
           )}
 
@@ -157,6 +161,7 @@ export default function ProfilePage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className={styles.input}
+                  autoFocus
                 />
                 <button onClick={handleSave} disabled={saving} className={styles.saveBtn}>
                   {saving ? '...' : t('save')}
@@ -166,7 +171,7 @@ export default function ProfilePage() {
                 </button>
               </div>
             ) : (
-              <div className={styles.editRow}>
+              <div className={styles.nameRow}>
                 <span>{profile.name || '—'}</span>
                 <button onClick={() => setEditing(true)} className={styles.editBtn}>
                   {t('edit')}
@@ -177,13 +182,54 @@ export default function ProfilePage() {
 
           <div className={styles.field}>
             <label>{t('member_since')}</label>
-            <span>{new Date(profile.createdAt).toLocaleDateString()}</span>
+            <span>{memberDate}</span>
           </div>
         </div>
 
-        {message && <p className={styles.message} role="alert">{message}</p>}
+        {message && (
+          <p className={styles.message} role="alert">
+            {message}
+          </p>
+        )}
+
+        <div className={styles.actions}>
+          <Link href="/profile/change-password" className={styles.actionLink}>
+            <svg className={styles.actionIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span>{t('change_password')}</span>
+            <svg className={styles.actionArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </Link>
+          <Link href="/profile/translations" className={styles.actionLink}>
+            <svg className={styles.actionIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+            <span>{t('my_translations')}</span>
+            <svg className={styles.actionArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </Link>
+          <Link href="/profile/favorites" className={styles.actionLink}>
+            <svg className={styles.actionIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            <span>{t('my_favorites')}</span>
+            <svg className={styles.actionArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </Link>
+        </div>
 
         <button onClick={handleLogout} className={styles.logoutBtn}>
+          <svg className={styles.actionIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
           {t('logout')}
         </button>
       </div>

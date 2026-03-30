@@ -49,13 +49,14 @@ export class BooksController {
   }
 
   @Post('upload')
+  @Public()
   @Throttle({ upload: { ttl: 900000, limit: 5 } })
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
   async upload(
     @UploadedFile(new FileValidationPipe()) file: Express.Multer.File,
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: { id: string } | undefined,
   ) {
-    return this.booksService.handleUpload(file, user.id);
+    return this.booksService.handleUpload(file, user?.id);
   }
 
   @Patch(':id')

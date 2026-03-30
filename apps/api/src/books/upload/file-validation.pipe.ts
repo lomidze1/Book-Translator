@@ -7,21 +7,17 @@ const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.epub', '.txt', '.docx'];
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+// Browsers (especially macOS) often report EPUB/DOCX as .zip or with generic MIME types
+const GENERIC_MIME_TYPES = ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'];
 
-// Magic bytes for file type verification
-const EXTENSION_MIME_MAP: Record<string, string> = {
-  '.pdf': 'application/pdf',
-  '.epub': 'application/epub+zip',
-  '.txt': 'text/plain',
-  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-};
+const ALLOWED_EXTENSIONS = ['.pdf', '.epub', '.txt', '.docx', '.zip'];
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 const MAGIC_BYTES: Record<string, number[]> = {
   pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
-  epub: [0x50, 0x4b, 0x03, 0x04], // PK (ZIP)
-  docx: [0x50, 0x4b, 0x03, 0x04], // PK (ZIP)
+  zip: [0x50, 0x4b, 0x03, 0x04], // PK (ZIP — covers EPUB and DOCX)
+  epub: [0x50, 0x4b, 0x03, 0x04],
+  docx: [0x50, 0x4b, 0x03, 0x04],
 };
 
 @Injectable()
@@ -43,24 +39,23 @@ export class FileValidationPipe implements PipeTransform {
     }
 
     // Extension check
-    const ext = this.getExtension(file.originalname);
+    let ext = this.getExtension(file.originalname);
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       throw new BadRequestException(
         `ფაილის ტიპი "${ext}" არ არის მხარდაჭერილი. გამოიყენე: PDF, EPUB, TXT, DOCX`,
       );
     }
 
-    // MIME type check
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    // MIME type check — accept known + generic types, rely on magic bytes for security
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype) && !GENERIC_MIME_TYPES.includes(file.mimetype)) {
       throw new BadRequestException('ფაილის MIME ტიპი არ არის მხარდაჭერილი');
     }
 
-    // MIME-to-extension cross-validation
-    const expectedMime = EXTENSION_MIME_MAP[ext];
-    if (expectedMime && file.mimetype !== expectedMime) {
-      throw new BadRequestException(
-        `ფაილის ტიპი და MIME არ ემთხვევა ერთმანეთს (${ext} ≠ ${file.mimetype})`,
-      );
+    // If extension is .zip, detect real type from content
+    if (ext === '.zip' && file.buffer) {
+      ext = this.detectZipContent(file.buffer);
+      // Update originalname so downstream code gets the correct extension
+      file.originalname = file.originalname.replace(/\.zip$/i, ext);
     }
 
     // Magic bytes check (for PDF, EPUB, DOCX)
@@ -73,6 +68,24 @@ export class FileValidationPipe implements PipeTransform {
 
   private getExtension(filename: string): string {
     return filename.substring(filename.lastIndexOf('.')).toLowerCase();
+  }
+
+  private detectZipContent(buffer: Buffer): string {
+    // EPUB files contain a "mimetype" file as the first entry with content "application/epub+zip"
+    // Check if the ZIP contains the EPUB signature
+    const content = buffer.toString('ascii', 0, Math.min(buffer.length, 100));
+    if (content.includes('mimetypeapplication/epub+zip')) {
+      return '.epub';
+    }
+
+    // DOCX files contain [Content_Types].xml
+    const contentStr = buffer.toString('ascii', 0, Math.min(buffer.length, 500));
+    if (contentStr.includes('[Content_Types].xml') || contentStr.includes('word/')) {
+      return '.docx';
+    }
+
+    // Default: treat as EPUB (most common case for book uploads)
+    return '.epub';
   }
 
   private verifyMagicBytes(buffer: Buffer, ext: string): void {

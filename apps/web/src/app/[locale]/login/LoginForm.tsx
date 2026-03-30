@@ -84,7 +84,9 @@ export default function LoginPage() {
           setEmailNotVerified(true);
           return;
         }
-        if (res.status === 429) {
+        if (res.status === 401) {
+          setError(t('error_credentials'));
+        } else if (res.status === 429 || data.message?.includes('Too many')) {
           setError(t('error_rate_limit'));
         } else {
           setError(t('error_default'));

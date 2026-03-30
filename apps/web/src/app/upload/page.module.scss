@@ -197,6 +197,24 @@
   }
 }
 
+.viewBookBtn {
+  display: inline-block;
+  margin-top: $spacing-md;
+  padding: 10px 24px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: $radius-md;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
 .infoBox {
   background: var(--surface);
   border-radius: $radius-md;
