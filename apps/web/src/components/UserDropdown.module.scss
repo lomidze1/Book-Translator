@@ -1,0 +1,109 @@
+@use '../styles/variables' as *;
+
+.wrapper {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: 6px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: $radius-full;
+  background: var(--card-bg);
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: var(--surface-hover);
+    border-color: var(--primary);
+  }
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: $radius-full;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.chevron {
+  font-size: 0.65rem;
+  transition: transform 0.2s;
+
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: $radius-md;
+  box-shadow: 0 8px 24px var(--shadow-lg);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.header {
+  padding: $spacing-md;
+  border-bottom: 1px solid var(--card-border);
+
+  .name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--foreground);
+  }
+
+  .email {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+}
+
+.section {
+  padding: $spacing-xs 0;
+  border-bottom: 1px solid var(--card-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.item {
+  display: block;
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.1s;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.logoutItem {
+  composes: item;
+  color: var(--error-text);
+}

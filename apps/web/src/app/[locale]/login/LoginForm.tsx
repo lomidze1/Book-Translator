@@ -103,7 +103,7 @@ export default function LoginPage() {
       if (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')) {
         router.push(returnUrl);
       } else {
-        router.push('/');
+        router.push('/dashboard');
       }
     } catch {
       setError(t('error_server'));

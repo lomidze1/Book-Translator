@@ -2,13 +2,23 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Book Translator',
+    name: 'Book Translator — წიგნების AI თარგმანი',
     short_name: 'BookTranslator',
-    description: 'AI-powered English to Georgian book translation',
+    description: 'ინგლისურენოვანი წიგნების ქართულ ენაზე AI თარგმანის პლატფორმა',
     start_url: '/ka',
+    scope: '/',
     display: 'standalone',
+    dir: 'ltr',
     background_color: '#ffffff',
-    theme_color: '#ffffff',
-    icons: [{ src: '/favicon.ico', sizes: 'any', type: 'image/x-icon' }],
+    theme_color: '#2563eb',
+    orientation: 'any',
+    categories: ['books', 'education'],
+    lang: 'ka',
+    icons: [
+      { src: '/favicon.ico', sizes: 'any', type: 'image/x-icon' },
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
   };
 }

@@ -10,6 +10,8 @@ import { UsersModule } from './users/users.module';
 import { BooksModule } from './books/books.module';
 import { TranslationModule } from './translation/translation.module';
 import { PaymentModule } from './payment/payment.module';
+import { ReaderModule } from './reader/reader.module';
+import { TtsModule } from './tts/tts.module';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { PaymentModule } from './payment/payment.module';
     BooksModule,
     TranslationModule,
     PaymentModule,
+    ReaderModule,
+    TtsModule,
   ],
   providers: [
     {
