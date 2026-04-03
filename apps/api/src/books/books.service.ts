@@ -3,9 +3,11 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
+import { ParsingService } from '../parsing/parsing.service';
 import { CreateBookDto, UpdateBookDto, SearchBooksDto, PaginationDto } from './dto';
 import * as crypto from 'crypto';
 
@@ -41,9 +43,12 @@ export interface SearchResult {
 
 @Injectable()
 export class BooksService {
+  private readonly logger = new Logger(BooksService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
+    private readonly parsing: ParsingService,
   ) {}
 
   // ========================
@@ -419,6 +424,20 @@ export class BooksService {
       }
 
       await this.prisma.$transaction(operations);
+
+      // Parse file to calculate pageCount (non-blocking — don't fail upload if parsing fails)
+      try {
+        const parsed = await this.parsing.parse(file.buffer, formatMap[ext] || 'PDF');
+        const totalWords = parsed.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+        const pageCount = Math.max(1, Math.ceil(totalWords / 250));
+        await this.prisma.book.update({
+          where: { id: book.id },
+          data: { pageCount },
+        });
+        this.logger.log(`Book ${book.id}: parsed ${parsed.chapters.length} chapters, ${totalWords} words, ~${pageCount} pages`);
+      } catch (parseErr) {
+        this.logger.warn(`Could not parse book for page count: ${parseErr instanceof Error ? parseErr.message : parseErr}`);
+      }
     } catch (error) {
       // Rollback: delete orphaned book record if S3 upload or DB fails
       await this.prisma.book.delete({ where: { id: book.id } }).catch(() => {});

@@ -128,16 +128,18 @@ model Chapter {
 }
 
 model Translation {
-  id             String            @id @default(cuid())
-  bookId         String
-  book           Book              @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  sourceLanguage String            @default("en")
-  targetLanguage String            @default("ka")
-  status         TranslationStatus @default(PENDING)
-  progress       Float             @default(0)
-  aiModel        String?
+  id              String            @id @default(cuid())
+  bookId          String
+  book            Book              @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sourceLanguage  String            @default("en")
+  targetLanguage  String            @default("ka")
+  status          TranslationStatus @default(PENDING)
+  translationType TranslationType   @default(FAST)
+  progress        Float             @default(0)
+  estimatedPrice  Decimal?          @db.Decimal(10, 2)
+  aiModel         String?
   totalTokensUsed Int?
-  glossary       Json?
+  glossary        Json?
 
   translatedChapters TranslatedChapter[]
   audioBooks         AudioBook[]
@@ -153,6 +155,11 @@ model Translation {
   @@index([bookId])
   @@index([status])
   @@index([bookId, status])
+}
+
+enum TranslationType {
+  FAST
+  STANDARD
 }
 
 enum TranslationStatus {

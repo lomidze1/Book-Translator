@@ -18,6 +18,11 @@
   text-decoration: none;
   margin-bottom: $spacing-lg;
   font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
 
   &:hover {
     text-decoration: underline;
@@ -29,6 +34,34 @@
   padding: $spacing-xl;
   font-size: 1.1rem;
   color: var(--text-secondary);
+}
+
+.loginPrompt {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: $radius-md;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+  text-align: center;
+}
+
+.loginPromptTitle {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: $spacing-md;
+  color: var(--foreground);
+}
+
+.loginPromptActions {
+  display: flex;
+  gap: $spacing-sm;
+  justify-content: center;
+  flex-wrap: wrap;
+
+  a, button {
+    text-decoration: none;
+    text-align: center;
+  }
 }
 
 .bookLayout {
@@ -220,4 +253,24 @@
   float: right;
   color: var(--text-secondary);
   font-size: 0.8rem;
+}
+
+.pricingOptions {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.pricingDesc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 $spacing-md;
+}
+
+.qualityNote {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: $spacing-sm;
+  font-style: italic;
 }

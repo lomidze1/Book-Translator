@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -11,6 +12,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 export default function LoginPage() {
   const t = useTranslations('login');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -95,7 +97,14 @@ export default function LoginPage() {
       }
 
       login(data.accessToken, data.refreshToken, data.user);
-      router.push('/');
+
+      // Redirect to returnUrl if present and safe (relative path only)
+      const returnUrl = searchParams.get('returnUrl');
+      if (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')) {
+        router.push(returnUrl);
+      } else {
+        router.push('/');
+      }
     } catch {
       setError(t('error_server'));
     } finally {

@@ -16,15 +16,18 @@ export class TranslationService {
     private readonly parsing: ParsingService,
   ) {
     try {
+      const redisConn = getRedisConnection();
+      this.logger.log(`Initializing BullMQ Queue — Redis at ${redisConn.host}:${redisConn.port}`);
       this.queue = new Queue(TRANSLATION_QUEUE, {
-        connection: getRedisConnection(),
+        connection: redisConn,
       });
-    } catch {
-      this.logger.warn('BullMQ queue not initialized — Redis may be unavailable');
+      this.logger.log('✅ BullMQ Queue initialized successfully');
+    } catch (err) {
+      this.logger.error(`❌ BullMQ queue init FAILED: ${err instanceof Error ? err.stack : err}`);
     }
   }
 
-  async createTranslation(bookId: string, userId: string, targetLanguage = 'ka') {
+  async createTranslation(bookId: string, userId: string, targetLanguage = 'ka', translationType: 'FAST' | 'STANDARD' = 'FAST') {
     // Check book exists and verify ownership (select only needed fields)
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
@@ -41,9 +44,12 @@ export class TranslationService {
       throw new NotFoundException('Book not found');
     }
 
-    // Verify ownership
+    // Auto-create UserBook if user doesn't own the book yet
+    // (e.g., book was uploaded anonymously before login)
     if (book.userBooks.length === 0) {
-      throw new ForbiddenException('You do not have access to this book');
+      await this.prisma.userBook.create({
+        data: { userId, bookId, type: 'UPLOADED' },
+      });
     }
 
     // Check if translation already exists
@@ -64,16 +70,39 @@ export class TranslationService {
       await this.parseAndSaveChapters(book.id, book.originalFileUrl, book.originalFormat || 'PDF');
     }
 
-    // Create translation record (PENDING — waits for payment)
+    // In development, skip payment — set status to PAID directly
+    const isDev = process.env.NODE_ENV !== 'production';
+    const initialStatus = isDev ? 'PAID' : 'PENDING';
+
     const translation = await this.prisma.translation.create({
       data: {
         bookId,
         sourceLanguage: 'en',
         targetLanguage,
-        status: 'PENDING',
+        translationType,
+        status: initialStatus,
         progress: 0,
       },
     });
+
+    // In dev mode, auto-start translation (skip payment step)
+    if (isDev) {
+      if (this.queue) {
+        this.logger.log(`Dev mode: auto-starting translation ${translation.id}`);
+        await this.startTranslation(translation.id);
+      } else {
+        this.logger.warn(`Queue not available — cannot auto-start translation ${translation.id}. Retrying queue init...`);
+        // Retry queue initialization
+        try {
+          this.queue = new (await import('bullmq')).Queue(TRANSLATION_QUEUE, {
+            connection: getRedisConnection(),
+          });
+          await this.startTranslation(translation.id);
+        } catch (err) {
+          this.logger.error(`Failed to initialize queue: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    }
 
     return translation;
   }
@@ -94,6 +123,7 @@ export class TranslationService {
 
     // Add to queue
     if (this.queue) {
+      this.logger.log(`Adding translation ${translationId} to queue...`);
       await this.queue.add('translate-book', {
         translationId: translation.id,
         bookId: translation.bookId,

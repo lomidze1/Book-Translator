@@ -25,31 +25,46 @@ export class TranslationProcessor implements OnModuleInit {
 
   onModuleInit() {
     try {
+      const redisConn = getRedisConnection();
+      this.logger.log(`Starting BullMQ Worker — Redis at ${redisConn.host}:${redisConn.port}, queue: "${TRANSLATION_QUEUE}"`);
+
       this.worker = new Worker(
         TRANSLATION_QUEUE,
         async (job: Job<TranslationJobData>) => {
+          this.logger.log(`📖 Processing translation job ${job.id}: translationId=${job.data.translationId}`);
           await this.processTranslation(job);
         },
         {
-          connection: getRedisConnection(),
+          connection: redisConn,
           concurrency: 1,
+          stalledInterval: 300000, // 5 minutes — translation takes long
+          lockDuration: 600000,   // 10 minutes lock
         },
       );
 
+      this.worker.on('ready', () => {
+        this.logger.log('✅ Translation Worker is READY and listening for jobs');
+      });
+
       this.worker.on('failed', (job, err) => {
-        this.logger.error(`Translation job ${job?.id} failed: ${err.message}`);
+        this.logger.error(`❌ Translation job ${job?.id} FAILED: ${err.message}\n${err.stack}`);
       });
 
       this.worker.on('completed', (job) => {
-        this.logger.log(`Translation job ${job.id} completed`);
+        this.logger.log(`✅ Translation job ${job.id} COMPLETED`);
       });
-    } catch {
-      this.logger.warn('Translation worker not started — Redis may be unavailable');
+
+      this.worker.on('error', (err) => {
+        this.logger.error(`❌ Worker error: ${err.message}`);
+      });
+    } catch (err) {
+      this.logger.error(`❌ Translation worker init FAILED: ${err instanceof Error ? err.stack : err}`);
     }
   }
 
   private async processTranslation(job: Job<TranslationJobData>) {
     const { translationId, bookId } = job.data;
+    this.logger.log(`🔄 Starting translation: translationId=${translationId}, bookId=${bookId}`);
 
     // Get chapter count and metadata (without loading content)
     const chapterMeta = await this.prisma.chapter.findMany({
@@ -57,6 +72,8 @@ export class TranslationProcessor implements OnModuleInit {
       orderBy: { number: 'asc' },
       select: { id: true, number: true },
     });
+
+    this.logger.log(`Found ${chapterMeta.length} chapters for book ${bookId}`);
 
     if (chapterMeta.length === 0) {
       await this.translationService.updateProgress(translationId, 0, 'FAILED');
@@ -94,6 +111,7 @@ export class TranslationProcessor implements OnModuleInit {
       if (!chapter) continue;
 
       try {
+        this.logger.log(`📝 Translating chapter ${chapter.number}/${totalChapters} (${chapter.originalContent.length} chars)...`);
         // Translate chapter
         const result = await this.claude.translateChapter(chapter.originalContent, {
           bookTitle: book.title,
@@ -104,6 +122,7 @@ export class TranslationProcessor implements OnModuleInit {
         });
 
         totalTokens += result.tokensUsed;
+        this.logger.log(`✅ Chapter ${chapter.number} translated (${result.tokensUsed} tokens, ${result.translatedText.length} chars)`);
 
         // Save translated chapter
         await this.translationService.saveTranslatedChapter(

@@ -21,7 +21,7 @@ import { PaymentModule } from './payment/payment.module';
       {
         name: 'default',
         ttl: 60000,
-        limit: 100,
+        limit: process.env.NODE_ENV === 'production' ? 100 : 500,
       },
       {
         name: 'upload',

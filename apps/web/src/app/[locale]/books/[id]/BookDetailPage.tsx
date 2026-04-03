@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { usePathname } from '@/i18n/navigation';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import PaymentModal from '@/components/PaymentModal';
@@ -40,31 +41,193 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 export default function BookDetailsPage() {
   const t = useTranslations('book');
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [book, setBook] = useState<BookDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [translating, setTranslating] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [pricing, setPricing] = useState<{
+    pageCount: number;
+    hasExistingTranslation: boolean;
+    existing: { amount: number; currency: string } | null;
+    fast: { amount: number; currency: string } | null;
+    slow: { amount: number; currency: string } | null;
+  } | null>(null);
   const [paymentModal, setPaymentModal] = useState<{
     type: 'TRANSLATION' | 'PURCHASE_TRANSLATION';
     amount: number;
     currency: string;
     translationId?: string;
+    translationType?: 'FAST' | 'STANDARD';
   } | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Cleanup polling on unmount
   useEffect(() => {
-    async function fetchBook() {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  // Fetch book data
+  useEffect(() => {
+    async function fetchBook(retries = 2) {
       try {
         const res = await fetch(`${API_URL}/api/books/${params.id}`);
-        if (!res.ok) throw new Error('Book not found');
+        if (res.status === 429 && retries > 0) {
+          await new Promise(r => setTimeout(r, 2000));
+          return fetchBook(retries - 1);
+        }
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.message || 'Book not found');
+        }
         const data = await res.json();
         setBook(data);
-      } catch {
-        setError(t('not_found'));
+
+        // Fetch pricing
+        try {
+          const priceRes = await fetch(`${API_URL}/api/payments/pricing/${params.id}`);
+          if (priceRes.ok) setPricing(await priceRes.json());
+        } catch { /* pricing fetch is non-critical */ }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '';
+        if (message.includes('Too many') || message.includes('rate')) {
+          setError(t('error_rate_limit'));
+        } else {
+          setError(t('not_found'));
+        }
       } finally {
         setLoading(false);
       }
     }
     if (params.id) fetchBook();
   }, [params.id, t]);
+
+  // Poll for translation progress when IN_PROGRESS or PAID
+  const startPolling = useCallback((translationId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (!token) return;
+
+        const res = await fetch(`${API_URL}/api/translations/${translationId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        // On rate limit, skip this cycle — don't spam
+        if (res.status === 429) return;
+        if (!res.ok) return;
+
+        const translation = await res.json();
+
+        // Update book's translation data in state
+        setBook(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            translations: prev.translations.map(tr =>
+              tr.id === translationId
+                ? { ...tr, status: translation.status, progress: translation.progress, completedAt: translation.completedAt }
+                : tr
+            ),
+          };
+        });
+
+        // Stop polling if done
+        if (translation.status === 'COMPLETED' || translation.status === 'FAILED') {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setTranslating(false);
+        }
+      } catch {
+        // Silently fail polling
+      }
+    }, 15000); // Poll every 15 seconds to avoid rate limiting
+  }, []);
+
+  // Auto-start polling if there's an active translation
+  useEffect(() => {
+    if (!book) return;
+    const active = book.translations.find(tr => tr.status === 'IN_PROGRESS' || tr.status === 'PAID');
+    if (active) {
+      setTranslating(true);
+      startPolling(active.id);
+    }
+  }, [book?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTranslateClick = async (translationType: 'FAST' | 'STANDARD' = 'FAST') => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setShowLoginPrompt(true);
+        return;
+      }
+
+      setTranslating(true);
+      setError('');
+
+      const res = await fetch(`${API_URL}/api/translations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ bookId: book!.id, translationType }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = data.message || '';
+        if (res.status === 403 || msg.includes('access')) {
+          setError(t('error_no_access'));
+        } else if (res.status === 400 && msg.includes('already exists')) {
+          setError(t('error_translation_exists'));
+        } else if (res.status === 429) {
+          setError(t('error_rate_limit'));
+        } else {
+          setError(t('error_translation_failed'));
+        }
+        setTranslating(false);
+        return;
+      }
+
+      const translation = await res.json();
+
+      // Dev mode: translation starts automatically
+      if (translation.status === 'PAID' || translation.status === 'IN_PROGRESS') {
+        // Add new translation to book state
+        setBook(prev => prev ? {
+          ...prev,
+          translations: [...prev.translations, {
+            id: translation.id,
+            status: translation.status,
+            targetLanguage: translation.targetLanguage || 'ka',
+            progress: translation.progress || 0,
+          }],
+        } : prev);
+
+        startPolling(translation.id);
+        return;
+      }
+
+      // Production: open payment modal
+      setTranslating(false);
+      setPaymentModal({
+        type: 'TRANSLATION',
+        amount: 10,
+        currency: 'GEL',
+        translationId: translation.id,
+      });
+    } catch {
+      setError(t('error_network'));
+      setTranslating(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -76,62 +239,47 @@ export default function BookDetailsPage() {
     );
   }
 
-  if (error || !book) {
+  if (error && !book) {
     return (
       <div className={styles.main}>
         <div className={styles.container}>
           <p className={styles.error} role="alert">{error || t('not_found')}</p>
-          <Link href="/search" className={styles.backLink}>{t('back_to_search')}</Link>
+          <button onClick={() => router.back()} className={styles.backLink}>{t('back_to_search')}</button>
         </div>
       </div>
     );
   }
 
-  const handleTranslateClick = async () => {
-    try {
-      // First create the translation record
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        setError(t('error_login_required'));
-        return;
-      }
-      const res = await fetch(`${API_URL}/api/translations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ bookId: book.id }),
-      });
+  if (!book) return null;
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || t('error_translation_failed'));
-        return;
-      }
-
-      const translation = await res.json();
-
-      // Open payment modal for the translation
-      setPaymentModal({
-        type: 'TRANSLATION',
-        amount: 10,
-        currency: 'GEL',
-        translationId: translation.id,
-      });
-    } catch {
-      setError(t('error_network'));
-    }
-  };
-
-  const completedTranslation = book.translations.find(t => t.status === 'COMPLETED');
-  const inProgressTranslation = book.translations.find(t => t.status === 'IN_PROGRESS');
-  const pendingTranslation = book.translations.find(t => t.status === 'PENDING' || t.status === 'PAID');
+  const completedTranslation = book.translations.find(tr => tr.status === 'COMPLETED');
+  const inProgressTranslation = book.translations.find(tr => tr.status === 'IN_PROGRESS');
+  const paidTranslation = book.translations.find(tr => tr.status === 'PAID');
+  const pendingTranslation = book.translations.find(tr => tr.status === 'PENDING');
+  const failedTranslation = book.translations.find(tr => tr.status === 'FAILED');
+  // Show PAID as "in progress" visually (translation is about to start)
+  const activeTranslation = inProgressTranslation || paidTranslation;
 
   return (
     <div className={styles.main}>
       <div className={styles.container}>
-        <Link href="/search" className={styles.backLink}>{t('back_to_search')}</Link>
+        <button onClick={() => router.back()} className={styles.backLink}>{t('back_to_search')}</button>
+
+        {showLoginPrompt && (
+          <div className={styles.loginPrompt} role="alert">
+            <p className={styles.loginPromptTitle}>{t('login_required_description')}</p>
+            <div className={styles.loginPromptActions}>
+              <Link href={`/login?returnUrl=${encodeURIComponent(pathname)}`} className={styles.btnPrimary}>
+                {t('login_button')}
+              </Link>
+              <button onClick={() => setShowLoginPrompt(false)} className={styles.btnSecondary}>
+                {t('back_to_search')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && <p className={styles.error} role="alert">{error}</p>}
 
         <div className={styles.bookLayout}>
           <div className={styles.coverSection}>
@@ -178,23 +326,67 @@ export default function BookDetailsPage() {
 
             <div className={styles.actions}>
               {completedTranslation ? (
-                <button className={styles.btnPrimary}>{t('translation_georgian')}</button>
-              ) : inProgressTranslation ? (
+                <Link href={`/books/${book.id}/read`} className={styles.btnPrimary}>
+                  {t('read_translation')}
+                </Link>
+              ) : activeTranslation ? (
                 <div className={styles.progressBox}>
-                  <p>{t('translation_in_progress')}</p>
+                  <p>{t('translation_progress', { progress: Math.round(activeTranslation.progress) })}</p>
                   <div className={styles.progressBar}>
-                    <div className={styles.progressFill} style={{ width: `${inProgressTranslation.progress}%` }} />
+                    <div className={styles.progressFill} style={{ width: `${activeTranslation.progress}%` }} />
                   </div>
-                  <span>{Math.round(inProgressTranslation.progress)}%</span>
+                  <span>{Math.round(activeTranslation.progress)}%</span>
+                </div>
+              ) : failedTranslation ? (
+                <div>
+                  <p className={styles.error}>{t('translation_failed')}</p>
+                  <button className={styles.btnPrimary} onClick={() => handleTranslateClick('FAST')}>
+                    {t('retry_translation')}
+                  </button>
                 </div>
               ) : pendingTranslation ? (
                 <button className={styles.btnPrimary} disabled>{t('translation_pending')}</button>
+              ) : pricing ? (
+                <div className={styles.pricingOptions}>
+                  {pricing.hasExistingTranslation && pricing.existing ? (
+                    <button
+                      className={styles.btnPrimary}
+                      onClick={() => handleTranslateClick('FAST')}
+                      disabled={translating}
+                    >
+                      {t('translate_existing', { price: pricing.existing.amount })}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className={styles.btnPrimary}
+                        onClick={() => handleTranslateClick('FAST')}
+                        disabled={translating}
+                      >
+                        {translating ? t('translation_started') : t('translate_fast', { price: pricing.fast?.amount || 10 })}
+                      </button>
+                      <p className={styles.pricingDesc}>{t('translate_fast_desc')}</p>
+
+                      <button
+                        className={styles.btnSecondary}
+                        onClick={() => handleTranslateClick('STANDARD')}
+                        disabled={translating}
+                      >
+                        {t('translate_slow', { price: pricing.slow?.amount || 5 })}
+                      </button>
+                      <p className={styles.pricingDesc}>{t('translate_slow_desc')}</p>
+
+                      <p className={styles.qualityNote}>{t('translate_quality_note')}</p>
+                    </>
+                  )}
+                </div>
               ) : (
                 <button
                   className={styles.btnPrimary}
-                  onClick={() => handleTranslateClick()}
+                  onClick={() => handleTranslateClick('FAST')}
+                  disabled={translating}
                 >
-                  {t('translate')}
+                  {translating ? t('translation_started') : t('translate')}
                 </button>
               )}
             </div>

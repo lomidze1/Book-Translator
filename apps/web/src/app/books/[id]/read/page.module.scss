@@ -1,0 +1,144 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.main {
+  min-height: calc(100vh - 140px);
+  padding: $spacing-xl 0;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 $spacing-md;
+}
+
+.backLink {
+  display: inline-block;
+  color: var(--primary);
+  text-decoration: none;
+  margin-bottom: $spacing-lg;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.loading, .error {
+  text-align: center;
+  padding: $spacing-xl;
+  color: var(--text-secondary);
+}
+
+.error {
+  color: var(--error);
+}
+
+.header {
+  margin-bottom: $spacing-xl;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: $spacing-lg;
+
+  h1 {
+    font-size: 1.8rem;
+    margin: 0 0 $spacing-xs;
+  }
+
+  .author {
+    color: var(--text-secondary);
+    font-size: 1rem;
+  }
+}
+
+.layout {
+  display: flex;
+  gap: $spacing-xl;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+.sidebar {
+  flex: 0 0 220px;
+  position: sticky;
+  top: $spacing-xl;
+  align-self: flex-start;
+
+  @media (max-width: 768px) {
+    flex: none;
+    position: static;
+  }
+
+  h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin: 0 0 $spacing-sm;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  li {
+    margin: 0;
+  }
+}
+
+.tocLink {
+  display: block;
+  padding: $spacing-xs $spacing-sm;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background: var(--bg-hover);
+  }
+
+  &.active {
+    background: var(--primary);
+    color: white;
+  }
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.chapter {
+  margin-bottom: $spacing-xl * 2;
+  scroll-margin-top: $spacing-lg;
+
+  h2 {
+    font-size: 1.4rem;
+    margin: 0 0 $spacing-lg;
+    padding-bottom: $spacing-sm;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+}
+
+.chapterText {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+
+  p {
+    margin: 0 0 $spacing-md;
+  }
+}

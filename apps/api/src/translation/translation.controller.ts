@@ -11,7 +11,7 @@ export class TranslationController {
 
   @Post()
   async create(@Body() dto: CreateTranslationDto, @CurrentUser('id') userId: string) {
-    return this.translationService.createTranslation(dto.bookId, userId, dto.targetLanguage);
+    return this.translationService.createTranslation(dto.bookId, userId, dto.targetLanguage, dto.translationType);
   }
 
   @Get('my')
@@ -27,5 +27,16 @@ export class TranslationController {
   @Get('book/:bookId')
   async getByBook(@Param('bookId') bookId: string, @CurrentUser('id') userId: string) {
     return this.translationService.getTranslationsByBook(bookId, userId);
+  }
+
+  @Post(':id/retry')
+  async retryTranslation(@Param('id') id: string) {
+    // Dev only — restart a stuck translation
+    if (process.env.NODE_ENV === 'production') {
+      return { error: 'Not available in production' };
+    }
+    // Reset status to PAID and re-queue
+    await this.translationService.updateProgress(id, 0, 'PAID');
+    return this.translationService.startTranslation(id);
   }
 }

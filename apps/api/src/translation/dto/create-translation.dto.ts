@@ -8,4 +8,8 @@ export class CreateTranslationDto {
   @IsOptional()
   @IsIn(['ka', 'en'])
   targetLanguage?: string = 'ka';
+
+  @IsOptional()
+  @IsIn(['FAST', 'STANDARD'])
+  translationType?: 'FAST' | 'STANDARD' = 'FAST';
 }

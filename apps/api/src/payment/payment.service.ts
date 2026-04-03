@@ -5,17 +5,12 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { BogProvider } from './providers/bog.provider';
 import { TbcProvider } from './providers/tbc.provider';
 import { PaymentProviderInterface, CallbackValidation } from './providers/payment-provider.interface';
 import { TranslationService } from '../translation/translation.service';
-
-const PRICING = {
-  NEW_TRANSLATION: 10,
-  EXISTING_TRANSLATION: 5,
-  ENGLISH_ORIGINAL: 1,
-} as const;
 
 @Injectable()
 export class PaymentService {
@@ -24,6 +19,7 @@ export class PaymentService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
     private readonly bogProvider: BogProvider,
     private readonly tbcProvider: TbcProvider,
     private readonly translationService: TranslationService,
@@ -34,12 +30,93 @@ export class PaymentService {
     };
   }
 
+  /**
+   * Calculate dynamic price based on page count and translation type
+   */
+  calculatePrice(pageCount: number, translationType: 'FAST' | 'STANDARD' = 'FAST') {
+    const perPageFast = parseFloat(this.config.get('PRICE_PER_PAGE_FAST') || '0.15');
+    const perPageSlow = parseFloat(this.config.get('PRICE_PER_PAGE_SLOW') || '0.07');
+    const minPrice = parseFloat(this.config.get('PRICE_MIN') || '10');
+    const currency = this.config.get('PRICE_CURRENCY') || 'GEL';
+
+    const rate = translationType === 'FAST' ? perPageFast : perPageSlow;
+    const calculated = Math.round(pageCount * rate);
+    const amount = Math.max(calculated, minPrice);
+
+    return { amount, currency, pageCount, rate, translationType };
+  }
+
+  /**
+   * Get price for already-translated book (fixed price)
+   */
+  getExistingTranslationPrice() {
+    const amount = parseFloat(this.config.get('PRICE_EXISTING') || '5');
+    const currency = this.config.get('PRICE_CURRENCY') || 'GEL';
+    return { amount, currency };
+  }
+
+  /**
+   * Get both pricing options for a book
+   */
+  async getBookPricing(bookId: string) {
+    const book = await this.prisma.book.findUnique({
+      where: { id: bookId },
+      select: {
+        id: true,
+        pageCount: true,
+        title: true,
+        chapters: {
+          select: { wordCount: true },
+        },
+        translations: {
+          where: { status: 'COMPLETED' },
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!book) throw new NotFoundException('Book not found');
+
+    // Calculate pageCount: from DB field, or from chapters wordCount
+    let pageCount = book.pageCount || 0;
+    if (pageCount === 0 && book.chapters.length > 0) {
+      const totalWords = book.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+      pageCount = Math.ceil(totalWords / 250);
+    }
+    const hasCompletedTranslation = book.translations.length > 0;
+
+    if (hasCompletedTranslation) {
+      const existing = this.getExistingTranslationPrice();
+      return {
+        bookId: book.id,
+        pageCount,
+        hasExistingTranslation: true,
+        existing: { amount: existing.amount, currency: existing.currency },
+        fast: null,
+        slow: null,
+      };
+    }
+
+    const fast = this.calculatePrice(pageCount, 'FAST');
+    const slow = this.calculatePrice(pageCount, 'STANDARD');
+
+    return {
+      bookId: book.id,
+      pageCount,
+      hasExistingTranslation: false,
+      existing: null,
+      fast: { amount: fast.amount, currency: fast.currency },
+      slow: { amount: slow.amount, currency: slow.currency },
+    };
+  }
+
   async createPayment(
     userId: string,
     bookId: string,
     type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION',
     providerName: 'BOG' | 'TBC',
     translationId?: string,
+    translationType?: 'FAST' | 'STANDARD',
   ) {
     // Verify book exists
     const book = await this.prisma.book.findUnique({
@@ -73,8 +150,8 @@ export class PaymentService {
       throw new BadRequestException('You already have a pending payment for this item');
     }
 
-    // Determine amount and currency
-    const { amount, currency } = this.getPrice(type);
+    // Determine amount and currency (dynamic based on page count)
+    const { amount, currency } = this.getPrice(type, book.pageCount || 0, translationType);
 
     // Get provider
     const provider = this.providers[providerName];
@@ -337,14 +414,22 @@ export class PaymentService {
     }
   }
 
-  private getPrice(type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION') {
+  private getPrice(
+    type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION',
+    pageCount?: number,
+    translationType?: 'FAST' | 'STANDARD',
+  ) {
     switch (type) {
       case 'TRANSLATION':
-        return { amount: PRICING.NEW_TRANSLATION, currency: 'GEL' };
+        if (pageCount && translationType) {
+          return this.calculatePrice(pageCount, translationType);
+        }
+        // Fallback to minimum price
+        return { amount: parseFloat(this.config.get('PRICE_MIN') || '10'), currency: this.config.get('PRICE_CURRENCY') || 'GEL' };
       case 'PURCHASE_TRANSLATION':
-        return { amount: PRICING.EXISTING_TRANSLATION, currency: 'GEL' };
+        return this.getExistingTranslationPrice();
       case 'PURCHASE_ORIGINAL':
-        return { amount: PRICING.ENGLISH_ORIGINAL, currency: 'USD' };
+        return { amount: 1, currency: 'USD' };
     }
   }
 }

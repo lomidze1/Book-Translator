@@ -32,6 +32,13 @@ export class PaymentController {
     );
   }
 
+  // Public endpoint — get book pricing (fast/slow/existing)
+  @Public()
+  @Get('pricing/:bookId')
+  async getBookPricing(@Param('bookId') bookId: string) {
+    return this.paymentService.getBookPricing(bookId);
+  }
+
   @Get('history')
   async getHistory(
     @CurrentUser('id') userId: string,

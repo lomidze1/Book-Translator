@@ -41,6 +41,20 @@ export default function UploadPage() {
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
 
+  // Restore uploadResult from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('uploadResult');
+      if (saved) {
+        const parsed = JSON.parse(saved) as UploadResponse;
+        setUploadResult(parsed);
+        setUploadProgress(100);
+      }
+    } catch {
+      sessionStorage.removeItem('uploadResult');
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (xhrRef.current) xhrRef.current.abort();
@@ -135,8 +149,16 @@ export default function UploadPage() {
       setUploadProgress(100);
       setUploadResult(result);
 
+      // Save to sessionStorage so result survives navigation (e.g., login redirect)
+      try {
+        sessionStorage.setItem('uploadResult', JSON.stringify(result));
+      } catch {
+        // sessionStorage might be full or unavailable
+      }
+
       if (!result.duplicate) {
         redirectTimerRef.current = setTimeout(() => {
+          sessionStorage.removeItem('uploadResult');
           router.push(`/books/${result.book.id}`);
         }, 2000);
       }
@@ -155,6 +177,7 @@ export default function UploadPage() {
     setError('');
     setUploadProgress(0);
     setUploadResult(null);
+    sessionStorage.removeItem('uploadResult');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -238,7 +261,10 @@ export default function UploadPage() {
                 </p>
                 <button
                   className={styles.viewBookBtn}
-                  onClick={() => router.push(`/books/${uploadResult.book.id}`)}
+                  onClick={() => {
+                    sessionStorage.removeItem('uploadResult');
+                    router.push(`/books/${uploadResult.book.id}`);
+                  }}
                 >
                   {t('view_book')}
                 </button>
