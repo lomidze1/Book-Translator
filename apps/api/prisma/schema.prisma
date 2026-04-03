@@ -269,6 +269,7 @@ model Bookmark {
   @@unique([userId, bookId, chapterNumber, position])
   @@index([userId])
   @@index([bookId])
+  @@index([userId, bookId])
 }
 
 model Highlight {
@@ -289,6 +290,7 @@ model Highlight {
 
   @@index([userId])
   @@index([bookId])
+  @@index([userId, bookId])
 }
 
 model Note {
@@ -308,6 +310,7 @@ model Note {
   @@index([userId])
   @@index([bookId])
   @@index([highlightId])
+  @@index([userId, bookId])
 }
 
 model ReadingProgress {
@@ -387,6 +390,8 @@ model AudioChapter {
   @@index([audioBookId])
   @@index([chapterId])
   @@index([status])
+  @@index([audioBookId, chapterNumber, status])
+  @@index([audioBookId, status])
 }
 
 enum AudioChapterStatus {

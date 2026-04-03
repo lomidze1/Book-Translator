@@ -5,6 +5,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
+import UserDropdown from './UserDropdown';
 import styles from './Navbar.module.scss';
 
 export default function Navbar() {
@@ -34,14 +35,11 @@ export default function Navbar() {
           <LanguageSwitcher />
           {!isLoading && (
             isLoggedIn ? (
-              <>
-                <Link href="/profile" className={styles.profileBtn}>
-                  {user?.name || t('profile')}
-                </Link>
-                <button onClick={handleLogout} className={styles.logoutBtn}>
-                  {t('logout')}
-                </button>
-              </>
+              <UserDropdown
+                userName={user?.name || null}
+                userEmail={user?.email || null}
+                onLogout={handleLogout}
+              />
             ) : (
               <>
                 <Link href="/login" className={styles.loginBtn}>

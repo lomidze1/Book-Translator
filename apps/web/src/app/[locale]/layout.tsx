@@ -88,6 +88,11 @@ export default async function LocaleLayout({
     <html lang={locale} suppressHydrationWarning>
       <head />
       <body suppressHydrationWarning>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.addEventListener('load',function(){if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}});`,
+          }}
+        />
         <NextIntlClientProvider>
           <AuthProvider>
             <Navbar />
