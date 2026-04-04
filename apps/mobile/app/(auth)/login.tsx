@@ -73,6 +73,10 @@ export default function LoginScreen() {
           <Text style={s.buttonText}>{loading ? 'იტვირთება...' : 'შესვლა'}</Text>
         </TouchableOpacity>
 
+        <Link href="/(auth)/forgot-password" style={s.forgotLink}>
+          <Text style={[s.forgotText, { color: theme.textSecondary }]}>დაგავიწყდათ პაროლი?</Text>
+        </Link>
+
         <Link href="/(auth)/register" style={s.link}>
           <Text style={[s.linkText, { color: theme.primary }]}>არ გაქვთ ანგარიში? რეგისტრაცია</Text>
         </Link>
@@ -107,6 +111,8 @@ const s = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  link: { marginTop: 20, alignSelf: 'center' },
+  forgotLink: { marginTop: 16, alignSelf: 'center' },
+  forgotText: { fontSize: 13 },
+  link: { marginTop: 12, alignSelf: 'center' },
   linkText: { fontSize: 14 },
 });
