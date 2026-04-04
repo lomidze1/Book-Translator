@@ -367,7 +367,13 @@ export class AuthService {
       },
     });
 
-    await this.emailService.sendPasswordResetEmail(user.email!, resetToken, user.name ?? undefined);
+    try {
+      this.logger.log(`Sending password reset email to ${user.email}`);
+      await this.emailService.sendPasswordResetEmail(user.email!, resetToken, user.name ?? undefined);
+      this.logger.log(`Password reset email sent successfully to ${user.email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${user.email}: ${error instanceof Error ? error.message : error}`);
+    }
 
     return { message: 'Reset link sent to email' };
   }
