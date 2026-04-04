@@ -1,7 +1,6 @@
-const CACHE_NAME = 'book-translator-v1';
-const STATIC_CACHE = 'static-assets-v1';
+const CACHE_NAME = 'book-translator-v2';
+const STATIC_CACHE = 'static-assets-v2';
 
-// Cache app shell on install
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) =>
@@ -11,7 +10,6 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Clean old caches on activate
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -25,51 +23,64 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Listen for logout message to clear user-specific caches
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CLEAR_AUTH_CACHE') {
     caches.delete(CACHE_NAME);
   }
 });
 
-// Network-first for API requests; NO caching of authenticated responses
-// Only cache static assets and public pages
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Never cache API requests (they contain user-specific authenticated data)
+  // Never cache API requests (authenticated data)
   if (url.pathname.startsWith('/api/')) {
     return;
   }
 
-  // Cache static assets (images, fonts, CSS, JS)
-  if (
-    url.pathname.match(/\.(js|css|woff2?|ttf|png|jpg|svg|ico)$/)
-  ) {
+  // Next.js hashed static assets (_next/static/) — cache-first
+  // These filenames contain content hashes, so cached versions are always valid
+  if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {
         const cached = await cache.match(request);
         if (cached) return cached;
 
-        try {
-          const response = await fetch(request);
-          if (response.ok) {
-            cache.put(request, response.clone());
-          }
-          return response;
-        } catch {
-          return cached || new Response('Offline', { status: 503 });
+        const response = await fetch(request);
+        if (response.ok) {
+          cache.put(request, response.clone());
         }
+        return response;
       })
     );
     return;
   }
 
-  // For navigation requests, try network first, fall back to cache
+  // Non-hashed assets (images, fonts, favicon) — stale-while-revalidate
+  if (url.pathname.match(/\.(woff2?|ttf|png|jpg|svg|ico)$/)) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(async (cache) => {
+        const cached = await cache.match(request);
+        const fetchPromise = fetch(request).then((response) => {
+          if (response.ok) {
+            cache.put(request, response.clone());
+          }
+          return response;
+        }).catch(() => cached);
+
+        return cached || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // Navigation requests — network-first, fallback to cache
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() => caches.match(request))
     );
   }
+
+  // All other requests (including non-hashed JS/CSS) — network only
+  // This prevents stale chunks from breaking the app after deployments
 });

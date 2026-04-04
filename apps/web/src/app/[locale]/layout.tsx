@@ -6,6 +6,7 @@ import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://booktranslator.ge';
 
@@ -88,11 +89,7 @@ export default async function LocaleLayout({
     <html lang={locale} suppressHydrationWarning>
       <head />
       <body suppressHydrationWarning>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.addEventListener('load',function(){if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}});`,
-          }}
-        />
+        <ServiceWorkerRegistrar />
         <NextIntlClientProvider>
           <AuthProvider>
             <Navbar />
