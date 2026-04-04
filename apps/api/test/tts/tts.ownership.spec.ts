@@ -17,15 +17,16 @@ describe('TTS Ownership & Authorization', () => {
     audioChapter: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), upsert: vi.fn() },
   };
   const mockS3 = { getPresignedUrl: vi.fn(), delete: vi.fn() };
-  const mockElevenlabs = { getVoices: vi.fn().mockResolvedValue([]) };
-  const mockAzure = { getVoices: vi.fn().mockResolvedValue([]) };
+  const mockProviderManager = {
+    getProvider: vi.fn().mockReturnValue({ getVoices: vi.fn().mockResolvedValue([]) }),
+  };
 
   const userA = 'user-A';
   const userB = 'user-B';
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new (TtsService as any)(mockPrisma, mockS3, mockElevenlabs, mockAzure);
+    service = new (TtsService as any)(mockPrisma, mockS3, mockProviderManager);
   });
 
   it('user should not synthesize book they do not own', async () => {

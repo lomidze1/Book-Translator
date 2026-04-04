@@ -812,6 +812,13 @@
   gap: $spacing-sm;
 }
 
+.audioVolumeSlider {
+  width: 60px;
+  height: 4px;
+  cursor: pointer;
+  accent-color: $color-primary;
+}
+
 .audioSelect {
   padding: 2px 6px;
   border: 1px solid var(--reader-border);
@@ -820,4 +827,367 @@
   color: var(--reader-text);
   font-size: 0.75rem;
   cursor: pointer;
+}
+
+// ========================
+// TTS Generation Panel
+// ========================
+
+.ttsPanel {
+  padding: $spacing-md;
+  border: 1px solid var(--reader-border);
+  border-radius: $radius-md;
+  background: var(--reader-bg);
+  margin-bottom: $spacing-md;
+}
+
+.ttsPanelTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: $spacing-sm;
+  color: var(--reader-text);
+}
+
+.ttsSpeedSelect {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin: $spacing-sm 0;
+
+  label {
+    font-size: 0.85rem;
+    color: var(--reader-text-secondary, #666);
+  }
+}
+
+.ttsSelect {
+  padding: 4px 8px;
+  border: 1px solid var(--reader-border);
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--reader-text);
+  font-size: 0.85rem;
+}
+
+.ttsEstimate {
+  padding: $spacing-sm;
+  background: var(--reader-card-bg, rgba(0, 0, 0, 0.03));
+  border-radius: $radius-sm;
+  margin: $spacing-sm 0;
+}
+
+.ttsEstimateRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--reader-text-secondary, #666);
+  padding: 2px 0;
+}
+
+.ttsGenerateBtn {
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  background: $color-primary;
+  color: white;
+  border: none;
+  border-radius: $radius-md;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+
+  &:hover { opacity: 0.9; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.ttsError {
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin: $spacing-xs 0;
+}
+
+.ttsConfirm {
+  padding: $spacing-sm;
+  border: 1px solid var(--reader-border);
+  border-radius: $radius-sm;
+  background: var(--reader-card-bg, rgba(0, 0, 0, 0.03));
+}
+
+.ttsConfirmTitle {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: $spacing-xs;
+}
+
+.ttsConfirmText {
+  font-size: 0.85rem;
+  color: var(--reader-text-secondary, #666);
+  margin-bottom: $spacing-sm;
+}
+
+.ttsConfirmActions {
+  display: flex;
+  gap: $spacing-sm;
+}
+
+.ttsConfirmYes {
+  flex: 1;
+  padding: $spacing-xs $spacing-sm;
+  background: $color-primary;
+  color: white;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  font-weight: 600;
+
+  &:hover { opacity: 0.9; }
+}
+
+.ttsConfirmNo {
+  flex: 1;
+  padding: $spacing-xs $spacing-sm;
+  background: transparent;
+  border: 1px solid var(--reader-border);
+  border-radius: $radius-sm;
+  color: var(--reader-text);
+  cursor: pointer;
+
+  &:hover { background: var(--reader-card-bg, rgba(0, 0, 0, 0.05)); }
+}
+
+// ========================
+// Voice Selector
+// ========================
+
+.voiceSelector {
+  margin: $spacing-sm 0;
+}
+
+.voiceLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--reader-text);
+  margin-bottom: $spacing-xs;
+  display: block;
+}
+
+.voiceLoading {
+  font-size: 0.85rem;
+  color: var(--reader-text-secondary, #666);
+}
+
+.voiceGenderFilter {
+  display: flex;
+  gap: 4px;
+  margin-bottom: $spacing-xs;
+}
+
+.genderBtn {
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  border: 1px solid var(--reader-border);
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--reader-text);
+  cursor: pointer;
+
+  &.active {
+    background: $color-primary;
+    color: white;
+    border-color: $color-primary;
+  }
+}
+
+.voiceList {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--reader-border);
+  border-radius: $radius-sm;
+}
+
+.voiceItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-xs $spacing-sm;
+  cursor: pointer;
+  border-bottom: 1px solid var(--reader-border);
+  transition: background 0.15s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--reader-card-bg, rgba(0, 0, 0, 0.03)); }
+}
+
+.voiceSelected {
+  background: rgba($color-primary, 0.08);
+  border-left: 3px solid $color-primary;
+}
+
+.voiceInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.voiceName {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--reader-text);
+}
+
+.voiceMeta {
+  font-size: 0.7rem;
+  color: var(--reader-text-secondary, #888);
+}
+
+.voicePreviewBtn {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border: 1px solid $color-primary;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: $color-primary;
+  cursor: pointer;
+
+  &:hover { background: rgba($color-primary, 0.1); }
+}
+
+.noVoices {
+  padding: $spacing-sm;
+  text-align: center;
+  color: var(--reader-text-secondary, #888);
+  font-size: 0.85rem;
+}
+
+// ========================
+// TTS Progress Bar
+// ========================
+
+.ttsProgress {
+  padding: $spacing-md;
+  border: 1px solid var(--reader-border);
+  border-radius: $radius-md;
+  background: var(--reader-bg);
+  margin-bottom: $spacing-md;
+}
+
+.ttsProgressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+}
+
+.ttsProgressTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--reader-text);
+}
+
+.ttsRetryBtn {
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  border: 1px solid #ef4444;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+
+  &:hover { background: rgba(#ef4444, 0.1); }
+}
+
+.ttsProgressBarOuter {
+  height: 8px;
+  background: var(--reader-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: $spacing-xs;
+}
+
+.ttsProgressBarInner {
+  height: 100%;
+  background: $color-primary;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.ttsProgressInfo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--reader-text-secondary, #666);
+}
+
+.ttsEta {
+  font-size: 0.8rem;
+  color: var(--reader-text-secondary, #666);
+  text-align: center;
+  margin-top: $spacing-xs;
+}
+
+// ========================
+// Karaoke Highlight
+// ========================
+
+.karaokeActive {
+  background-color: rgba($color-primary, 0.15);
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+  padding: 1px 0;
+}
+
+// ========================
+// TTS Side Panel & Floating Button
+// ========================
+
+.ttsSidePanel {
+  position: fixed;
+  right: 0;
+  top: 60px;
+  bottom: 0;
+  width: 340px;
+  max-width: 90vw;
+  background: var(--reader-bg, #fff);
+  border-left: 1px solid var(--reader-border);
+  z-index: 100;
+  overflow-y: auto;
+  padding: $spacing-md;
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.1);
+}
+
+.ttsClosePanelBtn {
+  position: absolute;
+  top: $spacing-sm;
+  right: $spacing-sm;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--reader-text);
+  border-radius: 50%;
+
+  &:hover { background: var(--reader-card-bg, rgba(0, 0, 0, 0.05)); }
+}
+
+.ttsFloatingBtn {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: $color-primary;
+  color: white;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+
+  &:hover { transform: scale(1.1); }
 }

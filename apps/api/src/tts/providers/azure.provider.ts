@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TtsProvider, TtsOptions, TtsSynthesisResult, Voice } from './tts-provider.interface';
+import { escapeXml, estimateMp3Duration } from '../utils/shared';
 
 @Injectable()
 export class AzureProvider implements TtsProvider {
@@ -84,7 +85,7 @@ export class AzureProvider implements TtsProvider {
       if (!retryRes.ok) throw new Error(`Azure TTS error ${retryRes.status}`);
       const arrayBuffer = await retryRes.arrayBuffer();
       const audioBuffer = Buffer.from(arrayBuffer);
-      const durationMs = Math.round((audioBuffer.length * 8) / 128000 * 1000);
+      const durationMs = estimateMp3Duration(audioBuffer.length);
       return { audioBuffer, durationMs };
     }
 
@@ -98,7 +99,7 @@ export class AzureProvider implements TtsProvider {
 
     const arrayBuffer = await res.arrayBuffer();
     const audioBuffer = Buffer.from(arrayBuffer);
-    const durationMs = Math.round((audioBuffer.length * 8) / 128000 * 1000);
+    const durationMs = estimateMp3Duration(audioBuffer.length);
 
     return { audioBuffer, durationMs };
   }
@@ -161,10 +162,10 @@ export class AzureProvider implements TtsProvider {
   }
 
   buildSsml(text: string, voiceId: string, speed: number): string {
-    const escapedText = this.escapeXml(text);
+    const escapedText = escapeXml(text);
     const rate = speed === 1.0 ? 'default' : `${Math.round(speed * 100)}%`;
 
-    const safeVoiceId = this.escapeXml(voiceId);
+    const safeVoiceId = escapeXml(voiceId);
     return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ka-GE">
   <voice name="${safeVoiceId}">
     <prosody rate="${rate}">
@@ -174,12 +175,4 @@ export class AzureProvider implements TtsProvider {
 </speak>`;
   }
 
-  private escapeXml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-  }
 }

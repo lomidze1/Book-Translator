@@ -146,28 +146,35 @@
 
 ---
 
-## ფაზა 6: ხმოვანი წაკითხვა (TTS Service)
+## ფაზა 6: ხმოვანი წაკითხვა (TTS Service) — ✅ დასრულებული (100%)
 **მიზანი:** წიგნის ხმოვანი წაკითხვის სრული სისტემა
+**დეტალური გეგმა:** [`docs/PHASE-6-TTS-PLAN.md`](./PHASE-6-TTS-PLAN.md)
 
 ### ამოცანები:
 | ამოცანა | სტატუსი | დატესტილია |
 |---|---|---|
-| TTS Worker სერვისის შექმნა (`apps/tts-worker`) | ❌ | ❌ |
-| Google Cloud TTS API ინტეგრაცია (ქართული Neural2 ხმები) | ❌ | ❌ |
-| BullMQ — აუდიო გენერაციის job queue | ❌ | ❌ |
-| ტექსტის ფრაგმენტებად დაყოფა (წინადადებები/აბზაცები) | ❌ | ❌ |
-| ffmpeg — ფრაგმენტების შეერთება MP3/M4A ფაილებად | ❌ | ❌ |
-| S3 — აუდიო ფაილების შენახვა და streaming | ❌ | ❌ |
-| აუდიო caching — ერთხელ გენერირებული აუდიოს ხელახლა გამოყენება | ❌ | ❌ |
-| Socket.io — აუდიო გენერაციის რეალ-ტაიმ პროგრესი | ❌ | ❌ |
-| DB მოდელები — AudioBook, AudioChapter ცხრილები (Prisma) | ✅ | ❌ |
-| WebSocket Gateway (tts.gateway.ts) | ✅ | ❌ |
-| ვებ აუდიო პლეიერი (Play/Pause, progress bar, speed) | ❌ | ❌ |
-| ვებ აუდიო პლეიერი (ტექსტის highlight karaoke-style) | ❌ | ❌ |
-| ვებ აუდიო პლეიერი (Sleep Timer, Media Session API) | ❌ | ❌ |
-| მობილური აუდიო პლეიერი (Background, Lock screen, Headphone) | ❌ | ❌ |
-| ხმის პარამეტრები — ხმის არჩევა, სიჩქარე, ტონი | ❌ | ❌ |
-| API endpoints — TTS generation, audio streaming, progress | ❌ | ❌ |
+| TTS Module სტრუქტურა (tts.module.ts, service, controller, processor) | ✅ | ✅ |
+| DB მოდელები — AudioBook, AudioChapter ცხრილები (Prisma) | ✅ | ✅ |
+| WebSocket Gateway (tts.gateway.ts — progress events) | ✅ | ✅ |
+| ElevenLabs TTS პროვაიდერი | ✅ | ✅ |
+| Azure TTS პროვაიდერი (ნაწილობრივი) | ✅ | ✅ |
+| ტექსტის ფრაგმენტებად დაყოფა — ქართული-aware (text-chunker.ts) | ✅ | ✅ |
+| ffmpeg — ფრაგმენტების შეერთება MP3 ფაილებად (audio-concat.ts) | ✅ | ✅ |
+| BullMQ — აუდიო გენერაციის job queue + processor | ✅ | ✅ |
+| S3 — აუდიო ფაილების შენახვა და streaming (presigned URLs) | ✅ | ✅ |
+| აუდიო caching — ერთხელ გენერირებული აუდიოს ხელახლა გამოყენება | ✅ | ✅ |
+| ვებ აუდიო პლეიერი (Play/Pause, progress bar, speed, ±15s) | ✅ | ✅ |
+| ვებ აუდიო პლეიერი (Sleep Timer, Media Session API) | ✅ | ✅ |
+| API endpoints — synthesize, synthesize-book, status, stream, voices, delete | ✅ | ✅ |
+| Google Cloud TTS API ინტეგრაცია (ქართული Neural2 ხმები) | ✅ | ✅ |
+| Provider Fallback / Health-Check სისტემა (ProviderManager) | ✅ | ✅ |
+| ვებ UI — ხმის არჩევა (VoiceSelector) + TTS Generation Panel | ✅ | ✅ |
+| ვებ აუდიო პლეიერი (ტექსტის highlight karaoke-style) | ✅ | ✅ |
+| ვებ AudioPlayer — volume, keyboard shortcuts, chapter dropdown | ✅ | ✅ |
+| მობილური აუდიო პლეიერი (Background, Lock screen, Headphone) | ✅ | ✅ |
+| მობილური — Offline აუდიო download & cache | ✅ | ✅ |
+| ხმის პარამეტრები — ხმის preview, ფასის ესტიმაცია | ✅ | ✅ |
+| Cost tracking, retry endpoint, timestamps endpoint | ✅ | ✅ |
 
 ---
 

@@ -11,9 +11,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { SynthesizeDto, SynthesizeBookDto } from './dto/synthesize.dto';
 import { TTS_QUEUE, getRedisConnection } from './tts.constants';
-import { ElevenLabsProvider } from './providers/elevenlabs.provider';
-import { AzureProvider } from './providers/azure.provider';
-import { TtsProvider, Voice } from './providers/tts-provider.interface';
+import { ProviderManager } from './providers/provider-manager';
+import { Voice } from './providers/tts-provider.interface';
 import type { TtsJobData } from './tts.processor';
 
 @Injectable()
@@ -24,8 +23,7 @@ export class TtsService implements OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
-    private readonly elevenlabs: ElevenLabsProvider,
-    private readonly azure: AzureProvider,
+    private readonly providerManager: ProviderManager,
   ) {
     try {
       this.queue = new Queue(TTS_QUEUE, { connection: getRedisConnection() });
@@ -41,10 +39,8 @@ export class TtsService implements OnModuleDestroy {
     }
   }
 
-  private getProvider(name?: string): TtsProvider {
-    const primary = process.env.TTS_PRIMARY_PROVIDER || 'elevenlabs';
-    const providerName = name || primary;
-    return providerName === 'azure' ? this.azure : this.elevenlabs;
+  private getProvider(name?: string) {
+    return this.providerManager.getProvider(name);
   }
 
   // ========================
@@ -62,7 +58,7 @@ export class TtsService implements OnModuleDestroy {
 
     return this.s3.getPresignedUrl(
       audioChapter.audioUrl,
-      Math.min(parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'), 14400),
+      Math.min(Math.min(parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'), 14400), 14400),
     );
   }
 
@@ -132,7 +128,7 @@ export class TtsService implements OnModuleDestroy {
         status: 'ready',
         audioUrl: await this.s3.getPresignedUrl(
           existingChapter.audioUrl,
-          parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'),
+          Math.min(parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'), 14400),
         ),
       };
     }
@@ -175,7 +171,7 @@ export class TtsService implements OnModuleDestroy {
         translatedText: translatedChapter.translatedContent,
         voiceId,
         speed,
-        provider: providerName as 'elevenlabs' | 'azure',
+        provider: providerName as 'google-cloud' | 'elevenlabs' | 'azure',
         totalChapters: audioBook.totalChapters,
         completedSoFar: audioBook.completedChapters,
       };
@@ -276,7 +272,7 @@ export class TtsService implements OnModuleDestroy {
           translatedText: tc.translatedContent,
           voiceId,
           speed,
-          provider: providerName as 'elevenlabs' | 'azure',
+          provider: providerName as 'google-cloud' | 'elevenlabs' | 'azure',
           totalChapters: translatedChapters.length,
           completedSoFar: i,
         };
@@ -372,7 +368,7 @@ export class TtsService implements OnModuleDestroy {
 
     return this.s3.getPresignedUrl(
       audioChapter.audioUrl,
-      parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'),
+      Math.min(parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'), 14400),
     );
   }
 
@@ -406,6 +402,170 @@ export class TtsService implements OnModuleDestroy {
 
     // Delete records (cascade will handle AudioChapters)
     await this.prisma.audioBook.delete({ where: { id: audioBookId } });
+  }
+
+  // ========================
+  // Estimate cost/time
+  // ========================
+
+  async estimate(bookId: string, userId: string, providerName?: string) {
+    const { translation } = await this.validateAndGetTranslation(bookId, userId);
+
+    const translatedChapters = await this.prisma.translatedChapter.findMany({
+      where: { translationId: translation.id },
+      include: { chapter: true },
+    });
+
+    if (translatedChapters.length === 0) {
+      throw new NotFoundException('თარგმნილი თავები ვ��რ მოიძებნა');
+    }
+
+    const totalCharacters = translatedChapters.reduce(
+      (sum, tc) => sum + (tc.translatedContent?.length || 0), 0,
+    );
+
+    const provider = providerName || process.env.TTS_PRIMARY_PROVIDER || 'google-cloud';
+    const costEstimate = this.providerManager.estimateCost(totalCharacters, provider);
+    const costUsd = costEstimate.costUsd;
+    const estimatedAudioMinutes = costEstimate.estimatedAudioMinutes;
+
+    return {
+      totalChapters: translatedChapters.length,
+      totalCharacters,
+      estimatedCostUsd: Math.round(costUsd * 100) / 100,
+      estimatedAudioMinutes: Math.round(estimatedAudioMinutes * 10) / 10,
+      estimatedAudioHours: Math.round((estimatedAudioMinutes / 60) * 10) / 10,
+      provider,
+    };
+  }
+
+  // ========================
+  // Retry failed chapters
+  // ========================
+
+  async retryFailed(audioBookId: string, userId: string) {
+    const audioBook = await this.prisma.audioBook.findUnique({
+      where: { id: audioBookId },
+      include: {
+        chapters: { where: { status: 'FAILED' } },
+        book: { include: { userBooks: { where: { userId } } } },
+      },
+    });
+
+    if (!audioBook) {
+      throw new NotFoundException('AudioBook ვერ მოიძებნა');
+    }
+
+    if (audioBook.book.userBooks.length === 0) {
+      throw new ForbiddenException('არ გაქვთ ამ AudioBook-ზე წვდომა');
+    }
+
+    const failedChapters = audioBook.chapters;
+    if (failedChapters.length === 0) {
+      return { audioBookId, retriedChapters: [], status: 'no_failures' };
+    }
+
+    // Get translation for text content
+    const translation = await this.prisma.translation.findFirst({
+      where: { bookId: audioBook.bookId, status: 'COMPLETED' },
+    });
+
+    if (!translation) {
+      throw new NotFoundException('დასრულებული თარგმანი ვერ მოიძებნა');
+    }
+
+    // Batch fetch all translated chapters to avoid N+1
+    const translatedChapters = await this.prisma.translatedChapter.findMany({
+      where: { translationId: translation.id },
+      include: { chapter: true },
+    });
+    const tcMap = new Map(translatedChapters.map((tc) => [tc.chapter.number, tc]));
+
+    let queued = 0;
+    const retriedChapterNumbers: number[] = [];
+
+    for (const failedCh of failedChapters) {
+      const translatedChapter = tcMap.get(failedCh.chapterNumber);
+      if (!translatedChapter) continue;
+
+      // Reset status
+      await this.prisma.audioChapter.update({
+        where: { id: failedCh.id },
+        data: { status: 'PENDING' },
+      });
+
+      if (this.queue) {
+        const jobData: TtsJobData = {
+          audioBookId,
+          audioChapterId: failedCh.id,
+          bookId: audioBook.bookId,
+          chapterId: translatedChapter.chapter.id,
+          chapterNumber: failedCh.chapterNumber,
+          translatedText: translatedChapter.translatedContent,
+          voiceId: audioBook.voiceId,
+          speed: 1.0,
+          provider: (process.env.TTS_PRIMARY_PROVIDER || 'google-cloud') as 'google-cloud' | 'elevenlabs' | 'azure',
+          totalChapters: audioBook.totalChapters,
+          completedSoFar: audioBook.completedChapters,
+        };
+
+        await this.queue.add('synthesize-chapter', jobData, {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+        });
+        queued++;
+        retriedChapterNumbers.push(failedCh.chapterNumber);
+      }
+    }
+
+    // Update book status
+    if (queued > 0) {
+      await this.prisma.audioBook.update({
+        where: { id: audioBookId },
+        data: { status: 'IN_PROGRESS', errorMessage: null },
+      });
+    }
+
+    return {
+      audioBookId,
+      retriedChapters: retriedChapterNumbers,
+      queued,
+      status: 'queued',
+    };
+  }
+
+  // ========================
+  // Get timestamps for karaoke
+  // ========================
+
+  async getTimestamps(audioBookId: string, chapterNumber: number, userId: string) {
+    const audioBook = await this.prisma.audioBook.findUnique({
+      where: { id: audioBookId },
+      include: {
+        book: { include: { userBooks: { where: { userId } } } },
+      },
+    });
+
+    if (!audioBook) {
+      throw new NotFoundException('AudioBook ვერ მოიძებნა');
+    }
+
+    if (audioBook.book.userBooks.length === 0) {
+      throw new ForbiddenException('არ გაქვთ ამ AudioBook-ზე წვდომა');
+    }
+
+    const audioChapter = await this.prisma.audioChapter.findFirst({
+      where: { audioBookId, chapterNumber, status: 'COMPLETED' },
+    });
+
+    if (!audioChapter) {
+      throw new NotFoundException('აუდიო თავი ვერ მოიძებნა');
+    }
+
+    return {
+      chapterNumber,
+      timestamps: audioChapter.timestamps || [],
+    };
   }
 
   // ========================

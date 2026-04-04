@@ -34,16 +34,14 @@ describe('TtsProcessor', () => {
     emitError: vi.fn(),
   };
 
-  const mockElevenlabs = {
+  const mockDefaultProvider = {
     synthesize: vi.fn().mockResolvedValue({ audioBuffer: Buffer.from('audio'), durationMs: 5000 }),
     getMaxChunkSize: vi.fn().mockReturnValue(4500),
     getName: vi.fn().mockReturnValue('elevenlabs'),
   };
 
-  const mockAzure = {
-    synthesize: vi.fn(),
-    getMaxChunkSize: vi.fn().mockReturnValue(8000),
-    getName: vi.fn().mockReturnValue('azure'),
+  const mockProviderManager = {
+    getProvider: vi.fn().mockReturnValue(mockDefaultProvider),
   };
 
   const createMockJob = (data: Partial<TtsJobData> = {}) => ({
@@ -68,7 +66,7 @@ describe('TtsProcessor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     processor = new (TtsProcessor as any)(
-      mockPrisma, mockS3, mockGateway, mockElevenlabs, mockAzure,
+      mockPrisma, mockS3, mockGateway, mockProviderManager,
     );
 
     // Default: single chunk, successful synthesis
@@ -88,7 +86,7 @@ describe('TtsProcessor', () => {
     it('should call TTS provider synthesize for each chunk', async () => {
       const job = createMockJob();
       await (processor as any).processChapter(job);
-      expect(mockElevenlabs.synthesize).toHaveBeenCalled();
+      expect(mockDefaultProvider.synthesize).toHaveBeenCalled();
     });
 
     it('should upload final audio to S3 with correct key', async () => {
@@ -193,7 +191,7 @@ describe('TtsProcessor', () => {
     });
 
     it('should mark AudioChapter as FAILED if provider throws', async () => {
-      mockElevenlabs.synthesize.mockRejectedValue(new Error('Provider error'));
+      mockDefaultProvider.synthesize.mockRejectedValue(new Error('Provider error'));
       mockPrisma.audioChapter.count.mockResolvedValue(0);
       const job = createMockJob();
 
@@ -206,7 +204,7 @@ describe('TtsProcessor', () => {
     });
 
     it('should mark AudioBook as FAILED if no chapters succeeded', async () => {
-      mockElevenlabs.synthesize.mockRejectedValue(new Error('Error'));
+      mockDefaultProvider.synthesize.mockRejectedValue(new Error('Error'));
       mockPrisma.audioChapter.count
         .mockResolvedValueOnce(0) // remaining
         .mockResolvedValueOnce(0); // completed
@@ -221,7 +219,7 @@ describe('TtsProcessor', () => {
     });
 
     it('should mark AudioBook as PARTIAL if some chapters succeeded', async () => {
-      mockElevenlabs.synthesize.mockRejectedValue(new Error('Error'));
+      mockDefaultProvider.synthesize.mockRejectedValue(new Error('Error'));
       mockPrisma.audioChapter.count
         .mockResolvedValueOnce(0)  // remaining
         .mockResolvedValueOnce(2); // completed
@@ -236,7 +234,7 @@ describe('TtsProcessor', () => {
     });
 
     it('should emit error event on failure', async () => {
-      mockElevenlabs.synthesize.mockRejectedValue(new Error('Error'));
+      mockDefaultProvider.synthesize.mockRejectedValue(new Error('Error'));
       mockPrisma.audioChapter.count.mockResolvedValue(0);
       const job = createMockJob();
 
@@ -248,14 +246,14 @@ describe('TtsProcessor', () => {
     });
 
     it('should call job.updateProgress per chunk', async () => {
-      mockElevenlabs.synthesize.mockResolvedValue({ audioBuffer: Buffer.from('audio'), durationMs: 5000 });
+      mockDefaultProvider.synthesize.mockResolvedValue({ audioBuffer: Buffer.from('audio'), durationMs: 5000 });
       const job = createMockJob();
       await (processor as any).processChapter(job);
       expect(job.updateProgress).toHaveBeenCalledWith(100);
     });
 
     it('should mark book as IN_PROGRESS on first chapter', async () => {
-      mockElevenlabs.synthesize.mockResolvedValue({ audioBuffer: Buffer.from('audio'), durationMs: 5000 });
+      mockDefaultProvider.synthesize.mockResolvedValue({ audioBuffer: Buffer.from('audio'), durationMs: 5000 });
       const job = createMockJob({ completedSoFar: 0 });
       await (processor as any).processChapter(job);
 
@@ -266,11 +264,21 @@ describe('TtsProcessor', () => {
     });
 
     it('should use azure provider when specified', async () => {
-      mockAzure.synthesize.mockResolvedValue({ audioBuffer: Buffer.from('audio'), durationMs: 3000 });
+      const mockAzureProvider = {
+        synthesize: vi.fn().mockResolvedValue({ audioBuffer: Buffer.from('audio'), durationMs: 3000 }),
+        getMaxChunkSize: vi.fn().mockReturnValue(8000),
+        getName: vi.fn().mockReturnValue('azure'),
+      };
+      mockProviderManager.getProvider.mockReturnValue(mockAzureProvider);
+
       const job = createMockJob({ provider: 'azure' });
       await (processor as any).processChapter(job);
-      expect(mockAzure.synthesize).toHaveBeenCalled();
-      expect(mockElevenlabs.synthesize).not.toHaveBeenCalled();
+
+      expect(mockProviderManager.getProvider).toHaveBeenCalledWith('azure');
+      expect(mockAzureProvider.synthesize).toHaveBeenCalled();
+
+      // Restore default provider for other tests
+      mockProviderManager.getProvider.mockReturnValue(mockDefaultProvider);
     });
   });
 });

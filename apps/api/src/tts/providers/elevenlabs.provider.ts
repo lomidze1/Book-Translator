@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TtsProvider, TtsOptions, TtsSynthesisResult, Voice } from './tts-provider.interface';
+import { estimateMp3Duration, TtsRateLimitError } from '../utils/shared';
 
 @Injectable()
 export class ElevenLabsProvider implements TtsProvider {
@@ -75,6 +76,7 @@ export class ElevenLabsProvider implements TtsProvider {
         throw new TtsRateLimitError(
           `ElevenLabs rate limit exceeded`,
           retryAfter ? parseInt(retryAfter) : 60,
+          'elevenlabs',
         );
       }
 
@@ -95,9 +97,7 @@ export class ElevenLabsProvider implements TtsProvider {
       const arrayBuffer = await res.arrayBuffer();
       const audioBuffer = Buffer.from(arrayBuffer);
 
-      // Estimate duration: MP3 128kbps → durationMs = (bytes * 8) / (128000) * 1000
-      const bitrate = 128000;
-      const durationMs = Math.round((audioBuffer.length * 8) / bitrate * 1000);
+      const durationMs = estimateMp3Duration(audioBuffer.length);
 
       return { audioBuffer, durationMs };
     } catch (error) {
@@ -139,12 +139,5 @@ export class ElevenLabsProvider implements TtsProvider {
   }
 }
 
-export class TtsRateLimitError extends Error {
-  constructor(
-    message: string,
-    public readonly retryAfterSeconds: number,
-  ) {
-    super(message);
-    this.name = 'TtsRateLimitError';
-  }
-}
+// Re-export for backwards compatibility
+export { TtsRateLimitError } from '../utils/shared';
