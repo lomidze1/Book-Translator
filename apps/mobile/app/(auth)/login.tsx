@@ -4,12 +4,14 @@ import {
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { authService } from '@/services/auth';
-import { colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -19,7 +21,7 @@ export default function LoginScreen() {
       await authService.login(email, password);
       router.replace('/(tabs)/library');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Login failed');
+      Alert.alert('შეცდომა', err.message || 'შესვლა ვერ მოხერხდა');
     } finally {
       setLoading(false);
     }
@@ -27,33 +29,44 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={s.container}
+      style={[s.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={s.inner}>
-        <Text style={s.title}>Book Translator</Text>
-        <Text style={s.subtitle}>შესვლა</Text>
+        <Text style={[s.title, { color: theme.primary }]}>Book Translator</Text>
+        <Text style={[s.subtitle, { color: theme.textSecondary }]}>შესვლა</Text>
 
         <TextInput
-          style={s.input}
+          style={[s.input, { borderColor: theme.border, color: theme.text }]}
           placeholder="ელ-ფოსტა"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholderTextColor={colors.light.textSecondary}
-        />
-        <TextInput
-          style={s.input}
-          placeholder="პაროლი"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholderTextColor={colors.light.textSecondary}
+          placeholderTextColor={theme.textSecondary}
         />
 
+        <View style={[s.passwordContainer, { borderColor: theme.border }]}>
+          <TextInput
+            style={[s.passwordInput, { color: theme.text }]}
+            placeholder="პაროლი"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            placeholderTextColor={theme.textSecondary}
+          />
+          <TouchableOpacity
+            style={s.eyeBtn}
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Text style={[s.eyeIcon, { color: theme.textSecondary }]}>
+              {showPassword ? '🙈' : '👁'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
-          style={[s.button, loading && s.buttonDisabled]}
+          style={[s.button, { backgroundColor: theme.primary }, loading && s.buttonDisabled]}
           onPress={handleLogin}
           disabled={loading}
         >
@@ -61,7 +74,7 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <Link href="/(auth)/register" style={s.link}>
-          <Text style={s.linkText}>არ გაქვთ ანგარიში? რეგისტრაცია</Text>
+          <Text style={[s.linkText, { color: theme.primary }]}>არ გაქვთ ანგარიში? რეგისტრაცია</Text>
         </Link>
       </View>
     </KeyboardAvoidingView>
@@ -69,20 +82,31 @@ export default function LoginScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.light.background },
+  container: { flex: 1 },
   inner: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { fontSize: 28, fontWeight: '700', color: colors.light.primary, textAlign: 'center', marginBottom: 4 },
-  subtitle: { fontSize: 18, color: colors.light.textSecondary, textAlign: 'center', marginBottom: 32 },
+  title: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
+  subtitle: { fontSize: 18, textAlign: 'center', marginBottom: 32 },
   input: {
-    height: 48, borderWidth: 1, borderColor: colors.light.border, borderRadius: 8,
-    paddingHorizontal: 16, fontSize: 16, marginBottom: 12, color: colors.light.text,
+    height: 48, borderWidth: 1, borderRadius: 8,
+    paddingHorizontal: 16, fontSize: 16, marginBottom: 12,
   },
+  passwordContainer: {
+    flexDirection: 'row', alignItems: 'center', height: 48,
+    borderWidth: 1, borderRadius: 8, marginBottom: 12,
+  },
+  passwordInput: {
+    flex: 1, height: '100%', paddingHorizontal: 16, fontSize: 16,
+  },
+  eyeBtn: {
+    paddingHorizontal: 14, height: '100%', justifyContent: 'center',
+  },
+  eyeIcon: { fontSize: 20 },
   button: {
-    height: 48, backgroundColor: colors.light.primary, borderRadius: 8,
+    height: 48, borderRadius: 8,
     justifyContent: 'center', alignItems: 'center', marginTop: 8,
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   link: { marginTop: 20, alignSelf: 'center' },
-  linkText: { color: colors.light.primary, fontSize: 14 },
+  linkText: { fontSize: 14 },
 });

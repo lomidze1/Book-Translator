@@ -136,6 +136,27 @@ export default function ReaderToolbar({
             </div>
           </div>
 
+          {/* Reading Mode */}
+          <div className={styles.settingRow}>
+            <label>{t('reading_mode')}</label>
+            <div className={styles.themeButtons}>
+              <button
+                className={`${styles.modeBtn} ${settings.scrollMode ? styles.active : ''}`}
+                onClick={() => onSettingsChange({ scrollMode: true })}
+                title={t('mode_scroll')}
+              >
+                &#x2195;
+              </button>
+              <button
+                className={`${styles.modeBtn} ${!settings.scrollMode ? styles.active : ''}`}
+                onClick={() => onSettingsChange({ scrollMode: false })}
+                title={t('mode_paginated')}
+              >
+                &#x25A1;
+              </button>
+            </div>
+          </div>
+
           {/* Theme */}
           <div className={styles.settingRow}>
             <label>{t('theme')}</label>

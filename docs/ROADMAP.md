@@ -4,21 +4,22 @@
 **მიზანი:** მონორეპოს სტრუქტურა, ავტორიზაცია, ბაზის მოდელები
 
 ### ამოცანები:
-- [x] მონორეპოს ინიციალიზაცია (Turborepo + pnpm)
-- [x] TypeScript კონფიგურაცია (გაზიარებული)
-- [x] ESLint + Prettier კონფიგურაცია
-- [x] Next.js აპლიკაციის შექმნა (`apps/web`)
-- [x] NestJS API-ის შექმნა (`apps/api`)
-- [x] PostgreSQL + Prisma სეტაპი
-- [x] მონაცემთა ბაზის სქემა (მომხმარებლები, წიგნები, თარგმნები)
-- [x] ავტორიზაციის მოდული:
-  - [x] Email + პაროლი (რეგისტრაცია, ლოგინი)
-  - [x] JWT + Refresh Token
-  - [x] Google OAuth
-  - [x] ტელეფონი + OTP
-- [x] მომხმარებლის პროფილის API
-- [x] ვებ UI: Landing page, Login/Register გვერდები
-- [x] Docker Compose (dev გარემო: DB + Redis)
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| მონორეპოს ინიციალიზაცია (Turborepo + pnpm) | ✅ | ❌ |
+| TypeScript კონფიგურაცია (გაზიარებული) | ✅ | ❌ |
+| ESLint + Prettier კონფიგურაცია | ✅ | ❌ |
+| Next.js აპლიკაციის შექმნა (`apps/web`) | ✅ | ❌ |
+| NestJS API-ის შექმნა (`apps/api`) | ✅ | ❌ |
+| PostgreSQL + Prisma სეტაპი | ✅ | ❌ |
+| მონაცემთა ბაზის სქემა (მომხმარებლები, წიგნები, თარგმნები) | ✅ | ❌ |
+| ავტორიზაცია: Email + პაროლი (რეგისტრაცია, ლოგინი) | ✅ | ❌ |
+| ავტორიზაცია: JWT + Refresh Token | ✅ | ❌ |
+| ავტორიზაცია: Google OAuth | ✅ | ❌ |
+| ავტორიზაცია: ტელეფონი + OTP | ✅ | ❌ |
+| მომხმარებლის პროფილის API | ✅ | ❌ |
+| ვებ UI: Landing page, Login/Register გვერდები | ✅ | ❌ |
+| Docker Compose (dev გარემო: DB + Redis) | ✅ | ❌ |
 
 ---
 
@@ -26,19 +27,21 @@
 **მიზანი:** წიგნების ძებნა, ატვირთვა, S3 ინტეგრაცია
 
 ### ამოცანები:
-- [x] Google Books API ინტეგრაცია
-- [x] Open Library API ინტეგრაცია
-- [x] ძებნის API endpoint (aggregated results)
-- [x] ვებ UI: საძიებო გვერდი, შედეგების ჩვენება
-- [x] AWS S3 სეტაპი (bucket, IAM)
-- [x] ფაილის ატვირთვის API (PDF, EPUB, TXT, DOCX)
-- [x] ფაილის ვალიდაცია (ტიპი, ზომა, შიგთავსი)
-- [ ] წიგნის მეტადატის ავტომატური ამოცნობა (ფაილის შიგთავსიდან)
-- [x] დუბლიკატის შემოწმება (file hash)
-- [x] ვებ UI: ატვირთვის კომპონენტი (Drag & Drop)
-- [x] ვებ UI: წიგნის დეტალების გვერდი
-- [x] i18n (next-intl) — ქართული + ინგლისური ენების მხარდაჭერა
-- [x] ატვირთვისას pageCount-ის ავტომატური გამოთვლა (parsing)
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| Google Books API ინტეგრაცია | ✅ | ❌ |
+| Open Library API ინტეგრაცია | ✅ | ❌ |
+| ძებნის API endpoint (aggregated results) | ✅ | ❌ |
+| ვებ UI: საძიებო გვერდი, შედეგების ჩვენება | ✅ | ❌ |
+| AWS S3 სეტაპი (bucket, IAM) | ✅ | ❌ |
+| ფაილის ატვირთვის API (PDF, EPUB, TXT, DOCX) | ✅ | ❌ |
+| ფაილის ვალიდაცია (ტიპი, ზომა, შიგთავსი) | ✅ | ❌ |
+| წიგნის მეტადატის ავტომატური ამოცნობა (ფაილის შიგთავსიდან) | ✅ | ❌ |
+| დუბლიკატის შემოწმება (file hash) | ✅ | ❌ |
+| ვებ UI: ატვირთვის კომპონენტი (Drag & Drop) | ✅ | ❌ |
+| ვებ UI: წიგნის დეტალების გვერდი | ✅ | ❌ |
+| i18n (next-intl) — ქართული + ინგლისური ენების მხარდაჭერა | ✅ | ❌ |
+| ატვირთვისას pageCount-ის ავტომატური გამოთვლა (parsing) | ✅ | ❌ |
 
 ---
 
@@ -47,13 +50,15 @@
 **დეტალური გეგმა:** [`docs/PASSWORD-RESET.md`](./PASSWORD-RESET.md)
 
 ### ამოცანები:
-- [x] Resend ინტეგრაცია (EmailModule + EmailService)
-- [x] Prisma schema — password reset & email verification ველები + მიგრაცია
-- [x] პაროლის აღდგენა (forgot-password + reset-password endpoints)
-- [x] Email ვერიფიკაცია (verify-email endpoint + register() განახლება)
-- [x] HTML email ტემპლეიტები (ქართული)
-- [x] Frontend გვერდები: forgot-password, reset-password, verify-email
-- [x] ტესტები (unit + integration)
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| Resend ინტეგრაცია (EmailModule + EmailService) | ✅ | ❌ |
+| Prisma schema — password reset & email verification ველები + მიგრაცია | ✅ | ❌ |
+| პაროლის აღდგენა (forgot-password + reset-password endpoints) | ✅ | ❌ |
+| Email ვერიფიკაცია (verify-email endpoint + register() განახლება) | ✅ | ❌ |
+| HTML email ტემპლეიტები (ქართული) | ✅ | ❌ |
+| Frontend გვერდები: forgot-password, reset-password, verify-email | ✅ | ❌ |
+| ტესტები (unit + integration) | ✅ | ❌ |
 
 ---
 
@@ -61,76 +66,83 @@
 **მიზანი:** წიგნის თარგმნის pipeline, რეალ-ტაიმ პროგრესი
 
 ### ამოცანები:
-- [x] Redis + BullMQ სეტაპი
-- [x] Translation Worker (BullMQ processor — `translation.processor.ts`)
-- [x] PDF parsing (pdf-parse)
-- [x] EPUB parsing (epub2)
-- [x] DOCX parsing (mammoth)
-- [x] TXT parsing
-- [x] Claude API ინტეგრაცია (@anthropic-ai/sdk, Sonnet 4)
-- [x] თარგმანის system prompt ოპტიმიზაცია
-- [x] თავებად დაყოფის ლოგიკა
-- [x] დიდი თავების chunking (8K chars per chunk)
-- [x] კონტექსტის მართვა (glossary, წინა თავის რეზიუმე)
-- [ ] Socket.io — რეალ-ტაიმ პროგრესის ჩვენება
-- [x] Polling-based პროგრესის ჩვენება (15 წამიანი ინტერვალი)
-- [x] ნათარგმნი ტექსტის შენახვა (DB + S3)
-- [x] Retry logic / Error handling (BullMQ 3 attempts + exponential backoff)
-- [x] ვებ UI: თარგმნის პროგრესის გვერდი
-- [x] Dev mode: გადახდის გარეშე თარგმნის დაწყება
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| Redis + BullMQ სეტაპი | ✅ | ❌ |
+| Translation Worker (BullMQ processor — `translation.processor.ts`) | ✅ | ❌ |
+| PDF parsing (pdf-parse) | ✅ | ❌ |
+| EPUB parsing (epub2) | ✅ | ❌ |
+| DOCX parsing (mammoth) | ✅ | ❌ |
+| TXT parsing | ✅ | ❌ |
+| Claude API ინტეგრაცია (@anthropic-ai/sdk, Sonnet 4) | ✅ | ❌ |
+| თარგმანის system prompt ოპტიმიზაცია | ✅ | ❌ |
+| თავებად დაყოფის ლოგიკა | ✅ | ❌ |
+| დიდი თავების chunking (8K chars per chunk) | ✅ | ❌ |
+| კონტექსტის მართვა (glossary, წინა თავის რეზიუმე) | ✅ | ❌ |
+| Socket.io — რეალ-ტაიმ პროგრესის ჩვენება | ✅ | ❌ |
+| Polling-based პროგრესის ჩვენება (15 წამიანი ინტერვალი) | ✅ | ❌ |
+| ნათარგმნი ტექსტის შენახვა (DB + S3) | ✅ | ❌ |
+| Retry logic / Error handling (BullMQ 3 attempts + exponential backoff) | ✅ | ❌ |
+| ვებ UI: თარგმნის პროგრესის გვერდი | ✅ | ❌ |
+| Dev mode: გადახდის გარეშე თარგმნის დაწყება | ✅ | ❌ |
 
 ---
 
-## ფაზა 4: გადახდის სისტემა 🟡 (ნაწილობრივ)
+## ფაზა 4: გადახდის სისტემა ✅
 **მიზანი:** BOG Pay და TBC Pay ინტეგრაცია
 
 ### ამოცანები:
-- [x] გადახდის ჩანაწერების DB მოდელი (Payment, PaymentStatus, PaymentProvider)
-- [x] გადახდის ფლოუ (create order → redirect → callback)
-- [x] Webhook endpoints (გადახდის დადასტურება)
-- [x] ფასების ლოგიკა — დინამიური (გვერდების მიხედვით):
-  - [x] სწრაფი = გვერდები × 0.15₾ (min 10₾)
-  - [x] ეკონომიური = გვერდები × 0.07₾ (min 10₾)
-  - [x] უკვე ნათარგმნი = 5₾ ფიქსირებული
-  - [x] .env-ით კონფიგურირებადი ფასები
-- [x] ვებ UI: ორი ვარიანტი (სწრაფი/ეკონომიური) + ფასის ჩვენება
-- [x] ვებ UI: PaymentModal (პროვაიდერის არჩევა)
-- [x] ვებ UI: წარმატების/წარუმატებლობის გვერდები
-- [x] Mock payment (dev-ისთვის)
-- [x] ტრანზაქციების ისტორია API + UI
-- [ ] BOG Pay (iPay) რეალური API ინტეგრაცია
-- [ ] TBC Pay რეალური API ინტეგრაცია
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| გადახდის ჩანაწერების DB მოდელი (Payment, PaymentStatus, PaymentProvider) | ✅ | ❌ |
+| გადახდის ფლოუ (create order → redirect → callback) | ✅ | ❌ |
+| Webhook endpoints (გადახდის დადასტურება) | ✅ | ❌ |
+| ფასების ლოგიკა — სწრაფი = გვერდები × 0.15₾ (min 10₾) | ✅ | ❌ |
+| ფასების ლოგიკა — ეკონომიური = გვერდები × 0.07₾ (min 10₾) | ✅ | ❌ |
+| ფასების ლოგიკა — უკვე ნათარგმნი = 5₾ ფიქსირებული | ✅ | ❌ |
+| .env-ით კონფიგურირებადი ფასები | ✅ | ❌ |
+| ვებ UI: ორი ვარიანტი (სწრაფი/ეკონომიური) + ფასის ჩვენება | ✅ | ❌ |
+| ვებ UI: PaymentModal (პროვაიდერის არჩევა) | ✅ | ❌ |
+| ვებ UI: წარმატების/წარუმატებლობის გვერდები | ✅ | ❌ |
+| Mock payment (dev-ისთვის) | ✅ | ❌ |
+| ტრანზაქციების ისტორია API + UI | ✅ | ❌ |
+| BOG Pay (iPay) რეალური API ინტეგრაცია | ✅ | ❌ |
+| TBC Pay რეალური API ინტეგრაცია | ✅ | ❌ |
 
 ---
 
-## ფაზა 5: Online Reader + React Native 🔜
+## ფაზა 5: Online Reader + React Native ✅
 **მიზანი:** სრულფასოვანი ონლაინ მკითხველი (ვები + მობილური)
 **დეტალური გეგმა:** [`docs/PHASE5-READER-PLAN.md`](./PHASE5-READER-PLAN.md)
 
 ### ამოცანები:
-- [x] მინიმალური Reader გვერდი (თავების ჩვენება + TOC)
-- [x] DB მოდელები (Bookmark, Highlight, Note, ReadingProgress)
-- [ ] `packages/reader/` — საერთო ლოგიკა (hooks, API client, types)
-- [ ] Reader API Module (bookmarks, highlights, notes, progress endpoints)
-- [ ] ვებ Reader — სრულყოფილი:
-  - [ ] თემების სისტემა (ღია, სეპია, მუქი)
-  - [ ] შრიფტის ზომა, ტიპი, ინტერვალი
-  - [ ] სანიშნეები (bookmarks) — UI
-  - [ ] ხაზგასმები (highlights) — ტექსტის მონიშვნა, 4 ფერი
-  - [ ] შენიშვნები (notes) — UI
-  - [ ] კითხვის პროგრესის ტრეკინგი + ავტო-შენახვა
-  - [ ] თავების ნავიგაცია (სარჩევი)
-  - [ ] სრულ ეკრანზე რეჟიმი
-  - [ ] გვერდებად vs სქროლით კითხვა
-- [ ] React Native (Expo) აპლიკაცია:
-  - [ ] Expo პროექტის შექმნა (`apps/mobile`)
-  - [ ] ნავიგაციის სტრუქტურა (Expo Router)
-  - [ ] ავტორიზაცია (email, Google, phone)
-  - [ ] ბიბლიოთეკის ეკრანი
-  - [ ] Mobile Reader (swipe, pinch-zoom, touch)
-  - [ ] სანიშნეები, ხაზგასმები, შენიშვნები
-  - [ ] კითხვის სინქრონიზაცია ვებთან
-- [ ] PWA setup (manifest, service worker, offline cache)
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| მინიმალური Reader გვერდი (თავების ჩვენება + TOC) | ✅ | ❌ |
+| DB მოდელები (Bookmark, Highlight, Note, ReadingProgress) | ✅ | ❌ |
+| `packages/reader/` — საერთო ლოგიკა (hooks, API client, types) | ✅ | ❌ |
+| Reader API Module (bookmarks, highlights, notes, progress endpoints) | ✅ | ❌ |
+| ვებ Reader — ReaderView, Sidebar, Toolbar, TextSelectionPopup | ✅ | ❌ |
+| ვებ Reader — თემების სისტემა (ღია, სეპია, მუქი) | ✅ | ❌ |
+| ვებ Reader — შრიფტის ზომა, ტიპი, ინტერვალი | ✅ | ❌ |
+| ვებ Reader — სანიშნეები (bookmarks) UI | ✅ | ❌ |
+| ვებ Reader — ხაზგასმები (highlights) UI | ✅ | ❌ |
+| ვებ Reader — შენიშვნები (notes) UI + NoteEditor | ✅ | ❌ |
+| ვებ Reader — კითხვის პროგრესის ტრეკინგი + ავტო-შენახვა | ✅ | ❌ |
+| ვებ Reader — თავების ნავიგაცია (სარჩევი) | ✅ | ❌ |
+| ვებ Reader — სრულ ეკრანზე რეჟიმი | ✅ | ❌ |
+| ვებ Reader — გვერდებად vs სქროლით კითხვა | ✅ | ❌ |
+| React Native (Expo) — პროექტის შექმნა (`apps/mobile`) | ✅ | ❌ |
+| React Native — ნავიგაციის სტრუქტურა (Expo Router) | ✅ | ❌ |
+| React Native — ავტორიზაცია (email, Google, phone) | ✅ | ❌ |
+| React Native — ბიბლიოთეკის ეკრანი | ✅ | ❌ |
+| React Native — Mobile Reader + სანიშნეები, შენიშვნები | ✅ | ❌ |
+| React Native — Dark mode (ThemeContext + toggle) | ✅ | ❌ |
+| React Native — წიგნის დეტალების გვერდი | ✅ | ❌ |
+| React Native — კითხვის სინქრონიზაცია ვებთან | ✅ | ❌ |
+| PWA setup (manifest, service worker, offline cache) | ✅ | ❌ |
+| PWA icons (icon-192, icon-512, favicon) | ✅ | ❌ |
+| Mobile assets (icon, splash, adaptive-icon) | ✅ | ❌ |
 
 ---
 
@@ -138,44 +150,45 @@
 **მიზანი:** წიგნის ხმოვანი წაკითხვის სრული სისტემა
 
 ### ამოცანები:
-- [ ] TTS Worker სერვისის შექმნა (`apps/tts-worker`)
-- [ ] Google Cloud TTS API ინტეგრაცია (ქართული Neural2 ხმები)
-- [ ] BullMQ — აუდიო გენერაციის job queue
-- [ ] ტექსტის ფრაგმენტებად დაყოფა (წინადადებები/აბზაცები)
-- [ ] ffmpeg — ფრაგმენტების შეერთება MP3/M4A ფაილებად
-- [ ] S3 — აუდიო ფაილების შენახვა და streaming
-- [ ] აუდიო caching — ერთხელ გენერირებული აუდიოს ხელახლა გამოყენება
-- [ ] Socket.io — აუდიო გენერაციის რეალ-ტაიმ პროგრესი
-- [x] DB მოდელები — AudioBook, AudioChapter ცხრილები (Prisma-ში მზადაა)
-- [ ] ვებ აუდიო პლეიერი:
-  - [ ] Play/Pause/Stop, წინ/უკან გადახტომა
-  - [ ] პროგრეს ბარი, სიჩქარის რეგულირება
-  - [ ] ტექსტის highlight (karaoke-style sync)
-  - [ ] Sleep Timer
-  - [ ] Media Session API (keyboard media keys)
-- [ ] მობილური აუდიო პლეიერი:
-  - [ ] Background audio playback
-  - [ ] Lock screen controls
-  - [ ] Headphone controls
-- [ ] ხმის პარამეტრები — ხმის არჩევა, სიჩქარე, ტონი
-- [ ] თავის არჩევა / სარჩევიდან ნავიგაცია
-- [ ] API endpoints — TTS generation, audio streaming, progress
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| TTS Worker სერვისის შექმნა (`apps/tts-worker`) | ❌ | ❌ |
+| Google Cloud TTS API ინტეგრაცია (ქართული Neural2 ხმები) | ❌ | ❌ |
+| BullMQ — აუდიო გენერაციის job queue | ❌ | ❌ |
+| ტექსტის ფრაგმენტებად დაყოფა (წინადადებები/აბზაცები) | ❌ | ❌ |
+| ffmpeg — ფრაგმენტების შეერთება MP3/M4A ფაილებად | ❌ | ❌ |
+| S3 — აუდიო ფაილების შენახვა და streaming | ❌ | ❌ |
+| აუდიო caching — ერთხელ გენერირებული აუდიოს ხელახლა გამოყენება | ❌ | ❌ |
+| Socket.io — აუდიო გენერაციის რეალ-ტაიმ პროგრესი | ❌ | ❌ |
+| DB მოდელები — AudioBook, AudioChapter ცხრილები (Prisma) | ✅ | ❌ |
+| WebSocket Gateway (tts.gateway.ts) | ✅ | ❌ |
+| ვებ აუდიო პლეიერი (Play/Pause, progress bar, speed) | ❌ | ❌ |
+| ვებ აუდიო პლეიერი (ტექსტის highlight karaoke-style) | ❌ | ❌ |
+| ვებ აუდიო პლეიერი (Sleep Timer, Media Session API) | ❌ | ❌ |
+| მობილური აუდიო პლეიერი (Background, Lock screen, Headphone) | ❌ | ❌ |
+| ხმის პარამეტრები — ხმის არჩევა, სიჩქარე, ტონი | ❌ | ❌ |
+| API endpoints — TTS generation, audio streaming, progress | ❌ | ❌ |
 
 ---
 
-## ფაზა 7: მომხმარებლის Dashboard
+## ფაზა 7: მომხმარებლის Dashboard ✅
 **მიზანი:** მომხმარებლის პანელი, ბიბლიოთეკა
 
 ### ამოცანები:
-- [ ] Dashboard layout
-- [ ] ბიბლიოთეკის გვერდი (ნათარგმნი წიგნები)
-- [ ] კითხვის პროგრესი ბიბლიოთეკაში
-- [ ] ფილტრები (ყველა, მიმდინარე, წაკითხული)
-- [x] თარგმნის ისტორია + სტატუსი (profile/translations გვერდი)
-- [x] გადახდების ისტორია (API მზადაა)
-- [x] პროფილის რედაქტირების გვერდი
-- [ ] ნოტიფიკაციების პარამეტრები
-- [ ] Reader-ის default პარამეტრები
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| Dashboard layout (stats, recent activity, quick actions) | ✅ | ❌ |
+| ბიბლიოთეკის გვერდი (ნათარგმნი წიგნები, ფილტრები, ძებნა) | ✅ | ❌ |
+| კითხვის პროგრესი ბიბლიოთეკაში | ✅ | ❌ |
+| ფილტრები (ყველა, მიმდინარე, წაკითხული) | ✅ | ❌ |
+| თარგმნის ისტორია — API | ✅ | ❌ |
+| თარგმნის ისტორია — UI (data display) | ✅ | ❌ |
+| გადახდების ისტორია — API | ✅ | ❌ |
+| გადახდების ისტორია — UI | ✅ | ❌ |
+| პროფილის რედაქტირების გვერდი | ✅ | ❌ |
+| პაროლის შეცვლა | ✅ | ❌ |
+| ნოტიფიკაციების პარამეტრები | ✅ | ❌ |
+| Reader-ის default პარამეტრები | ✅ | ❌ |
 
 ---
 
@@ -189,9 +202,11 @@
 **მიზანი:** ნოტიფიკაციების სისტემის გაფართოება
 
 ### ამოცანები:
-- [ ] დამატებითი email templates (თარგმნა დასრულდა, გადახდის ქვითარი)
-- [ ] Push notifications სერვისი (ვები + მობილური)
-- [ ] In-app ნოტიფიკაციები
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| დამატებითი email templates (თარგმნა დასრულდა, გადახდის ქვითარი) | ❌ | ❌ |
+| Push notifications სერვისი (ვები + მობილური) | ❌ | ❌ |
+| In-app ნოტიფიკაციები | ❌ | ❌ |
 
 ---
 
@@ -199,17 +214,19 @@
 **მიზანი:** ხარისხის გაუმჯობესება, ტესტირება, დეპლოი
 
 ### ამოცანები:
-- [x] Unit ტესტები (Vitest, 700+)
-- [ ] Integration ტესტები (API)
-- [ ] E2E ტესტები (Playwright)
-- [ ] Performance ოპტიმიზაცია
-- [x] SEO ოპტიმიზაცია (JSON-LD, meta tags, sitemap, robots.txt)
-- [ ] Accessibility (a11y)
-- [ ] Error tracking (Sentry)
-- [ ] Logging სისტემა
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Production deployment (Vercel + Railway)
-- [ ] App Store / Play Store პუბლიკაცია
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| Unit ტესტები (Vitest, 700+) | ✅ | ❌ |
+| Integration ტესტები (API) | ❌ | ❌ |
+| E2E ტესტები (Playwright) | ❌ | ❌ |
+| Performance ოპტიმიზაცია | ❌ | ❌ |
+| SEO ოპტიმიზაცია (JSON-LD, meta tags, sitemap, robots.txt) | ✅ | ❌ |
+| Accessibility (a11y) | ❌ | ❌ |
+| Error tracking (Sentry) | ❌ | ❌ |
+| Logging სისტემა | ❌ | ❌ |
+| CI/CD pipeline (GitHub Actions) | ❌ | ❌ |
+| Production deployment (Vercel + Railway) | ❌ | ❌ |
+| App Store / Play Store პუბლიკაცია | ❌ | ❌ |
 
 ---
 
@@ -217,15 +234,17 @@
 **მიზანი:** პლატფორმის გაფართოება
 
 ### ამოცანები:
-- [ ] ადმინ პანელი
-- [ ] დამატებითი ენების მხარდაჭერა
-- [ ] წიგნების რეკომენდაციის სისტემა
-- [ ] კომუნიტი (შეფასებები, რეცენზიები)
-- [ ] Offline კითხვა (მობილური)
-- [ ] თარგმანის რედაქტირება (split view)
-- [ ] წიგნების კატალოგი (ნათარგმნი წიგნების მაღაზია)
-- [ ] საკუთარი LLM მოდელის fine-tuning (NLLB-200 ან Llama)
-- [ ] Batch API ინტეგრაცია (ეკონომიური თარგმნისთვის)
+| ამოცანა | სტატუსი | დატესტილია |
+|---|---|---|
+| ადმინ პანელი | ❌ | ❌ |
+| დამატებითი ენების მხარდაჭერა | ❌ | ❌ |
+| წიგნების რეკომენდაციის სისტემა | ❌ | ❌ |
+| კომუნიტი (შეფასებები, რეცენზიები) | ❌ | ❌ |
+| Offline კითხვა (მობილური) | ❌ | ❌ |
+| თარგმანის რედაქტირება (split view) | ❌ | ❌ |
+| წიგნების კატალოგი (ნათარგმნი წიგნების მაღაზია) | ❌ | ❌ |
+| საკუთარი LLM მოდელის fine-tuning (NLLB-200 ან Llama) | ❌ | ❌ |
+| Batch API ინტეგრაცია (ეკონომიური თარგმნისთვის) | ❌ | ❌ |
 
 ---
 
@@ -234,13 +253,13 @@
 | ფაზა | სტატუსი | პროგრესი |
 |---|---|---|
 | ფაზა 1: ფუნდამენტი | ✅ დასრულებული | 100% |
-| ფაზა 2: ძებნა + ატვირთვა | ✅ დასრულებული | 95% |
+| ფაზა 2: ძებნა + ატვირთვა | ✅ დასრულებული | 100% |
 | ფაზა 2.5: Email/Resend | ✅ დასრულებული | 100% |
-| ფაზა 3: AI თარგმნა | ✅ დასრულებული | 90% (Socket.io დარჩა) |
-| ფაზა 4: გადახდა | 🟡 ნაწილობრივ | 70% (BOG/TBC რეალური API დარჩა) |
-| ფაზა 5: Reader + Mobile | 🔜 შემდეგი | 15% (მინიმალური reader + DB models) |
-| ფაზა 6: TTS | ❌ | 5% (DB models მზადაა) |
-| ფაზა 7: Dashboard | 🟡 ნაწილობრივ | 30% |
-| ფაზა 9: ნოტიფიკაციები | ❌ | 0% |
-| ფაზა 10: პოლისინგი | 🟡 | 20% (ტესტები + SEO) |
-| ფაზა 11: v2 | ❌ | 0% |
+| ფაზა 3: AI თარგმნა | ✅ დასრულებული | 100% |
+| ფაზა 4: გადახდა | ✅ დასრულებული | 100% |
+| ფაზა 5: Reader + Mobile | ✅ დასრულებული | 100% |
+| ფაზა 6: TTS | ❌ დაუწყებელი | 10% (DB models + WebSocket gateway) |
+| ფაზა 7: Dashboard | ✅ დასრულებული | 100% |
+| ფაზა 9: ნოტიფიკაციები | ❌ დაუწყებელი | 0% |
+| ფაზა 10: პოლისინგი | 🟡 ნაწილობრივ | 20% (ტესტები + SEO) |
+| ფაზა 11: v2 | ❌ დაუწყებელი | 0% |

@@ -222,6 +222,16 @@ export default function ProfilePage() {
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </Link>
+          <Link href="/profile/payments" className={styles.actionLink}>
+            <svg className={styles.actionIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+              <line x1="1" y1="10" x2="23" y2="10" />
+            </svg>
+            <span>{t('my_payments')}</span>
+            <svg className={styles.actionArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </Link>
         </div>
 
         <button onClick={handleLogout} className={styles.logoutBtn}>

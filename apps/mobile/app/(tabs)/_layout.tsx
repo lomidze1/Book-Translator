@@ -1,14 +1,17 @@
 import { Tabs } from 'expo-router';
-import { colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 
 export default function TabsLayout() {
+  const { theme } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.light.primary,
-        tabBarInactiveTintColor: colors.light.textSecondary,
-        headerStyle: { backgroundColor: colors.light.background },
-        headerTintColor: colors.light.text,
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.textSecondary,
+        tabBarStyle: { backgroundColor: theme.background, borderTopColor: theme.border },
+        headerStyle: { backgroundColor: theme.background },
+        headerTintColor: theme.text,
       }}
     >
       <Tabs.Screen

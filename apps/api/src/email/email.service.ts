@@ -22,13 +22,18 @@ export class EmailService {
     }
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 
-    await this.resend.emails.send({
-      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+    console.log(`📧 Sending password reset email: from=${from}, to=${to}`);
+
+    const result = await this.resend.emails.send({
+      from,
       to,
       subject: 'პაროლის აღდგენა — Book Translator',
       html: this.getPasswordResetTemplate(resetUrl, name),
     });
+
+    console.log(`📧 Resend response:`, JSON.stringify(result));
   }
 
   async sendEmailVerification(to: string, token: string, name?: string): Promise<void> {

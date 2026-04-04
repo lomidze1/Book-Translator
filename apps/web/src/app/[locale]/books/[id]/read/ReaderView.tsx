@@ -58,6 +58,9 @@ export default function ReaderView({ translation, token }: Props) {
   const [percentage, setPercentage] = useState(0);
   const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; text: string; chapterNumber: number; start: number; end: number } | null>(null);
   const [noteEditor, setNoteEditor] = useState<{ chapterNumber: number; highlightId?: string } | null>(null);
+  // Paginated mode state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const chapters = [...translation.translatedChapters].sort(
     (a, b) => a.chapter.number - b.chapter.number
@@ -194,6 +197,43 @@ export default function ReaderView({ translation, token }: Props) {
     setNoteEditor(null);
   };
 
+  // Paginated mode: calculate pages based on content height
+  useEffect(() => {
+    if (settings.scrollMode || !contentRef.current) return;
+    const el = contentRef.current;
+    const pageHeight = el.clientHeight;
+    const scrollHeight = el.scrollHeight;
+    if (pageHeight > 0) {
+      setTotalPages(Math.max(1, Math.ceil(scrollHeight / pageHeight)));
+    }
+  }, [settings.scrollMode, settings.fontSize, settings.lineHeight, chapters]);
+
+  const goToPage = (page: number) => {
+    if (!contentRef.current) return;
+    const clamped = Math.max(0, Math.min(page, totalPages - 1));
+    setCurrentPage(clamped);
+    const pageHeight = contentRef.current.clientHeight;
+    contentRef.current.scrollTop = clamped * pageHeight;
+    const pct = totalPages > 1 ? Math.round((clamped / (totalPages - 1)) * 100) : 0;
+    setPercentage(pct);
+  };
+
+  // Handle keyboard for paginated mode
+  useEffect(() => {
+    if (settings.scrollMode) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+        e.preventDefault();
+        goToPage(currentPage + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        goToPage(currentPage - 1);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [settings.scrollMode, currentPage, totalPages]);
+
   // Apply CSS custom properties for reader settings
   const contentStyle: React.CSSProperties = {
     '--reader-font-size': `${settings.fontSize}px`,
@@ -234,7 +274,7 @@ export default function ReaderView({ translation, token }: Props) {
 
         <div
           ref={contentRef}
-          className={styles.contentArea}
+          className={`${styles.contentArea} ${!settings.scrollMode ? styles.paginatedMode : ''}`}
           onMouseUp={handleMouseUp}
         >
           <div className={styles.contentInner} style={contentStyle}>
@@ -276,12 +316,38 @@ export default function ReaderView({ translation, token }: Props) {
         />
       )}
 
+      {/* Paginated Navigation */}
+      {!settings.scrollMode && (
+        <div className={styles.pageNavigation}>
+          <button
+            className={styles.pageNavBtn}
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage <= 0}
+          >
+            &#8592;
+          </button>
+          <span className={styles.pageInfo}>
+            {currentPage + 1} / {totalPages}
+          </span>
+          <button
+            className={styles.pageNavBtn}
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage >= totalPages - 1}
+          >
+            &#8594;
+          </button>
+        </div>
+      )}
+
       {/* Progress Bar */}
       <div className={styles.progressBar}>
         <div className={styles.progressFill} style={{ width: `${percentage}%` }} />
       </div>
       <div className={styles.progressLabel}>
-        {t('progress', { percentage })}
+        {settings.scrollMode
+          ? t('progress', { percentage })
+          : `${currentPage + 1} / ${totalPages}`
+        }
       </div>
     </div>
   );
