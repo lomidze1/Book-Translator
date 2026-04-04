@@ -9,13 +9,14 @@ function RootStack() {
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)/login" />
+        <Stack.Screen name="(auth)/register" />
+        <Stack.Screen name="(auth)/forgot-password" />
+        <Stack.Screen name="(auth)/reset-password" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="book/[id]" options={{ headerShown: true, title: '' }} />
-        <Stack.Screen
-          name="reader/[id]"
-          options={{ headerShown: false, orientation: 'all' }}
-        />
+        <Stack.Screen name="reader/[id]" options={{ headerShown: false, orientation: 'all' }} />
       </Stack>
     </>
   );
