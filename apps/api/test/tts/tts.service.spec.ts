@@ -29,8 +29,11 @@ describe('TtsService', () => {
     getVoices: vi.fn().mockResolvedValue([{ id: 'v1', name: 'Ka Voice', language: 'ka', gender: 'female', provider: 'elevenlabs' }]),
   };
 
-  const mockAzure = {
-    getVoices: vi.fn().mockResolvedValue([]),
+  const mockProviderManager = {
+    getProvider: vi.fn().mockReturnValue({
+      getVoices: vi.fn().mockResolvedValue([{ id: 'ka-GE-Neural2-A', name: 'Georgian Neural2 A', language: 'ka-GE', gender: 'female', provider: 'google-cloud' }]),
+    }),
+    estimateCost: vi.fn().mockReturnValue({ provider: 'google-cloud', charCount: 1000, costUsd: 0.01, estimatedAudioMinutes: 1 }),
   };
 
   const userId = 'user-1';
@@ -38,7 +41,7 @@ describe('TtsService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new (TtsService as any)(mockPrisma, mockS3, mockElevenlabs, mockAzure);
+    service = new (TtsService as any)(mockPrisma, mockS3, mockProviderManager);
 
     // Default: book exists and user owns it
     mockPrisma.book.findUnique.mockResolvedValue({
@@ -195,7 +198,7 @@ describe('TtsService', () => {
     it('should return voices from primary provider', async () => {
       const voices = await service.getVoices();
       expect(voices).toHaveLength(1);
-      expect(voices[0].provider).toBe('elevenlabs');
+      expect(voices[0].provider).toBe('google-cloud');
     });
   });
 

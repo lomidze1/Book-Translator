@@ -15,14 +15,18 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ge.booktranslator.app"
+      "bundleIdentifier": "ge.booktranslator.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2563eb"
       },
-      "package": "ge.booktranslator.app"
+      "package": "ge.booktranslator.app",
+      "permissions": ["android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"]
     },
     "plugins": ["expo-router", "expo-secure-store"]
   }

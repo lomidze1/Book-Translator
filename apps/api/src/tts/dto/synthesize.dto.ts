@@ -1,12 +1,12 @@
 import {
-  IsString, IsNotEmpty, IsInt, IsOptional, IsNumber,
-  Min, Max, IsIn, Matches, MaxLength,
+  IsString, IsNotEmpty, IsInt, IsOptional, IsNumber, IsUUID,
+  Min, Max, IsIn, Matches, MaxLength, IsArray,
 } from 'class-validator';
 
 const VOICE_ID_PATTERN = /^[a-zA-Z0-9_\-]+$/;
 
 export class SynthesizeDto {
-  @IsString()
+  @IsUUID('4', { message: 'bookId არასწორი ფორმატია' })
   @IsNotEmpty({ message: 'bookId სავალდებულოა' })
   bookId: string;
 
@@ -27,12 +27,16 @@ export class SynthesizeDto {
   speed?: number;
 
   @IsOptional()
-  @IsIn(['elevenlabs', 'azure'], { message: 'provider უნდა იყოს: elevenlabs ან azure' })
-  provider?: 'elevenlabs' | 'azure';
+  @IsIn(['google-cloud', 'elevenlabs', 'azure'], { message: 'provider უნდა იყოს: google-cloud, elevenlabs ან azure' })
+  provider?: 'google-cloud' | 'elevenlabs' | 'azure';
+
+  @IsOptional()
+  @IsIn(['standard', 'premium'], { message: 'quality უნდა იყოს: standard ან premium' })
+  quality?: 'standard' | 'premium';
 }
 
 export class SynthesizeBookDto {
-  @IsString()
+  @IsUUID('4', { message: 'bookId არასწორი ფორმატია' })
   @IsNotEmpty({ message: 'bookId სავალდებულოა' })
   bookId: string;
 
@@ -49,6 +53,30 @@ export class SynthesizeBookDto {
   speed?: number;
 
   @IsOptional()
-  @IsIn(['elevenlabs', 'azure'], { message: 'provider უნდა იყოს: elevenlabs ან azure' })
-  provider?: 'elevenlabs' | 'azure';
+  @IsIn(['google-cloud', 'elevenlabs', 'azure'], { message: 'provider უნდა იყოს: google-cloud, elevenlabs ან azure' })
+  provider?: 'google-cloud' | 'elevenlabs' | 'azure';
+
+  @IsOptional()
+  @IsIn(['standard', 'premium'], { message: 'quality უნდა იყოს: standard ან premium' })
+  quality?: 'standard' | 'premium';
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true, message: 'chapters უნდა იყოს მთელი რიცხვების მასივი' })
+  chapters?: number[];
+}
+
+export class EstimateTtsDto {
+  @IsUUID('4', { message: 'bookId არასწორი ფორმატია' })
+  @IsNotEmpty({ message: 'bookId სავალდებულოა' })
+  bookId: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  voiceId?: string;
+
+  @IsOptional()
+  @IsIn(['google-cloud', 'elevenlabs', 'azure'])
+  provider?: 'google-cloud' | 'elevenlabs' | 'azure';
 }

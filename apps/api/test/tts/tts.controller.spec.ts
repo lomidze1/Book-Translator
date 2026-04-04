@@ -14,13 +14,21 @@ describe('TtsController', () => {
     getAudioBookStatus: vi.fn(),
     getStreamUrl: vi.fn(),
     deleteAudioBook: vi.fn(),
+    estimate: vi.fn(),
+    retryFailed: vi.fn(),
+    getTimestamps: vi.fn(),
+  };
+
+  const mockProviderManager = {
+    getAvailableProviders: vi.fn(),
+    getAllVoices: vi.fn(),
   };
 
   const user = { id: 'user-1' };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    controller = new (TtsController as any)(mockService);
+    controller = new (TtsController as any)(mockService, mockProviderManager);
   });
 
   describe('GET /tts/audio/:bookId/:chapterNumber', () => {
@@ -121,6 +129,84 @@ describe('TtsController', () => {
     it('should propagate ForbiddenException', async () => {
       mockService.deleteAudioBook.mockRejectedValue(new ForbiddenException());
       await expect(controller.deleteAudio(user, 'ab-1')).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  // ========================
+  // Phase 6 new endpoints
+  // ========================
+
+  describe('GET /tts/estimate', () => {
+    it('should call estimate with bookId and userId', async () => {
+      mockService.estimate.mockResolvedValue({ totalChapters: 5, estimatedCostUsd: 0.98 });
+      const result = await controller.estimate(user, 'book-1', undefined);
+      expect(result.totalChapters).toBe(5);
+      expect(mockService.estimate).toHaveBeenCalledWith('book-1', 'user-1', undefined);
+    });
+
+    it('should pass provider to estimate', async () => {
+      mockService.estimate.mockResolvedValue({ provider: 'elevenlabs' });
+      await controller.estimate(user, 'book-1', 'elevenlabs');
+      expect(mockService.estimate).toHaveBeenCalledWith('book-1', 'user-1', 'elevenlabs');
+    });
+  });
+
+  describe('POST /tts/retry/:audioBookId', () => {
+    it('should call retryFailed with audioBookId and userId', async () => {
+      mockService.retryFailed.mockResolvedValue({ retriedChapters: [3, 7], status: 'queued' });
+      const result = await controller.retry(user, 'ab-1');
+      expect(result.retriedChapters).toEqual([3, 7]);
+      expect(mockService.retryFailed).toHaveBeenCalledWith('ab-1', 'user-1');
+    });
+
+    it('should propagate NotFoundException', async () => {
+      mockService.retryFailed.mockRejectedValue(new NotFoundException());
+      await expect(controller.retry(user, 'nonexistent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('GET /tts/:audioBookId/timestamps/:chapterNumber', () => {
+    it('should call getTimestamps with correct params', async () => {
+      mockService.getTimestamps.mockResolvedValue({
+        chapterNumber: 1,
+        timestamps: [{ text: 'test', startMs: 0, endMs: 5000 }],
+      });
+      const result = await controller.getTimestamps(user, 'ab-1', 1);
+      expect(result.chapterNumber).toBe(1);
+      expect(mockService.getTimestamps).toHaveBeenCalledWith('ab-1', 1, 'user-1');
+    });
+
+    it('should propagate NotFoundException', async () => {
+      mockService.getTimestamps.mockRejectedValue(new NotFoundException());
+      await expect(controller.getTimestamps(user, 'ab-1', 99)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('GET /tts/providers', () => {
+    it('should return available providers from ProviderManager', async () => {
+      mockProviderManager.getAvailableProviders.mockReturnValue([
+        { name: 'google-cloud', available: true, languages: ['ka', 'en'], costPerMillionChars: 4 },
+      ]);
+      const result = await controller.getProviders();
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('google-cloud');
+    });
+  });
+
+  describe('GET /tts/voices/all', () => {
+    it('should call getAllVoices with language filter', async () => {
+      mockProviderManager.getAllVoices.mockResolvedValue([
+        { id: 'ka-GE-Neural2-A', provider: 'google-cloud' },
+      ]);
+      const result = await controller.getAllVoices('ka');
+      expect(result).toHaveLength(1);
+      expect(mockProviderManager.getAllVoices).toHaveBeenCalledWith('ka');
+    });
+
+    it('should call getAllVoices without filter', async () => {
+      mockProviderManager.getAllVoices.mockResolvedValue([]);
+      await controller.getAllVoices(undefined);
+      expect(mockProviderManager.getAllVoices).toHaveBeenCalledWith(undefined);
     });
   });
 });

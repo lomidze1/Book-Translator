@@ -33,6 +33,7 @@ export default function AudioPlayer({
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1.0);
   const [isLoading, setIsLoading] = useState(false);
+  const [volume, setVolume] = useState(1.0);
   const [isMinimized, setIsMinimized] = useState(false);
   const [sleepTimer, setSleepTimer] = useState<number | null>(null);
   const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -41,28 +42,29 @@ export default function AudioPlayer({
     (c) => c.chapterNumber === currentChapter && c.status === 'COMPLETED',
   );
 
-  // Load audio for current chapter
+  // Load audio for current chapter (speed excluded — handled separately)
   useEffect(() => {
     if (!currentChapterAudio) return;
+    let cancelled = false;
 
     const loadAudio = async () => {
       setIsLoading(true);
       try {
         const url = await getStreamUrl(currentChapterAudio.audioChapterId);
-        if (url && audioRef.current) {
+        if (url && audioRef.current && !cancelled) {
           audioRef.current.src = url;
-          audioRef.current.playbackRate = speed;
           audioRef.current.load();
         }
       } catch {
         // Ignore load errors
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     loadAudio();
-  }, [currentChapterAudio?.audioChapterId, getStreamUrl, speed]);
+    return () => { cancelled = true; };
+  }, [currentChapterAudio?.audioChapterId, getStreamUrl]);
 
   // Time update handler
   const handleTimeUpdate = useCallback(() => {
@@ -133,6 +135,12 @@ export default function AudioPlayer({
     if (audioRef.current) audioRef.current.playbackRate = s;
   };
 
+  const changeVolume = (v: number) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    setVolume(clamped);
+    if (audioRef.current) audioRef.current.volume = clamped;
+  };
+
   const nextChapter = useCallback(() => {
     const next = chapters.find(
       (c) => c.chapterNumber > currentChapter && c.status === 'COMPLETED',
@@ -161,6 +169,40 @@ export default function AudioPlayer({
     }
   }, [currentChapter, bookTitle, togglePlay, prevChapter, nextChapter, t]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't handle if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'ArrowLeft':
+          if (e.shiftKey) prevChapter();
+          else skip(-15);
+          break;
+        case 'ArrowRight':
+          if (e.shiftKey) nextChapter();
+          else skip(15);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          changeVolume(volume + 0.1);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          changeVolume(volume - 0.1);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [togglePlay, prevChapter, nextChapter, volume]);
+
   const formatTime = (seconds: number): string => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
@@ -180,17 +222,18 @@ export default function AudioPlayer({
       />
 
       <div className={styles.audioControls}>
-        <button className={styles.audioBtn} onClick={prevChapter} title="Previous">⏮</button>
-        <button className={styles.audioBtn} onClick={() => skip(-15)} title="-15s">-15</button>
+        <button className={styles.audioBtn} onClick={prevChapter} aria-label="Previous chapter">⏮</button>
+        <button className={styles.audioBtn} onClick={() => skip(-15)} aria-label="Rewind 15 seconds">-15</button>
         <button
           className={`${styles.audioBtn} ${styles.audioPlayBtn}`}
           onClick={togglePlay}
           disabled={isLoading}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isLoading ? '⏳' : isPlaying ? '⏸' : '▶'}
         </button>
-        <button className={styles.audioBtn} onClick={() => skip(15)} title="+15s">+15</button>
-        <button className={styles.audioBtn} onClick={nextChapter} title="Next">⏭</button>
+        <button className={styles.audioBtn} onClick={() => skip(15)} aria-label="Forward 15 seconds">+15</button>
+        <button className={styles.audioBtn} onClick={nextChapter} aria-label="Next chapter">⏭</button>
       </div>
 
       <div className={styles.audioProgress}>
@@ -207,6 +250,17 @@ export default function AudioPlayer({
       </div>
 
       <div className={styles.audioMeta}>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          onChange={(e) => changeVolume(Number(e.target.value))}
+          className={styles.audioVolumeSlider}
+          title={t('tts_volume')}
+        />
+
         <select
           value={speed}
           onChange={(e) => setPlaybackSpeed(Number(e.target.value))}

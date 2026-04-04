@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Delete, Body, Param,
+  Controller, Get, Post, Delete, Body, Param, Query,
   UseGuards, ParseIntPipe,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -7,11 +7,15 @@ import { TtsService } from './tts.service';
 import { SynthesizeDto, SynthesizeBookDto } from './dto/synthesize.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ProviderManager } from './providers/provider-manager';
 
 @Controller('tts')
 @UseGuards(JwtAuthGuard)
 export class TtsController {
-  constructor(private readonly ttsService: TtsService) {}
+  constructor(
+    private readonly ttsService: TtsService,
+    private readonly providerManager: ProviderManager,
+  ) {}
 
   // ========================
   // Existing endpoints (Phase 5)
@@ -83,5 +87,46 @@ export class TtsController {
     @Param('audioBookId') audioBookId: string,
   ) {
     return this.ttsService.deleteAudioBook(audioBookId, user.id);
+  }
+
+  // ========================
+  // New Phase 6 endpoints
+  // ========================
+
+  @Get('estimate')
+  estimate(
+    @CurrentUser() user: { id: string },
+    @Query('bookId') bookId: string,
+    @Query('provider') provider?: string,
+  ) {
+    return this.ttsService.estimate(bookId, user.id, provider);
+  }
+
+  @Post('retry/:audioBookId')
+  @Throttle({ default: { ttl: 3600000, limit: 10 } })
+  retry(
+    @CurrentUser() user: { id: string },
+    @Param('audioBookId') audioBookId: string,
+  ) {
+    return this.ttsService.retryFailed(audioBookId, user.id);
+  }
+
+  @Get(':audioBookId/timestamps/:chapterNumber')
+  getTimestamps(
+    @CurrentUser() user: { id: string },
+    @Param('audioBookId') audioBookId: string,
+    @Param('chapterNumber', ParseIntPipe) chapterNumber: number,
+  ) {
+    return this.ttsService.getTimestamps(audioBookId, chapterNumber, user.id);
+  }
+
+  @Get('providers')
+  getProviders() {
+    return this.providerManager.getAvailableProviders();
+  }
+
+  @Get('voices/all')
+  getAllVoices(@Query('language') language?: string) {
+    return this.providerManager.getAllVoices(language);
   }
 }

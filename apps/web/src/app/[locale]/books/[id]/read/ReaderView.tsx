@@ -19,7 +19,11 @@ import ReaderToolbar from './components/ReaderToolbar';
 import ReaderSidebar from './components/ReaderSidebar';
 import TextSelectionPopup from './components/TextSelectionPopup';
 import NoteEditor from './components/NoteEditor';
+import TtsGenerationPanel from './components/TtsGenerationPanel';
+import AudioPlayer from './components/AudioPlayer';
 import styles from './reader.module.scss';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface TranslatedChapter {
   id: string;
@@ -61,10 +65,61 @@ export default function ReaderView({ translation, token }: Props) {
   // Paginated mode state
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  // TTS state
+  const [audioBookId, setAudioBookId] = useState<string | null>(null);
+  const [audioChapters, setAudioChapters] = useState<Array<{ audioChapterId: string; chapterNumber: number; duration: number | null; status: string }>>([]);
+  const [showTtsPanel, setShowTtsPanel] = useState(false);
 
   const chapters = [...translation.translatedChapters].sort(
     (a, b) => a.chapter.number - b.chapter.number
   );
+
+  // Load existing audio chapters on mount
+  useEffect(() => {
+    async function loadAudioChapters() {
+      try {
+        const res = await fetch(`${API_URL}/api/tts/chapters/${bookId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.length > 0) {
+            setAudioChapters(data);
+          }
+        }
+      } catch {
+        // Audio not available — that's OK
+      }
+    }
+    loadAudioChapters();
+  }, [bookId, token]);
+
+  const handleAudioReady = useCallback((newAudioBookId: string) => {
+    setAudioBookId(newAudioBookId);
+    setShowTtsPanel(false);
+    // Reload audio chapters
+    fetch(`${API_URL}/api/tts/chapters/${bookId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setAudioChapters(data))
+      .catch(() => {});
+  }, [bookId, token]);
+
+  const getStreamUrl = useCallback(async (audioChapterId: string): Promise<string | null> => {
+    try {
+      const res = await fetch(`${API_URL}/api/tts/stream/${audioChapterId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const url = await res.text();
+        return url.startsWith('"') ? JSON.parse(url) : url;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }, [token]);
 
   // Resume from saved position
   useEffect(() => {
@@ -337,6 +392,47 @@ export default function ReaderView({ translation, token }: Props) {
             &#8594;
           </button>
         </div>
+      )}
+
+      {/* TTS Generation Panel */}
+      {showTtsPanel && (
+        <div className={styles.ttsSidePanel}>
+          <TtsGenerationPanel
+            bookId={bookId}
+            apiUrl={API_URL}
+            token={token}
+            onAudioReady={handleAudioReady}
+          />
+          <button
+            className={styles.ttsClosePanelBtn}
+            onClick={() => setShowTtsPanel(false)}
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
+      {/* TTS toggle button */}
+      {!showTtsPanel && audioChapters.length === 0 && (
+        <button
+          className={styles.ttsFloatingBtn}
+          onClick={() => setShowTtsPanel(true)}
+          title={t('tts_generate')}
+          aria-label={t('tts_generate')}
+        >
+          🔊
+        </button>
+      )}
+
+      {/* Audio Player */}
+      {audioChapters.length > 0 && (
+        <AudioPlayer
+          chapters={audioChapters}
+          currentChapter={activeChapter}
+          onChapterChange={(ch) => scrollToChapter(ch)}
+          getStreamUrl={getStreamUrl}
+          bookTitle={translation.book.title || ''}
+        />
       )}
 
       {/* Progress Bar */}

@@ -11,7 +11,7 @@ const expectError = (errors: any[], property: string) => {
 };
 
 describe('SynthesizeDto', () => {
-  const valid = { bookId: 'book-1', chapterNumber: 1 };
+  const valid = { bookId: '550e8400-e29b-41d4-a716-446655440001', chapterNumber: 1 };
 
   it('should pass with valid bookId and chapterNumber', async () => {
     const errors = await validate(toDto(SynthesizeDto, valid));
@@ -71,13 +71,13 @@ describe('SynthesizeDto', () => {
 
 describe('SynthesizeBookDto', () => {
   it('should pass with only bookId', async () => {
-    const errors = await validate(toDto(SynthesizeBookDto, { bookId: 'book-1' }));
+    const errors = await validate(toDto(SynthesizeBookDto, { bookId: '550e8400-e29b-41d4-a716-446655440001' }));
     expect(errors.length).toBe(0);
   });
 
   it('should pass with all optional fields', async () => {
     const errors = await validate(toDto(SynthesizeBookDto, {
-      bookId: 'book-1', voiceId: 'v1', speed: 1.0, provider: 'azure',
+      bookId: '550e8400-e29b-41d4-a716-446655440001', voiceId: 'v1', speed: 1.0, provider: 'azure',
     }));
     expect(errors.length).toBe(0);
   });
@@ -88,35 +88,35 @@ describe('SynthesizeBookDto', () => {
   });
 
   it('should fail with speed < 0.5', async () => {
-    const errors = await validate(toDto(SynthesizeBookDto, { bookId: 'b1', speed: 0.1 }));
+    const errors = await validate(toDto(SynthesizeBookDto, { bookId: '550e8400-e29b-41d4-a716-446655440001', speed: 0.1 }));
     expectError(errors, 'speed');
   });
 
   it('should fail with speed > 2.0', async () => {
-    const errors = await validate(toDto(SynthesizeBookDto, { bookId: 'b1', speed: 3.0 }));
+    const errors = await validate(toDto(SynthesizeBookDto, { bookId: '550e8400-e29b-41d4-a716-446655440001', speed: 3.0 }));
     expectError(errors, 'speed');
   });
 
   it('should fail with invalid provider', async () => {
-    const errors = await validate(toDto(SynthesizeBookDto, { bookId: 'b1', provider: 'openai' }));
+    const errors = await validate(toDto(SynthesizeBookDto, { bookId: '550e8400-e29b-41d4-a716-446655440001', provider: 'openai' }));
     expectError(errors, 'provider');
   });
 });
 
 describe('SynthesizeDto voiceId validation', () => {
   it('should pass with valid voiceId (alphanumeric + dash + underscore)', async () => {
-    const errors = await validate(toDto(SynthesizeDto, { bookId: 'b1', chapterNumber: 1, voiceId: 'ka-GE-voice_1' }));
+    const errors = await validate(toDto(SynthesizeDto, { bookId: '550e8400-e29b-41d4-a716-446655440001', chapterNumber: 1, voiceId: 'ka-GE-voice_1' }));
     expect(errors.length).toBe(0);
   });
 
   it('should fail with voiceId containing path traversal', async () => {
-    const errors = await validate(toDto(SynthesizeDto, { bookId: 'b1', chapterNumber: 1, voiceId: '../../v2/user' }));
+    const errors = await validate(toDto(SynthesizeDto, { bookId: '550e8400-e29b-41d4-a716-446655440001', chapterNumber: 1, voiceId: '../../v2/user' }));
     const err = errors.find((e) => e.property === 'voiceId');
     expect(err).toBeDefined();
   });
 
   it('should fail with voiceId containing special characters', async () => {
-    const errors = await validate(toDto(SynthesizeDto, { bookId: 'b1', chapterNumber: 1, voiceId: 'voice<script>' }));
+    const errors = await validate(toDto(SynthesizeDto, { bookId: '550e8400-e29b-41d4-a716-446655440001', chapterNumber: 1, voiceId: 'voice<script>' }));
     const err = errors.find((e) => e.property === 'voiceId');
     expect(err).toBeDefined();
   });

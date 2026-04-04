@@ -3,9 +3,7 @@ import { Worker, Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { TtsGateway } from './tts.gateway';
-import { ElevenLabsProvider } from './providers/elevenlabs.provider';
-import { AzureProvider } from './providers/azure.provider';
-import { TtsProvider } from './providers/tts-provider.interface';
+import { ProviderManager } from './providers/provider-manager';
 import { chunkText } from './utils/text-chunker';
 import { concatenateAudioBuffers } from './utils/audio-concat';
 import { TTS_QUEUE, getRedisConnection } from './tts.constants';
@@ -19,7 +17,7 @@ export interface TtsJobData {
   translatedText: string;
   voiceId: string;
   speed: number;
-  provider: 'elevenlabs' | 'azure';
+  provider: 'google-cloud' | 'elevenlabs' | 'azure';
   totalChapters: number;
   completedSoFar: number;
 }
@@ -33,8 +31,7 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
     private readonly gateway: TtsGateway,
-    private readonly elevenlabs: ElevenLabsProvider,
-    private readonly azure: AzureProvider,
+    private readonly providerManager: ProviderManager,
   ) {}
 
   onModuleInit(): void {
@@ -72,8 +69,8 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private getProvider(name: string): TtsProvider {
-    return name === 'azure' ? this.azure : this.elevenlabs;
+  private getProvider(name: string) {
+    return this.providerManager.getProvider(name);
   }
 
   async processChapter(job: Job<TtsJobData>): Promise<void> {
