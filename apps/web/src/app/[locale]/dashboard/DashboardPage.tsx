@@ -11,7 +11,7 @@ export default function DashboardPage() {
   const t = useTranslations('dashboard');
   const locale = useLocale();
   const { user } = useAuth();
-  const { stats, recentActivity, loading, error } = useDashboardData();
+  const { stats, recentActivity, loading, error, retry } = useDashboardData();
 
   const today = new Date().toLocaleDateString(locale === 'ka' ? 'ka-GE' : 'en-US', {
     day: 'numeric',
@@ -31,7 +31,10 @@ export default function DashboardPage() {
         {loading ? (
           <div className={styles.loadingState}>{t('loading')}</div>
         ) : error ? (
-          <div className={styles.emptyState}>{t('error')}</div>
+          <div className={styles.emptyState}>
+            <p>{t('error')}</p>
+            <button onClick={retry} className={styles.retryBtn}>{t('retry')}</button>
+          </div>
         ) : (
           <>
             {/* Stats Cards */}
@@ -59,21 +62,23 @@ export default function DashboardPage() {
                 <ul className={styles.activityList}>
                   {recentActivity.map((item) => (
                     <li key={item.id} className={styles.activityItem}>
-                      {item.book.coverUrl ? (
-                        <img src={item.book.coverUrl} alt={item.book.title} className={styles.activityCover} />
-                      ) : (
-                        <div className={styles.activityCoverPlaceholder}>
-                          {item.book.title?.[0] || '?'}
+                      <Link href={`/books/${item.book.id}`} className={styles.activityLink}>
+                        {item.book.coverUrl ? (
+                          <img src={item.book.coverUrl} alt={item.book.title} className={styles.activityCover} />
+                        ) : (
+                          <div className={styles.activityCoverPlaceholder}>
+                            {item.book.title?.[0] || '?'}
+                          </div>
+                        )}
+                        <div className={styles.activityInfo}>
+                          <div className={styles.activityTitle}>{item.book.title}</div>
+                          <div className={styles.activityStatus}>
+                            {item.status === 'COMPLETED'
+                              ? t('translation_completed')
+                              : t('translation_progress', { percentage: Math.round(item.progress) })}
+                          </div>
                         </div>
-                      )}
-                      <div className={styles.activityInfo}>
-                        <div className={styles.activityTitle}>{item.book.title}</div>
-                        <div className={styles.activityStatus}>
-                          {item.status === 'COMPLETED'
-                            ? t('translation_completed')
-                            : t('translation_progress', { percentage: Math.round(item.progress) })}
-                        </div>
-                      </div>
+                      </Link>
                       {item.status === 'COMPLETED' && (
                         <Link href={`/books/${item.book.id}/read`} className={styles.activityAction}>
                           {t('continue_reading')}

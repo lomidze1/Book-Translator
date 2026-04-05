@@ -93,6 +93,16 @@
   }
 }
 
+.activityLink {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
 .activityCover {
   width: 40px;
   height: 56px;
@@ -179,6 +189,21 @@
   padding: $spacing-xl;
   color: var(--text-secondary);
   font-size: 0.95rem;
+}
+
+.retryBtn {
+  margin-top: $spacing-sm;
+  padding: $spacing-xs $spacing-md;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  font-size: 0.9rem;
+
+  &:hover {
+    opacity: 0.9;
+  }
 }
 
 .loadingState {

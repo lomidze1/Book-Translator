@@ -51,6 +51,15 @@ export class ClaudeService implements OnModuleInit {
     return this._model;
   }
 
+  /**
+   * Calculate how many chunks a chapter will produce without actually splitting.
+   */
+  estimateChunkCount(contentLength: number): number {
+    const MAX_CHUNK_SIZE = 8000;
+    if (contentLength <= MAX_CHUNK_SIZE) return 1;
+    return Math.ceil(contentLength / MAX_CHUNK_SIZE);
+  }
+
   async translateChapter(
     content: string,
     options: {
@@ -59,6 +68,7 @@ export class ClaudeService implements OnModuleInit {
       totalChapters: number;
       glossary?: Record<string, string>;
       previousSummary?: string;
+      onChunkComplete?: (chunkIndex: number, totalChunks: number) => Promise<void>;
     },
   ): Promise<TranslationResult> {
     if (!this.client) {
@@ -69,7 +79,9 @@ export class ClaudeService implements OnModuleInit {
 
     // If content is small enough, translate in one go
     if (content.length <= MAX_CHUNK_SIZE) {
-      return this.translateSingleChunk(content, options);
+      const result = await this.translateSingleChunk(content, options);
+      if (options.onChunkComplete) await options.onChunkComplete(0, 1);
+      return result;
     }
 
     // Split into chunks by paragraphs
@@ -88,6 +100,8 @@ export class ClaudeService implements OnModuleInit {
       });
       translatedText += (i > 0 ? '\n\n' : '') + result.translatedText;
       totalTokens += result.tokensUsed;
+
+      if (options.onChunkComplete) await options.onChunkComplete(i, chunks.length);
     }
 
     return { translatedText, tokensUsed: totalTokens };

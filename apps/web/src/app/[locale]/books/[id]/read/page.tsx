@@ -43,7 +43,7 @@ export default function ReaderPage() {
     }
     setToken(accessToken);
 
-    async function fetchTranslation() {
+    async function fetchTranslation(attempt = 0) {
       try {
         const res = await fetch(`${API_URL}/api/translations/book/${params.id}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -51,6 +51,7 @@ export default function ReaderPage() {
 
         if (!res.ok) {
           setError(t('not_found'));
+          setLoading(false);
           return;
         }
 
@@ -58,7 +59,22 @@ export default function ReaderPage() {
         const completed = translations.find((tr: { status: string }) => tr.status === 'COMPLETED');
 
         if (!completed) {
+          const inProgress = translations.find(
+            (tr: { status: string }) => tr.status === 'IN_PROGRESS' || tr.status === 'PAID'
+          );
+
+          if (inProgress && attempt < 5) {
+            await new Promise(r => setTimeout(r, 3000));
+            return fetchTranslation(attempt + 1);
+          }
+
+          if (!inProgress && attempt < 3) {
+            await new Promise(r => setTimeout(r, 2000));
+            return fetchTranslation(attempt + 1);
+          }
+
           setError(t('not_ready'));
+          setLoading(false);
           return;
         }
 
@@ -68,13 +84,14 @@ export default function ReaderPage() {
 
         if (!fullRes.ok) {
           setError(t('not_found'));
+          setLoading(false);
           return;
         }
 
         setTranslation(await fullRes.json());
+        setLoading(false);
       } catch {
         setError(t('error_network'));
-      } finally {
         setLoading(false);
       }
     }

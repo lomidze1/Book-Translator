@@ -160,6 +160,7 @@
     "translation_progress": "თარგმნა მიმდინარეობს — {progress}%",
     "translation_completed": "თარგმანი მზადაა!",
     "translation_failed": "თარგმნა ვერ მოხერხდა",
+    "status_checking": "სტატუსის შემოწმება...",
     "read_translation": "წაკითხვა",
     "retry_translation": "ხელახლა ცდა",
     "translation_pending": "გადახდა მოლოდინში...",
@@ -407,7 +408,8 @@
     "translation_in_progress": "თარგმნა მიმდინარეობს...",
     "continue_reading": "კითხვის გაგრძელება",
     "loading": "იტვირთება...",
-    "error": "მონაცემების ჩატვირთვა ვერ მოხერხდა"
+    "error": "მონაცემების ჩატვირთვა ვერ მოხერხდა",
+    "retry": "თავიდან ცდა"
   },
   "library": {
     "title": "ბიბლიოთეკა",
