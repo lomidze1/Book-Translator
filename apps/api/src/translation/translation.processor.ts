@@ -96,29 +96,43 @@ export class TranslationProcessor implements OnModuleInit {
     // Mark as in progress
     await this.translationService.updateProgress(translationId, 0, 'IN_PROGRESS');
 
+    // Pre-scan all chapters to estimate total chunks for granular progress
+    const chapterContents: { meta: (typeof chapterMeta)[0]; chapter: { id: string; number: number; originalContent: string } }[] = [];
+    let totalChunks = 0;
+
+    for (const meta of chapterMeta) {
+      const chapter = await this.prisma.chapter.findUnique({ where: { id: meta.id } });
+      if (!chapter) continue;
+      const chunkCount = this.claude.estimateChunkCount(chapter.originalContent.length);
+      totalChunks += chunkCount;
+      chapterContents.push({ meta, chapter });
+    }
+
+    this.logger.log(`Total estimated chunks across all chapters: ${totalChunks}`);
+
     let totalTokens = 0;
     let previousSummary: string | undefined;
-    const totalChapters = chapterMeta.length;
+    let completedChunks = 0;
+    const totalChapters = chapterContents.length;
 
     for (let i = 0; i < totalChapters; i++) {
-      const meta = chapterMeta[i];
-
-      // Load chapter content one at a time to avoid memory bloat
-      const chapter = await this.prisma.chapter.findUnique({
-        where: { id: meta.id },
-      });
-
-      if (!chapter) continue;
+      const { chapter } = chapterContents[i];
 
       try {
         this.logger.log(`📝 Translating chapter ${chapter.number}/${totalChapters} (${chapter.originalContent.length} chars)...`);
-        // Translate chapter
+        // Translate chapter with chunk-level progress callback
         const result = await this.claude.translateChapter(chapter.originalContent, {
           bookTitle: book.title,
           chapterNumber: chapter.number,
           totalChapters,
           glossary,
           previousSummary,
+          onChunkComplete: async () => {
+            completedChunks++;
+            const progress = Math.min(Math.round((completedChunks / totalChunks) * 100), 99);
+            await this.translationService.updateProgress(translationId, progress);
+            await job.updateProgress(progress);
+          },
         });
 
         totalTokens += result.tokensUsed;
@@ -138,18 +152,11 @@ export class TranslationProcessor implements OnModuleInit {
         // Generate summary for context continuity
         previousSummary = await this.claude.generateChapterSummary(result.translatedText);
 
-        // Update progress
-        const progress = Math.round(((i + 1) / totalChapters) * 100);
-        await this.translationService.updateProgress(translationId, progress);
-
         // Update total tokens
         await this.prisma.translation.update({
           where: { id: translationId },
           data: { totalTokensUsed: totalTokens, aiModel: this.claude.getModel() },
         });
-
-        // Update job progress for BullMQ
-        await job.updateProgress(progress);
       } catch (error) {
         this.logger.error(`Failed to translate chapter ${chapter.number}: ${error instanceof Error ? error.message : 'Unknown error'}`);
 

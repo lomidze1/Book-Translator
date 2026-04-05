@@ -35,6 +35,7 @@ describe('TranslationProcessor', () => {
     translateChapter: vi.fn(),
     generateChapterSummary: vi.fn(),
     getModel: vi.fn().mockReturnValue('claude-sonnet-4-20250514'),
+    estimateChunkCount: vi.fn().mockReturnValue(1),
   };
 
   const mockTranslationService = {
@@ -47,6 +48,14 @@ describe('TranslationProcessor', () => {
     id: 'job-1',
     updateProgress: vi.fn().mockResolvedValue(undefined),
   });
+
+  // Helper: make translateChapter invoke the onChunkComplete callback
+  function mockTranslateWithCallback(result: { translatedText: string; tokensUsed: number }) {
+    return async (_content: string, options: any) => {
+      if (options.onChunkComplete) await options.onChunkComplete(0, 1);
+      return result;
+    };
+  }
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,10 +84,9 @@ describe('TranslationProcessor', () => {
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
 
-      mockClaude.translateChapter.mockResolvedValue({
-        translatedText: 'ნათარგმნი ტექსტი',
-        tokensUsed: 100,
-      });
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'ნათარგმნი ტექსტი', tokensUsed: 100 }),
+      );
       mockClaude.generateChapterSummary.mockResolvedValue('თავის რეზიუმე');
 
       await callProcess(job);
@@ -100,7 +108,7 @@ describe('TranslationProcessor', () => {
       // Should mark as completed
       expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
 
-      // Should update job progress
+      // Should update job progress per chunk (2 chunks total, 1 per chapter)
       expect(job.updateProgress).toHaveBeenCalledTimes(2);
     });
 
@@ -118,7 +126,9 @@ describe('TranslationProcessor', () => {
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
 
-      mockClaude.translateChapter.mockResolvedValue({ translatedText: 'text', tokensUsed: 50 });
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
+      );
       mockClaude.generateChapterSummary
         .mockResolvedValueOnce('Summary of chapter 1')
         .mockResolvedValueOnce('Summary of chapter 2');
@@ -141,6 +151,7 @@ describe('TranslationProcessor', () => {
     it('should fail if book not found', async () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
       mockPrisma.chapter.findMany.mockResolvedValue([{ id: 'ch-1', number: 1 }]);
+      mockPrisma.chapter.findUnique.mockResolvedValue({ id: 'ch-1', number: 1, originalContent: 'text' });
       mockPrisma.book.findUnique.mockResolvedValue(null);
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
 
@@ -172,7 +183,7 @@ describe('TranslationProcessor', () => {
       });
     });
 
-    it('should calculate progress correctly', async () => {
+    it('should calculate chunk-based progress correctly', async () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
@@ -187,14 +198,19 @@ describe('TranslationProcessor', () => {
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
-      mockClaude.translateChapter.mockResolvedValue({ translatedText: 'text', tokensUsed: 10 });
+      // Each chapter = 1 chunk, total 3 chunks
+      mockClaude.estimateChunkCount.mockReturnValue(1);
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 10 }),
+      );
       mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
-      // Progress: 33%, 67%, 100%
+      // Chunk progress: 33%, 67%, 99% (capped at 99 before COMPLETED)
       expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 33);
       expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 67);
+      expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 99);
       expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
     });
 
@@ -211,9 +227,14 @@ describe('TranslationProcessor', () => {
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
-      mockClaude.translateChapter
-        .mockResolvedValueOnce({ translatedText: 'text', tokensUsed: 100 })
-        .mockResolvedValueOnce({ translatedText: 'text', tokensUsed: 200 });
+
+      let callCount = 0;
+      mockClaude.translateChapter.mockImplementation(async (_content: string, options: any) => {
+        callCount++;
+        const tokensUsed = callCount === 1 ? 100 : 200;
+        if (options.onChunkComplete) await options.onChunkComplete(0, 1);
+        return { translatedText: 'text', tokensUsed };
+      });
       mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
@@ -229,21 +250,24 @@ describe('TranslationProcessor', () => {
       mockPrisma.chapter.findMany.mockResolvedValue([
         { id: 'ch-1', number: 1 },
       ]);
-      mockPrisma.chapter.findUnique.mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'text' });
+      mockPrisma.chapter.findUnique.mockResolvedValue({ id: 'ch-1', number: 1, originalContent: 'glossary test text' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({
         id: 'tr-1',
         glossary: { John: 'ჯონი' },
       });
       mockPrisma.translation.update.mockResolvedValue({});
-      mockClaude.translateChapter.mockResolvedValue({ translatedText: 'text', tokensUsed: 50 });
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
+      );
       mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
-      expect(mockClaude.translateChapter).toHaveBeenCalledWith('text', expect.objectContaining({
-        glossary: { John: 'ჯონი' },
-      }));
+      expect(mockClaude.translateChapter).toHaveBeenCalledWith(
+        'glossary test text',
+        expect.objectContaining({ glossary: { John: 'ჯონი' } }),
+      );
     });
 
     it('should use getModel() for aiModel field', async () => {
@@ -256,7 +280,9 @@ describe('TranslationProcessor', () => {
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
-      mockClaude.translateChapter.mockResolvedValue({ translatedText: 'text', tokensUsed: 50 });
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
+      );
       mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
@@ -269,7 +295,7 @@ describe('TranslationProcessor', () => {
       expect(mockClaude.getModel).toHaveBeenCalled();
     });
 
-    it('should handle single chapter (100% progress)', async () => {
+    it('should handle single chapter with chunk-level progress', async () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
@@ -279,13 +305,15 @@ describe('TranslationProcessor', () => {
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
-      mockClaude.translateChapter.mockResolvedValue({ translatedText: 'text', tokensUsed: 50 });
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
+      );
       mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
-      // Single chapter = 100% after first iteration
-      expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100);
+      // Single chunk = 99% (capped), then 100% COMPLETED
+      expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 99);
       expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
     });
 
@@ -299,7 +327,9 @@ describe('TranslationProcessor', () => {
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
-      mockClaude.translateChapter.mockResolvedValue({ translatedText: 'text', tokensUsed: 50 });
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
+      );
       mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);

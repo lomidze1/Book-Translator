@@ -17,6 +17,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const res = await fetch(`${_apiUrl}/api${basePath}${path}`, {
     ...options,
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,

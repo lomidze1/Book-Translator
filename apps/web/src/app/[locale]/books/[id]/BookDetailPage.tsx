@@ -63,6 +63,7 @@ export default function BookDetailsPage() {
     translationType?: 'FAST' | 'STANDARD';
   } | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pollFailCount, setPollFailCount] = useState(0);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -110,7 +111,7 @@ export default function BookDetailsPage() {
   const startPolling = useCallback((translationId: string) => {
     if (pollingRef.current) clearInterval(pollingRef.current);
 
-    pollingRef.current = setInterval(async () => {
+    const pollOnce = async () => {
       try {
         const token = localStorage.getItem('accessToken');
         if (!token) return;
@@ -124,6 +125,7 @@ export default function BookDetailsPage() {
         if (!res.ok) return;
 
         const translation = await res.json();
+        setPollFailCount(0);
 
         // Update book's translation data in state
         setBook(prev => {
@@ -144,10 +146,15 @@ export default function BookDetailsPage() {
           pollingRef.current = null;
           setTranslating(false);
         }
-      } catch {
-        // Silently fail polling
+      } catch (err) {
+        console.error('Translation poll failed:', err);
+        setPollFailCount(prev => prev + 1);
       }
-    }, 15000); // Poll every 15 seconds to avoid rate limiting
+    };
+
+    // Immediate first poll, then every 5 seconds
+    pollOnce();
+    pollingRef.current = setInterval(pollOnce, 5000);
   }, []);
 
   // Auto-start polling if there's an active translation
@@ -331,11 +338,13 @@ export default function BookDetailsPage() {
                 </Link>
               ) : activeTranslation ? (
                 <div className={styles.progressBox}>
-                  <p>{t('translation_progress', { progress: Math.round(activeTranslation.progress) })}</p>
+                  <div className={styles.spinner} />
+                  <p>{activeTranslation.progress === 0 ? t('translation_started') : t('translation_progress', { progress: Math.round(activeTranslation.progress) })}</p>
                   <div className={styles.progressBar}>
-                    <div className={styles.progressFill} style={{ width: `${activeTranslation.progress}%` }} />
+                    <div className={`${styles.progressFill} ${activeTranslation.progress === 0 ? styles.progressPulse : ''}`} style={{ width: activeTranslation.progress === 0 ? '100%' : `${activeTranslation.progress}%` }} />
                   </div>
-                  <span>{Math.round(activeTranslation.progress)}%</span>
+                  <span>100%</span>
+                  {pollFailCount >= 3 && <p className={styles.pollWarning}>{t('status_checking')}</p>}
                 </div>
               ) : failedTranslation ? (
                 <div>

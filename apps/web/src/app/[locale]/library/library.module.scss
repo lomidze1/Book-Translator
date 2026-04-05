@@ -86,6 +86,9 @@
   border-radius: $radius-lg;
   overflow: hidden;
   transition: box-shadow 0.2s, transform 0.15s;
+  text-decoration: none;
+  color: inherit;
+  display: block;
 
   &:hover {
     box-shadow: 0 4px 16px var(--shadow);

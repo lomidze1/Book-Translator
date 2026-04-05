@@ -77,7 +77,7 @@ export default function LibraryPage() {
         ) : (
           <div className={styles.grid}>
             {filtered.map((item) => (
-              <div key={item.id} className={styles.bookCard}>
+              <Link key={item.id} href={`/books/${item.book.id}`} className={styles.bookCard}>
                 {item.book.coverUrl ? (
                   <img src={item.book.coverUrl} alt={item.book.title} className={styles.bookCover} />
                 ) : (
@@ -102,12 +102,12 @@ export default function LibraryPage() {
                     </div>
                   )}
                   {item.status === 'COMPLETED' ? (
-                    <Link href={`/books/${item.book.id}/read`} className={styles.readBtn}>
-                      {t('continue_reading')}
-                    </Link>
+                    <span className={styles.readBtn}>
+                      {t('read')}
+                    </span>
                   ) : null}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

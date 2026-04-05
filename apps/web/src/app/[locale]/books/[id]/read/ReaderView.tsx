@@ -53,7 +53,7 @@ export default function ReaderView({ translation, token }: Props) {
   const { settings, setSettings } = useReaderSettings();
   const { progress, updateProgress } = useReadingProgress(bookId, token);
   const { bookmarks, addBookmark, removeBookmark } = useBookmarks(bookId, token);
-  const { highlights, addHighlight, removeHighlight } = useHighlights(bookId, token);
+  const { highlights, addHighlight, updateColor, removeHighlight } = useHighlights(bookId, token);
   const { notes, addNote, removeNote } = useNotes(bookId, token);
 
   // Local UI state
@@ -252,6 +252,64 @@ export default function ReaderView({ translation, token }: Props) {
     setNoteEditor(null);
   };
 
+  // Render chapter text with highlights applied
+  // Uses text-search matching: finds selectedText within each paragraph
+  const renderWithHighlights = useCallback((text: string, chapterNumber: number) => {
+    const chapterHighlights = highlights.filter(h => h.chapterNumber === chapterNumber);
+    if (chapterHighlights.length === 0) return text;
+
+    // Find highlights that match text in this paragraph
+    const matches: { start: number; end: number; color: string }[] = [];
+    for (const hl of chapterHighlights) {
+      // Only match single-paragraph highlights (no newlines in selectedText)
+      if (hl.selectedText.includes('\n')) continue;
+
+      let searchFrom = 0;
+      // Find first occurrence in this paragraph
+      const idx = text.indexOf(hl.selectedText, searchFrom);
+      if (idx !== -1) {
+        matches.push({ start: idx, end: idx + hl.selectedText.length, color: hl.color });
+      }
+    }
+
+    if (matches.length === 0) return text;
+
+    // Sort by start position
+    matches.sort((a, b) => a.start - b.start);
+
+    // Build React elements, skip overlapping matches
+    const parts: React.ReactNode[] = [];
+    let lastEnd = 0;
+
+    for (let i = 0; i < matches.length; i++) {
+      const m = matches[i];
+      if (m.start < lastEnd) continue;
+
+      if (m.start > lastEnd) {
+        parts.push(text.slice(lastEnd, m.start));
+      }
+
+      const colorClass =
+        m.color === 'yellow' ? styles.highlightYellow :
+        m.color === 'green' ? styles.highlightGreen :
+        m.color === 'blue' ? styles.highlightBlue :
+        m.color === 'red' ? styles.highlightRed : '';
+
+      parts.push(
+        <span key={`hl-${i}`} className={`${styles.highlightSpan} ${colorClass}`}>
+          {text.slice(m.start, m.end)}
+        </span>
+      );
+      lastEnd = m.end;
+    }
+
+    if (lastEnd < text.length) {
+      parts.push(text.slice(lastEnd));
+    }
+
+    return <>{parts}</>;
+  }, [highlights]);
+
   // Paginated mode: calculate pages based on content height
   useEffect(() => {
     if (settings.scrollMode || !contentRef.current) return;
@@ -343,7 +401,7 @@ export default function ReaderView({ translation, token }: Props) {
                 <h2>{ch.chapter.title || t('chapter', { number: ch.chapter.number })}</h2>
                 <div className={styles.chapterText}>
                   {ch.translatedContent.split('\n').map((paragraph, i) =>
-                    paragraph.trim() ? <p key={i}>{paragraph}</p> : null
+                    paragraph.trim() ? <p key={i}>{renderWithHighlights(paragraph, ch.chapter.number)}</p> : null
                   )}
                 </div>
               </article>

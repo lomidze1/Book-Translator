@@ -23,12 +23,12 @@ import { TtsModule } from './tts/tts.module';
       {
         name: 'default',
         ttl: 60000,
-        limit: process.env.NODE_ENV === 'production' ? 100 : 500,
+        limit: process.env.NODE_ENV === 'production' ? 100 : 10000,
       },
       {
         name: 'upload',
         ttl: 900000, // 15 minutes
-        limit: 5,
+        limit: process.env.NODE_ENV === 'production' ? 5 : 10000,
       },
     ]),
     PrismaModule,

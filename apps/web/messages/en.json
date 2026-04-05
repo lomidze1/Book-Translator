@@ -160,6 +160,7 @@
     "translation_progress": "Translating — {progress}%",
     "translation_completed": "Translation is ready!",
     "translation_failed": "Translation failed",
+    "status_checking": "Checking status...",
     "read_translation": "Read",
     "retry_translation": "Try Again",
     "translation_pending": "Payment pending...",
@@ -407,7 +408,8 @@
     "translation_in_progress": "Translating...",
     "continue_reading": "Continue Reading",
     "loading": "Loading...",
-    "error": "Failed to load data"
+    "error": "Failed to load data",
+    "retry": "Try Again"
   },
   "library": {
     "title": "Library",
