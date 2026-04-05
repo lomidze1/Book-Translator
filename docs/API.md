@@ -626,6 +626,53 @@ Content-Length: 4567890
 { "message": "Audio book deleted" }
 ```
 
+### GET `/tts/estimate?bookId={bookId}&provider={provider}` 🔒
+აუდიო გენერაციის ფასის და დროის ესტიმაცია.
+```json
+// Response 200
+{
+  "totalChapters": 12,
+  "totalCharacters": 245000,
+  "estimatedCostUsd": 0.98,
+  "estimatedAudioMinutes": 27.2,
+  "estimatedAudioHours": 2.3,
+  "provider": "google-cloud"
+}
+```
+
+### POST `/tts/retry/{audioBookId}` 🔒
+წარუმატებელი თავების ხელახალი სინთეზი.
+```json
+// Response 200
+{
+  "audioBookId": "...",
+  "retriedChapters": [3, 7],
+  "queued": 2,
+  "status": "queued"
+}
+```
+
+### GET `/tts/providers` 🔒
+ხელმისაწვდომი TTS პროვაიდერების სია და სტატუსი.
+```json
+// Response 200
+[
+  { "name": "google-cloud", "available": true, "languages": ["ka", "en"], "costPerMillionChars": 4 },
+  { "name": "elevenlabs", "available": true, "languages": ["en"], "costPerMillionChars": 5 },
+  { "name": "azure", "available": false, "languages": ["ka", "en"], "costPerMillionChars": 4 }
+]
+```
+
+### GET `/tts/voices/all?language={language}` 🔒
+ყველა პროვაიდერის ხმების აგრეგირებული სია.
+```json
+// Response 200
+[
+  { "id": "ka-GE-Neural2-A", "name": "Georgian Neural2 A (Female)", "language": "ka-GE", "gender": "female", "provider": "google-cloud" },
+  { "id": "ka-GE-Neural2-B", "name": "Georgian Neural2 B (Male)", "language": "ka-GE", "gender": "male", "provider": "google-cloud" }
+]
+```
+
 ---
 
 ## 9. WebSocket Events (Socket.io)

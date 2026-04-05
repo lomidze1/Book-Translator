@@ -8,5 +8,8 @@ coverage/
 .next/
 .turbo/
 apps/api/.env
+apps/api/*.json
+!apps/api/package.json
+!apps/api/tsconfig*.json
 apps/api/test/**/*.js
 apps/api/test/**/*.d.ts
