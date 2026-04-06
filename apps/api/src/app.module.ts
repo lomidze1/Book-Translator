@@ -13,6 +13,7 @@ import { PaymentModule } from './payment/payment.module';
 import { ReaderModule } from './reader/reader.module';
 import { TtsModule } from './tts/tts.module';
 import { NotificationModule } from './notification/notification.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { NotificationModule } from './notification/notification.module';
     TtsModule,
     NotificationModule,
   ],
+  controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,

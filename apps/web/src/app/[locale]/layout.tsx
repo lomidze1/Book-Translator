@@ -95,8 +95,11 @@ export default async function LocaleLayout({
         <NextIntlClientProvider>
           <AuthProvider>
             <ToastProvider>
+              <a href="#main-content" className="skip-to-content">
+                {locale === 'ka' ? 'მთავარ შიგთავსზე გადასვლა' : 'Skip to content'}
+              </a>
               <Navbar />
-              <main>{children}</main>
+              <main id="main-content">{children}</main>
               <Footer />
               <ToastContainer />
             </ToastProvider>
