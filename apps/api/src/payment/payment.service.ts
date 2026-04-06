@@ -11,6 +11,7 @@ import { BogProvider } from './providers/bog.provider';
 import { TbcProvider } from './providers/tbc.provider';
 import { PaymentProviderInterface, CallbackValidation } from './providers/payment-provider.interface';
 import { TranslationService } from '../translation/translation.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class PaymentService {
@@ -23,6 +24,7 @@ export class PaymentService {
     private readonly bogProvider: BogProvider,
     private readonly tbcProvider: TbcProvider,
     private readonly translationService: TranslationService,
+    private readonly notificationService: NotificationService,
   ) {
     this.providers = {
       BOG: this.bogProvider,
@@ -411,6 +413,34 @@ export class PaymentService {
         });
         this.logger.log(`UserBook created: ${userBookType} for book ${bookRelation.bookId}`);
       }
+    }
+
+    // Send payment receipt notification
+    try {
+      const fullPayment = await this.prisma.payment.findUnique({
+        where: { id: payment.id },
+        include: { translation: { include: { book: true } } },
+      });
+      if (fullPayment) {
+        const bookTitle = fullPayment.translation?.book?.title || fullPayment.description || '';
+        await this.notificationService.notify({
+          userId: payment.userId,
+          type: 'PAYMENT_RECEIPT',
+          titleKa: 'გადახდა წარმატებულია',
+          titleEn: 'Payment Successful',
+          bodyKa: `${fullPayment.amount} ${fullPayment.currency} — ${bookTitle}`,
+          bodyEn: `${fullPayment.amount} ${fullPayment.currency} — ${bookTitle}`,
+          data: {
+            paymentId: payment.id,
+            amount: Number(fullPayment.amount),
+            currency: fullPayment.currency,
+            bookTitle,
+            paidAt: fullPayment.paidAt?.toISOString(),
+          },
+        });
+      }
+    } catch (err) {
+      this.logger.error(`Payment notification failed: ${err instanceof Error ? err.message : err}`);
     }
   }
 

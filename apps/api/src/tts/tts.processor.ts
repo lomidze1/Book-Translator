@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { TtsGateway } from './tts.gateway';
 import { ProviderManager } from './providers/provider-manager';
+import { NotificationService } from '../notification/notification.service';
 import { chunkText } from './utils/text-chunker';
 import { concatenateAudioBuffers } from './utils/audio-concat';
 import { TTS_QUEUE, getRedisConnection } from './tts.constants';
@@ -32,6 +33,7 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly s3: S3Service,
     private readonly gateway: TtsGateway,
     private readonly providerManager: ProviderManager,
+    private readonly notificationService: NotificationService,
   ) {}
 
   onModuleInit(): void {
@@ -211,6 +213,35 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
           totalDuration: bookUpdateData.totalDuration as number,
           totalSize: bookUpdateData.totalSize as number,
         });
+
+        // Send TTS completion notification
+        try {
+          const audioBook = await this.prisma.audioBook.findUnique({
+            where: { id: audioBookId },
+            include: { book: { include: { userBooks: { select: { userId: true } } } } },
+          });
+          if (audioBook) {
+            const userIds = [...new Set(audioBook.book.userBooks.map(ub => ub.userId))];
+            for (const uid of userIds) {
+              await this.notificationService.notify({
+                userId: uid,
+                type: 'TTS_COMPLETED',
+                titleKa: 'აუდიო მზადაა',
+                titleEn: 'Audio Book Ready',
+                bodyKa: `„${audioBook.book.title}" — აუდიო წიგნი მზადაა`,
+                bodyEn: `"${audioBook.book.title}" — audio book is ready`,
+                data: {
+                  bookId,
+                  audioBookId,
+                  bookTitle: audioBook.book.title,
+                  totalDuration: bookUpdateData.totalDuration,
+                },
+              });
+            }
+          }
+        } catch (err) {
+          this.logger.error(`TTS notification failed: ${err instanceof Error ? err.message : err}`);
+        }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'TTS synthesis failed';

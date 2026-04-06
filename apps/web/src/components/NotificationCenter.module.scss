@@ -1,0 +1,124 @@
+@use '../styles/variables' as *;
+
+.center {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 360px;
+  max-height: 440px;
+  background: var(--card-bg, white);
+  border: 1px solid var(--card-border, $color-border);
+  border-radius: $radius-lg;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  @media (max-width: $breakpoint-sm) {
+    width: calc(100vw - 32px);
+    right: -60px;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md;
+  border-bottom: 1px solid var(--card-border, $color-border);
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.markAll {
+  background: none;
+  border: none;
+  color: var(--primary, $color-primary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.empty {
+  padding: $spacing-xl $spacing-md;
+  text-align: center;
+  color: var(--text-secondary, $color-secondary);
+  font-size: 14px;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-sm;
+  width: 100%;
+  padding: 12px $spacing-md;
+  border: none;
+  border-bottom: 1px solid var(--card-border, $color-border);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: var(--card-hover, rgba(0, 0, 0, 0.03));
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.unread {
+  background-color: var(--notification-unread, rgba(37, 99, 235, 0.04));
+}
+
+.itemContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground, $color-foreground);
+}
+
+.itemBody {
+  font-size: 13px;
+  color: var(--text-secondary, $color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemTime {
+  font-size: 12px;
+  color: var(--text-secondary, $color-secondary);
+  margin-top: 2px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--primary, $color-primary);
+  flex-shrink: 0;
+  margin-top: 4px;
+}

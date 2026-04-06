@@ -84,3 +84,49 @@ self.addEventListener('fetch', (event) => {
   // All other requests (including non-hashed JS/CSS) — network only
   // This prevents stale chunks from breaking the app after deployments
 });
+
+// === Push Notifications ===
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  try {
+    const payload = event.data.json();
+    event.waitUntil(
+      self.registration.showNotification(payload.title || 'Book Translator', {
+        body: payload.body || '',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        data: payload.data || {},
+      })
+    );
+  } catch (e) {
+    // Fallback for plain text push
+    event.waitUntil(
+      self.registration.showNotification('Book Translator', {
+        body: event.data.text(),
+        icon: '/icons/icon-192.png',
+      })
+    );
+  }
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const data = event.notification.data || {};
+  const url = data.bookId
+    ? `/books/${data.bookId}/read`
+    : '/dashboard';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(url) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});

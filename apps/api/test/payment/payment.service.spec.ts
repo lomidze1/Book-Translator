@@ -5,9 +5,11 @@ import { NotFoundException, BadRequestException, ForbiddenException } from '@nes
 describe('PaymentService', () => {
   let service: PaymentService;
   let prisma: any;
+  let config: any;
   let bogProvider: any;
   let tbcProvider: any;
   let translationService: any;
+  let notificationService: any;
 
   beforeEach(() => {
     prisma = {
@@ -58,7 +60,24 @@ describe('PaymentService', () => {
       startTranslation: vi.fn().mockResolvedValue({}),
     };
 
-    service = new PaymentService(prisma, bogProvider, tbcProvider, translationService);
+    config = {
+      get: vi.fn((key: string) => {
+        const map: Record<string, string> = {
+          PRICE_PER_PAGE_FAST: '0.15',
+          PRICE_PER_PAGE_SLOW: '0.07',
+          PRICE_MIN: '10',
+          PRICE_EXISTING: '5',
+          PRICE_CURRENCY: 'GEL',
+        };
+        return map[key] || undefined;
+      }),
+    };
+
+    notificationService = {
+      notify: vi.fn().mockResolvedValue(undefined),
+    };
+
+    service = new PaymentService(prisma, config, bogProvider, tbcProvider, translationService, notificationService);
   });
 
   describe('createPayment', () => {

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ClaudeService } from './claude.service';
 import { TranslationService } from './translation.service';
+import { NotificationService } from '../notification/notification.service';
 import { TRANSLATION_QUEUE, getRedisConnection } from './translation.constants';
 
 interface TranslationJobData {
@@ -21,6 +22,7 @@ export class TranslationProcessor implements OnModuleInit {
     private readonly s3: S3Service,
     private readonly claude: ClaudeService,
     private readonly translationService: TranslationService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   onModuleInit() {
@@ -174,5 +176,29 @@ export class TranslationProcessor implements OnModuleInit {
 
     // Mark as completed
     await this.translationService.updateProgress(translationId, 100, 'COMPLETED');
+
+    // Send notification
+    try {
+      const completedTranslation = await this.prisma.translation.findUnique({
+        where: { id: translationId },
+        include: { book: { include: { userBooks: { select: { userId: true } } } } },
+      });
+      if (completedTranslation) {
+        const userIds = [...new Set(completedTranslation.book.userBooks.map(ub => ub.userId))];
+        for (const uid of userIds) {
+          await this.notificationService.notify({
+            userId: uid,
+            type: 'TRANSLATION_COMPLETED',
+            titleKa: 'თარგმანი დასრულდა',
+            titleEn: 'Translation Completed',
+            bodyKa: `„${completedTranslation.book.title}" — თარგმანი მზადაა`,
+            bodyEn: `"${completedTranslation.book.title}" — translation is ready`,
+            data: { bookId, translationId, bookTitle: completedTranslation.book.title },
+          });
+        }
+      }
+    } catch (err) {
+      this.logger.error(`Notification failed: ${err instanceof Error ? err.message : err}`);
+    }
   }
 }

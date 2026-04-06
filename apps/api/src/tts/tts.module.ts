@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationModule } from '../notification/notification.module';
 import { TtsController } from './tts.controller';
 import { TtsService } from './tts.service';
 import { TtsProcessor } from './tts.processor';
@@ -10,7 +11,7 @@ import { GoogleCloudProvider } from './providers/google-cloud.provider';
 import { ProviderManager } from './providers/provider-manager';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, forwardRef(() => NotificationModule)],
   controllers: [TtsController],
   providers: [
     TtsService,

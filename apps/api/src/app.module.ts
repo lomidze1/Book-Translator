@@ -12,6 +12,7 @@ import { TranslationModule } from './translation/translation.module';
 import { PaymentModule } from './payment/payment.module';
 import { ReaderModule } from './reader/reader.module';
 import { TtsModule } from './tts/tts.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { TtsModule } from './tts/tts.module';
     PaymentModule,
     ReaderModule,
     TtsModule,
+    NotificationModule,
   ],
   providers: [
     {
