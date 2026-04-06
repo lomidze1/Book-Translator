@@ -1,12 +1,18 @@
+import './sentry';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api');
+
+  // Compression
+  app.use(compression());
 
   // Security headers
   app.use(helmet());
@@ -27,6 +33,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  app.useGlobalInterceptors(new LoggingInterceptor());
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
