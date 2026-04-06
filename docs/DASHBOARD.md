@@ -15,8 +15,17 @@
 
 ### 2.2 ავტორიზებული (ახალი)
 ```
-[Logo] [ძებნა] [ატვირთვა]     [🌙] [KA/EN] [ჩემი პროფილი ▾]
+[Logo] [ძებნა] [ატვირთვა]     [🌙] [KA/EN] [🔔 3] [ჩემი პროფილი ▾]
 ```
+
+**NotificationBell (🔔):**
+- Bell icon + წითელი badge წაუკითხავი count-ით
+- Click → NotificationCenter dropdown (scrollable სია, max-height 440px)
+- Header: "შეტყობინებები" + "ყველას წაკითხულად მონიშვნა"
+- Item: სათაური, ტექსტი, რელატიური დრო, read/unread dot
+- Click notification → navigate + mark as read
+- Real-time: Socket.IO `/notifications` namespace
+- Toast popup ახალი შეტყობინებისას (bottom-right, 5s auto-dismiss)
 
 ### 2.3 Dropdown მენიუ
 ```
@@ -192,6 +201,33 @@ Public routes (ყველასთვის ხელმისაწვდო�
 ### ნაბიჯი 5: Login/Register → Dashboard Redirect
 1. Login გვერდის განახლება — წარმატებული login → `/dashboard`
 2. Register გვერდის განახლება — წარმატებული register → `/dashboard`
+
+---
+
+## 7.5 Settings გვერდი — ნოტიფიკაციების პრეფერენსები (Phase 9)
+
+Settings გვერდი (`/[locale]/settings`) განახლებულია API-backed notification preferences-ით:
+
+### არხების კონტროლი
+| Toggle | აღწერა |
+|---|---|
+| Email შეტყობინებები | email ნოტიფიკაციები (Resend) |
+| Push შეტყობინებები | ბრაუზერის push notifications (VAPID) |
+| In-App შეტყობინებები | NotificationBell + Toast |
+
+### მოვლენების კონტროლი
+| Toggle | აღწერა |
+|---|---|
+| თარგმანის დასრულება | TRANSLATION_COMPLETED event |
+| აუდიოს მომზადება | TTS_COMPLETED event |
+| გადახდის ქვითარი | PAYMENT_RECEIPT event |
+
+### ტექნიკური დეტალები
+- პრეფერენსები ინახება **სერვერზე** (`NotificationPreference` ცხრილი), არა localStorage-ში
+- `GET /api/notifications/preferences` — ჩატვირთვა mount-ზე
+- `PATCH /api/notifications/preferences` — auto-save toggle-ის ცვლილებაზე
+- Push toggle: ბრაუზერის `Notification.requestPermission()` + API subscribe/unsubscribe
+- Reader defaults კვლავ localStorage-ში (client-only)
 
 ---
 

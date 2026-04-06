@@ -114,6 +114,19 @@
 
 ---
 
+## Notification System (ნოტიფიკაციები)
+
+| ტექნოლოგია | დანიშნულება | რატომ |
+|---|---|---|
+| **web-push** | Web Push API (VAPID) | W3C სტანდარტი, უფასო, ბრაუზერის vendor-ები უზრუნველყოფენ |
+| **BullMQ** (notification queue) | Async email/push dispatch | არ ანელებს translation/payment flow-ს |
+| **Socket.io** (/notifications) | In-app real-time delivery | მყისიერი WebSocket შეტყობინებები |
+| **Resend** | Email templates | თარგმანი, გადახდა, TTS completion emails (KA/EN) |
+| **Service Worker** (sw.js) | Push + notificationclick handlers | Browser push notifications, click navigation |
+| **socket.io-client** | Frontend WebSocket | real-time notification bell + toast |
+
+---
+
 ## გარე სერვისები და API-ები
 
 | სერვისი | დანიშნულება |

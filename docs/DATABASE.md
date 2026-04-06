@@ -40,6 +40,10 @@
        └────<┌──────────────┐
              │ReadingProgress│
              └──────────────┘
+
+  User ────< Notification
+       ────  NotificationPreference (1:1)
+       ────< PushSubscription
 ```
 
 ---
@@ -69,6 +73,11 @@ model User {
   highlights    Highlight[]
   notes         Note[]
   readingProgress ReadingProgress[]
+
+  // Notification relations (Phase 9)
+  notificationPreference NotificationPreference?
+  notifications          Notification[]
+  pushSubscriptions      PushSubscription[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -449,6 +458,75 @@ enum AudioChapterStatus {
 }
 ```
 
+### NotificationPreference (ნოტიფიკაციის პრეფერენსები)
+
+```prisma
+model NotificationPreference {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // არხების ჩართვა/გამორთვა
+  emailEnabled Boolean @default(true)   // email შეტყობინებები
+  pushEnabled  Boolean @default(true)   // browser push შეტყობინებები
+  inAppEnabled Boolean @default(true)   // in-app შეტყობინებები
+
+  // მოვლენების ჩართვა/გამორთვა
+  translationCompleted Boolean @default(true)  // თარგმანი დასრულდა
+  ttsCompleted         Boolean @default(true)  // აუდიო მზადაა
+  paymentReceipt       Boolean @default(true)  // გადახდის ქვითარი
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+### Notification (შეტყობინება)
+
+```prisma
+model Notification {
+  id     String           @id @default(cuid())
+  userId String
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   NotificationType
+  title  String           // შეტყობინების სათაური
+  body   String           // შეტყობინების ტექსტი
+  data   Json?            // დამატებითი მონაცემები (bookId, translationId და ა.შ.)
+  read   Boolean          @default(false)
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  TRANSLATION_COMPLETED  // თარგმანი დასრულდა
+  TTS_COMPLETED          // აუდიო მზადაა
+  PAYMENT_RECEIPT        // გადახდა წარმატებულია
+  SYSTEM                 // სისტემური შეტყობინება
+}
+```
+
+### PushSubscription (Web Push subscription)
+
+```prisma
+model PushSubscription {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String @unique  // Push API endpoint URL
+  p256dh    String          // VAPID public key
+  auth      String          // VAPID auth secret
+  userAgent String?         // ბრაუზერის ინფორმაცია
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+```
+
 ---
 
 ## ინდექსები
@@ -481,6 +559,7 @@ enum AudioChapterStatus {
 | `tts-progress:{audioBookId}` | TTS გენერაციის პროგრესი | persistent |
 | `bull:tts:*` | BullMQ TTS jobs | persistent |
 | `audio-cache:{bookId}:{chapter}` | აუდიო streaming cache | 24 საათი |
+| `bull:notification:*` | BullMQ notification jobs | persistent |
 
 ## Docker Setup
 
