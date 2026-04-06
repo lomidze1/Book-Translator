@@ -113,6 +113,7 @@ book-translator/
 | **Payment** | BOG Pay, TBC Pay ინტეგრაცია |
 | **Reader** | სანიშნეები, ხაზგასმები, შენიშვნები, კითხვის პროგრესი |
 | **Library** | მომხმარებლის ბიბლიოთეკა |
+| **Notification** | შეტყობინებები (email, push, in-app), WebSocket gateway, BullMQ queue |
 
 **ტექნიკური დეტალები:**
 - NestJS 10+
@@ -203,6 +204,24 @@ book-translator/
 ```
 მომხმარებელი → Reader → API → DB (წიგნის შიგთავსი, სანიშნეები, პროგრესი)
                              → S3 (ფაილი, თუ საჭიროა)
+```
+
+### ნოტიფიკაციის ნაკადი (Phase 9)
+```
+თარგმანი/გადახდა/TTS დასრულდა
+        ↓
+  NotificationService.notify()
+        ↓
+  ┌─────────────────────────────────────┐
+  │  1. Notification ჩანაწერი DB-ში     │
+  │  2. WebSocket → real-time emit      │  ← in-app (მყისიერი)
+  │  3. BullMQ Queue → async job        │
+  └─────────────────────────────────────┘
+        ↓ (async)
+  ┌─────────────────────────────────────┐
+  │  Email (Resend) — თუ emailEnabled   │
+  │  Push (VAPID)  — თუ pushEnabled     │
+  └─────────────────────────────────────┘
 ```
 
 ## უსაფრთხოება

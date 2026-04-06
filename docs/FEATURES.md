@@ -259,21 +259,42 @@
 
 ---
 
-## 9. ნოტიფიკაციები
+## 9. ნოტიფიკაციების სისტემა
 
 ### 9.1 Email ნოტიფიკაციები
-- რეგისტრაციის დადასტურება
-- პაროლის აღდგენა
-- თარგმნა დასრულდა
-- გადახდის ქვითარი
+- **რეგისტრაციის დადასტურება** — verification link (24 საათი)
+- **პაროლის აღდგენა** — reset link (1 საათი)
+- **თარგმანი დასრულდა** — CTA ღილაკი "წაკითხვა" + წიგნის სახელი (KA/EN)
+- **გადახდის ქვითარი** — თანხა, წიგნი, თარიღი, ტრანზაქციის ID (KA/EN)
+- **აუდიო მზადაა** — CTA ღილაკი "მოსმენა" + ხანგრძლივობა (KA/EN)
+- ენა: მომხმარებლის `locale`-ის მიხედვით (ქართული ან ინგლისური)
 
-### 9.2 Push ნოტიფიკაციები (მობილური)
-- თარგმნა დასრულდა
-- ახალი ფუნქციები / აქციები
+### 9.2 Web Push ნოტიფიკაციები
+- **VAPID** პროტოკოლით (W3C სტანდარტი, უფასო)
+- ბრაუზერის permission request flow
+- მრავალი მოწყობილობის მხარდაჭერა (PushSubscription per device)
+- Notification click → ნავიგაცია შესაბამის გვერდზე
+- ავტომატური expired subscription-ების გაწმენდა (HTTP 410)
 
 ### 9.3 In-App ნოტიფიკაციები
-- თარგმნის პროგრესი
-- სისტემური შეტყობინებები
+- **NotificationBell** — Navbar-ში bell icon წაუკითხავი counter badge-ით
+- **NotificationCenter** — dropdown სია: სათაური, ტექსტი, დრო, წაკითხული/წაუკითხავი
+- **Toast** — ახალი შეტყობინებისას bottom-right popup (5 წამი auto-dismiss)
+- **Real-time** — Socket.IO WebSocket (`/notifications` namespace)
+- "ყველას წაკითხულად მონიშვნა" ფუნქცია
+- რელატიური დრო: "ახლახანს", "5 წუთის წინ", "2 საათის წინ"
+
+### 9.4 ნოტიფიკაციის პრეფერენსები
+- **არხების კონტროლი** — Email / Push / In-App ცალ-ცალკე ჩართვა/გამორთვა
+- **მოვლენების კონტროლი** — თარგმანი / აუდიო / გადახდა ცალ-ცალკე
+- Settings გვერდზე API-backed toggles (სერვერზე ინახება, არა localStorage)
+- Backend processor-ები ამოწმებენ პრეფერენსებს გაგზავნამდე
+
+### 9.5 არქიტექტურა
+- **NotificationService.notify()** — ერთი entry point ყველა trigger-ისთვის
+- **BullMQ queue** — email/push async, არ ანელებს translation/payment/TTS flow-ს
+- **WebSocket gateway** — `/notifications` namespace, JWT auth, user-based rooms
+- **Trigger points:** TranslationProcessor, PaymentService, TtsProcessor
 
 ---
 

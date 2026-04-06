@@ -675,7 +675,106 @@ Content-Length: 4567890
 
 ---
 
-## 9. WebSocket Events (Socket.io)
+## 9. Notifications (ნოტიფიკაციები)
+
+### GET `/notifications` 🔒
+შეტყობინებების სია (პაგინაციით).
+```json
+// Query: ?page=1&limit=20
+
+// Response 200
+{
+  "notifications": [
+    {
+      "id": "clx...",
+      "type": "TRANSLATION_COMPLETED",
+      "title": "თარგმანი დასრულდა",
+      "body": "„Clean Code" — თარგმანი მზადაა",
+      "data": { "bookId": "clx...", "translationId": "clx..." },
+      "read": false,
+      "readAt": null,
+      "createdAt": "2026-04-06T10:00:00Z"
+    }
+  ],
+  "total": 15,
+  "page": 1,
+  "limit": 20
+}
+```
+
+### GET `/notifications/unread-count` 🔒
+წაუკითხავი შეტყობინებების რაოდენობა.
+```json
+// Response 200
+{ "count": 3 }
+```
+
+### PATCH `/notifications/{id}/read` 🔒
+შეტყობინების წაკითხულად მონიშვნა.
+```json
+// Response 200
+{ "success": true }
+```
+
+### PATCH `/notifications/read-all` 🔒
+ყველა შეტყობინების წაკითხულად მონიშვნა.
+```json
+// Response 200
+{ "success": true }
+```
+
+### GET `/notifications/preferences` 🔒
+ნოტიფიკაციის პრეფერენსები.
+```json
+// Response 200
+{
+  "emailEnabled": true,
+  "pushEnabled": false,
+  "inAppEnabled": true,
+  "translationCompleted": true,
+  "ttsCompleted": true,
+  "paymentReceipt": true
+}
+```
+
+### PATCH `/notifications/preferences` 🔒
+პრეფერენსების განახლება (partial update).
+```json
+// Request
+{ "emailEnabled": false, "ttsCompleted": false }
+
+// Response 200
+{ ...updatedPreferences }
+```
+
+### POST `/notifications/push/subscribe` 🔒
+Web Push subscription-ის რეგისტრაცია.
+```json
+// Request
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+  "p256dh": "BPvz3...",
+  "auth": "DGv6RA...",
+  "userAgent": "Mozilla/5.0..."
+}
+
+// Response 201
+{ "id": "clx..." }
+```
+
+### DELETE `/notifications/push/unsubscribe` 🔒
+Push subscription-ის წაშლა.
+```json
+// Request
+{ "endpoint": "https://fcm.googleapis.com/fcm/send/..." }
+
+// Response 200
+{ "success": true }
+```
+
+---
+
+## 10. WebSocket Events (Socket.io)
 
 ### კლიენტი → სერვერი
 
@@ -698,6 +797,16 @@ Content-Length: 4567890
 | `tts:chapter-done` | `{ audioBookId, chapterNumber, duration }` | თავის აუდიო მზადაა |
 | `tts:completed` | `{ audioBookId, totalDuration }` | მთელი წიგნის აუდიო მზადაა |
 | `tts:failed` | `{ audioBookId, chapterNumber, error }` | TTS შეცდომა |
+
+### Notification Events (namespace: `/notifications`)
+
+**კავშირი:** `io("API_URL/notifications", { auth: { token } })`
+მომხმარებელი ავტომატურად უერთდება `user:{userId}` ოთახს.
+
+| Event | მონაცემები | აღწერა |
+|---|---|---|
+| `notification:new` | `{ id, type, title, body, data, read, createdAt }` | ახალი შეტყობინება |
+| `notification:unread-count` | `number` | წაუკითხავი რაოდენობის განახლება |
 
 ---
 
