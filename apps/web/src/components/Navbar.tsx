@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 import UserDropdown from './UserDropdown';
+import NotificationBell from './NotificationBell';
 import styles from './Navbar.module.scss';
 
 export default function Navbar() {
@@ -35,11 +36,14 @@ export default function Navbar() {
           <LanguageSwitcher />
           {!isLoading && (
             isLoggedIn ? (
+              <>
+              <NotificationBell />
               <UserDropdown
                 userName={user?.name || null}
                 userEmail={user?.email || null}
                 onLogout={handleLogout}
               />
+              </>
             ) : (
               <>
                 <Link href="/login" className={styles.loginBtn}>

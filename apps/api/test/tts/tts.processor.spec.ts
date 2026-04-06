@@ -67,6 +67,7 @@ describe('TtsProcessor', () => {
     vi.clearAllMocks();
     processor = new (TtsProcessor as any)(
       mockPrisma, mockS3, mockGateway, mockProviderManager,
+      { notify: vi.fn().mockResolvedValue(undefined) },
     );
 
     // Default: single chunk, successful synthesis

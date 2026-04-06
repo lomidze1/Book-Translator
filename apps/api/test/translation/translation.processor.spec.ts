@@ -64,6 +64,7 @@ describe('TranslationProcessor', () => {
       mockS3,
       mockClaude,
       mockTranslationService,
+      { notify: vi.fn().mockResolvedValue(undefined) },
     );
   });
 

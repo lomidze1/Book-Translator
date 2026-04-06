@@ -41,6 +41,11 @@ model User {
   notes           Note[]
   readingProgress ReadingProgress[]
 
+  // Notification relations
+  notificationPreference NotificationPreference?
+  notifications          Notification[]
+  pushSubscriptions      PushSubscription[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -399,4 +404,63 @@ enum AudioChapterStatus {
   GENERATING
   COMPLETED
   FAILED
+}
+
+// === Phase 9: Notifications ===
+
+model NotificationPreference {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailEnabled Boolean @default(true)
+  pushEnabled  Boolean @default(true)
+  inAppEnabled Boolean @default(true)
+
+  translationCompleted Boolean @default(true)
+  ttsCompleted         Boolean @default(true)
+  paymentReceipt       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Notification {
+  id     String           @id @default(cuid())
+  userId String
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   NotificationType
+  title  String
+  body   String
+  data   Json?
+  read   Boolean          @default(false)
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  TRANSLATION_COMPLETED
+  TTS_COMPLETED
+  PAYMENT_RECEIPT
+  SYSTEM
+}
+
+model PushSubscription {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

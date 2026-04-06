@@ -4,8 +4,10 @@ import { notFound } from 'next/navigation';
 import type { Metadata, Viewport } from 'next';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
+import { ToastProvider } from '@/context/ToastContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import ToastContainer from '@/components/Toast';
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://booktranslator.ge';
@@ -92,9 +94,12 @@ export default async function LocaleLayout({
         <ServiceWorkerRegistrar />
         <NextIntlClientProvider>
           <AuthProvider>
-            <Navbar />
-            <main>{children}</main>
-            <Footer />
+            <ToastProvider>
+              <Navbar />
+              <main>{children}</main>
+              <Footer />
+              <ToastContainer />
+            </ToastProvider>
           </AuthProvider>
         </NextIntlClientProvider>
       </body>

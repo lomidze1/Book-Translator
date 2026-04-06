@@ -1,15 +1,27 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import styles from './settings.module.scss';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface ReaderDefaults {
   fontFamily: string;
   fontSize: number;
   lineHeight: number;
   theme: string;
+}
+
+interface NotificationPrefs {
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  inAppEnabled: boolean;
+  translationCompleted: boolean;
+  ttsCompleted: boolean;
+  paymentReceipt: boolean;
 }
 
 const DEFAULT_READER: ReaderDefaults = {
@@ -19,24 +31,52 @@ const DEFAULT_READER: ReaderDefaults = {
   theme: 'light',
 };
 
+const DEFAULT_NOTIF: NotificationPrefs = {
+  emailEnabled: true,
+  pushEnabled: true,
+  inAppEnabled: true,
+  translationCompleted: true,
+  ttsCompleted: true,
+  paymentReceipt: true,
+};
+
 export default function SettingsPage() {
   const t = useTranslations('settings');
   const locale = useLocale();
 
-  const [emailNotifs, setEmailNotifs] = useState(true);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIF);
   const [reader, setReader] = useState<ReaderDefaults>(DEFAULT_READER);
   const [saved, setSaved] = useState(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { permission, isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications();
 
-  // Load from localStorage
+  // Fetch notification preferences from API
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+
+    fetch(`${API_URL}/api/notifications/preferences`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) {
+          setNotifPrefs({
+            emailEnabled: data.emailEnabled ?? true,
+            pushEnabled: data.pushEnabled ?? true,
+            inAppEnabled: data.inAppEnabled ?? true,
+            translationCompleted: data.translationCompleted ?? true,
+            ttsCompleted: data.ttsCompleted ?? true,
+            paymentReceipt: data.paymentReceipt ?? true,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load reader settings from localStorage
   useEffect(() => {
     try {
-      const notifStr = localStorage.getItem('notificationPreferences');
-      if (notifStr) {
-        const prefs = JSON.parse(notifStr);
-        if (typeof prefs.email === 'boolean') setEmailNotifs(prefs.email);
-      }
-
       const readerStr = localStorage.getItem('reader-settings');
       if (readerStr) {
         const parsed = JSON.parse(readerStr);
@@ -47,16 +87,13 @@ export default function SettingsPage() {
           theme: ['light', 'sepia', 'dark'].includes(parsed.theme) ? parsed.theme : DEFAULT_READER.theme,
         });
       }
-    } catch {
-      // Reset to defaults on parse error
-    }
+    } catch {}
   }, []);
 
-  // Auto-save when state changes (fixes stale closure issue)
+  // Auto-save reader settings to localStorage
   useEffect(() => {
-    localStorage.setItem('notificationPreferences', JSON.stringify({ email: emailNotifs }));
     localStorage.setItem('reader-settings', JSON.stringify(reader));
-  }, [emailNotifs, reader]);
+  }, [reader]);
 
   const showSavedBadge = () => {
     setSaved(true);
@@ -64,12 +101,42 @@ export default function SettingsPage() {
     savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
   };
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
   }, []);
+
+  const updateNotifPref = useCallback(async (update: Partial<NotificationPrefs>) => {
+    setNotifPrefs(prev => ({ ...prev, ...update }));
+    showSavedBadge();
+
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+
+    try {
+      await fetch(`${API_URL}/api/notifications/preferences`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(update),
+      });
+    } catch {}
+  }, []);
+
+  const handlePushToggle = async () => {
+    if (isSubscribed) {
+      await unsubscribe();
+      await updateNotifPref({ pushEnabled: false });
+    } else {
+      const success = await subscribe();
+      if (success) {
+        await updateNotifPref({ pushEnabled: true });
+      }
+    }
+  };
 
   const switchLocale = (newLocale: string) => {
     const currentPath = window.location.pathname;
@@ -88,16 +155,95 @@ export default function SettingsPage() {
         {/* Notifications */}
         <div className={styles.section}>
           <h2>{t('notifications')}</h2>
+
+          {/* Email */}
           <div className={styles.settingRow}>
             <div className={styles.settingLabel}>
               <div className={styles.labelText}>{t('email_notifications')}</div>
               <div className={styles.labelDesc}>{t('email_notifications_desc')}</div>
             </div>
             <button
-              className={`${styles.toggle} ${emailNotifs ? styles.active : ''}`}
-              onClick={() => { setEmailNotifs((prev) => !prev); showSavedBadge(); }}
+              className={`${styles.toggle} ${notifPrefs.emailEnabled ? styles.active : ''}`}
+              onClick={() => updateNotifPref({ emailEnabled: !notifPrefs.emailEnabled })}
               role="switch"
-              aria-checked={emailNotifs}
+              aria-checked={notifPrefs.emailEnabled}
+            />
+          </div>
+
+          {/* Push */}
+          <div className={styles.settingRow}>
+            <div className={styles.settingLabel}>
+              <div className={styles.labelText}>{t('push_notifications')}</div>
+              <div className={styles.labelDesc}>
+                {!isSupported
+                  ? t('push_not_supported')
+                  : permission === 'denied'
+                    ? t('push_denied')
+                    : t('push_notifications_desc')}
+              </div>
+            </div>
+            {isSupported && permission !== 'denied' && (
+              <button
+                className={`${styles.toggle} ${isSubscribed ? styles.active : ''}`}
+                onClick={handlePushToggle}
+                role="switch"
+                aria-checked={isSubscribed}
+              />
+            )}
+          </div>
+
+          {/* In-App */}
+          <div className={styles.settingRow}>
+            <div className={styles.settingLabel}>
+              <div className={styles.labelText}>{t('in_app_notifications')}</div>
+              <div className={styles.labelDesc}>{t('in_app_notifications_desc')}</div>
+            </div>
+            <button
+              className={`${styles.toggle} ${notifPrefs.inAppEnabled ? styles.active : ''}`}
+              onClick={() => updateNotifPref({ inAppEnabled: !notifPrefs.inAppEnabled })}
+              role="switch"
+              aria-checked={notifPrefs.inAppEnabled}
+            />
+          </div>
+        </div>
+
+        {/* Notification Events */}
+        <div className={styles.section}>
+          <h2>{t('notification_events')}</h2>
+
+          <div className={styles.settingRow}>
+            <div className={styles.settingLabel}>
+              <div className={styles.labelText}>{t('event_translation')}</div>
+            </div>
+            <button
+              className={`${styles.toggle} ${notifPrefs.translationCompleted ? styles.active : ''}`}
+              onClick={() => updateNotifPref({ translationCompleted: !notifPrefs.translationCompleted })}
+              role="switch"
+              aria-checked={notifPrefs.translationCompleted}
+            />
+          </div>
+
+          <div className={styles.settingRow}>
+            <div className={styles.settingLabel}>
+              <div className={styles.labelText}>{t('event_tts')}</div>
+            </div>
+            <button
+              className={`${styles.toggle} ${notifPrefs.ttsCompleted ? styles.active : ''}`}
+              onClick={() => updateNotifPref({ ttsCompleted: !notifPrefs.ttsCompleted })}
+              role="switch"
+              aria-checked={notifPrefs.ttsCompleted}
+            />
+          </div>
+
+          <div className={styles.settingRow}>
+            <div className={styles.settingLabel}>
+              <div className={styles.labelText}>{t('event_payment')}</div>
+            </div>
+            <button
+              className={`${styles.toggle} ${notifPrefs.paymentReceipt ? styles.active : ''}`}
+              onClick={() => updateNotifPref({ paymentReceipt: !notifPrefs.paymentReceipt })}
+              role="switch"
+              aria-checked={notifPrefs.paymentReceipt}
             />
           </div>
         </div>
