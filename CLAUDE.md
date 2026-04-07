@@ -9,26 +9,61 @@ Book-Translator/
 ├── apps/
 │   ├── api/              # NestJS backend API
 │   │   ├── src/
-│   │   │   ├── auth/     # Auth module (JWT, Google OAuth, OTP)
-│   │   │   ├── users/    # Users module (profile CRUD)
-│   │   │   ├── books/    # Books module (search, upload, CRUD)
-│   │   │   ├── s3/       # AWS S3 service (file storage)
-│   │   │   ├── prisma/   # Prisma service
-│   │   │   └── redis/    # Redis service (OTP, rate limiting)
-│   │   ├── test/         # Vitest tests (400+)
+│   │   │   ├── auth/         # Auth (JWT, Google OAuth, OTP, password reset/change)
+│   │   │   ├── users/        # Users (profile CRUD)
+│   │   │   ├── books/        # Books (search, upload, CRUD)
+│   │   │   ├── translation/  # AI Translation (BullMQ processor, Claude API)
+│   │   │   ├── tts/          # Text-to-Speech (Google Cloud, ElevenLabs, Azure)
+│   │   │   ├── payment/      # Payment (BOG Pay, TBC Pay)
+│   │   │   ├── reader/       # Reader (bookmarks, highlights, notes, progress)
+│   │   │   ├── notification/ # Notifications (email, push, in-app, WebSocket)
+│   │   │   ├── email/        # Email service (Resend)
+│   │   │   ├── parsing/      # File parsing (PDF, EPUB, DOCX, TXT)
+│   │   │   ├── s3/           # AWS S3 service (file storage)
+│   │   │   ├── prisma/       # Prisma service
+│   │   │   ├── redis/        # Redis service (OTP, rate limiting)
+│   │   │   └── common/       # Shared guards, decorators, pipes
+│   │   ├── test/         # Vitest tests (700+)
 │   │   └── prisma/       # Prisma schema + migrations
-│   └── web/              # Next.js 15 frontend (SCSS)
-│       ├── src/app/      # Pages (landing, login, register, search, upload, books)
-│       ├── src/components/  # Navbar, Footer
-│       └── src/styles/   # SCSS variables, mixins
+│   ├── web/              # Next.js 15 frontend (SCSS)
+│   │   ├── src/app/      # Pages (see below)
+│   │   ├── src/components/  # Navbar, Footer, NotificationBell, PaymentModal, etc.
+│   │   └── src/styles/   # SCSS variables, mixins
+│   └── mobile/           # React Native (Expo)
 ├── packages/
 │   ├── config/           # ESLint, Prettier, TSConfig
-│   └── shared/           # Shared types & interfaces
-├── docs/                 # დოკუმენტაცია (8 ფაილი)
+│   ├── shared/           # Shared types & interfaces
+│   └── reader/           # Online Reader shared logic
+├── docs/                 # დოკუმენტაცია
 ├── docker-compose.yml    # PostgreSQL 16 + Redis 7
 └── .claude/
-    └── agents/
-        └── test-guardian.md   # ტესტირების აგენტი
+    └── agents/           # 7 აგენტი (test-guardian, code-reviewer, etc.)
+```
+
+### Frontend გვერდები
+```
+/{locale}/                     # Landing page
+/{locale}/login                # Login (email + Google OAuth)
+/{locale}/register             # Registration
+/{locale}/search               # Book search
+/{locale}/upload               # File upload (drag & drop)
+/{locale}/books/:id            # Book detail + translation options
+/{locale}/books/:id/read       # Online Reader
+/{locale}/forgot-password      # Forgot password
+/{locale}/reset-password       # Reset password (token)
+/{locale}/verify-email         # Email verification
+/{locale}/confirm-password-change  # Password change confirmation
+/{locale}/dashboard            # User dashboard
+/{locale}/library              # User library
+/{locale}/profile              # User profile
+/{locale}/profile/change-password  # Change password
+/{locale}/profile/translations # Translation history
+/{locale}/profile/favorites    # Favorites
+/{locale}/profile/payments     # Payment history
+/{locale}/settings             # Notification + reader settings
+/{locale}/payment/success      # Payment success
+/{locale}/payment/failure      # Payment failure
+/{locale}/payment/mock         # Mock payment (dev only)
 ```
 
 ## ხელმისაწვდომი აგენტები
@@ -46,7 +81,7 @@ Book-Translator/
 უსაფრთხოების აუდიტორი. Auth bypass, input sanitization, secrets, OWASP Top 10.
 
 ### SEO Auditor (`seo-auditor`)
-SEO ოპტიმიზაციის მცველი. Meta tags, structured data (JSON-LD), hreflang, sitemap, robots.txt, Core Web Vitals, ქართულენოვანი SEO.
+SEO ოპტიმიზაციის მცველი. Meta tags, structured data (JSON-LD), hreflang, sitemap, robots.txt.
 
 ### Doc Sync (`doc-sync`)
 დოკუმენტაციის სინქრონიზატორი. კოდის ცვლილებები → docs/ განახლება.
@@ -89,13 +124,19 @@ pnpm turbo build
 
 ## ტექნოლოგიური სტეკი
 - **Monorepo:** pnpm workspaces + Turborepo
-- **Backend:** NestJS + Prisma + PostgreSQL
+- **Backend:** NestJS + Prisma + PostgreSQL 16
 - **Frontend:** Next.js 15 + React 19 + SCSS + next-intl (i18n)
-- **Auth:** JWT + Passport.js + Google OAuth (google-auth-library) + OTP (Redis)
+- **Auth:** JWT + Google OAuth (google-auth-library) + OTP (Redis)
+- **AI Translation:** Claude API (@anthropic-ai/sdk) + BullMQ
+- **TTS:** Google Cloud TTS + ElevenLabs + Azure + BullMQ
+- **Payments:** BOG Pay + TBC Pay
+- **Notifications:** Web Push (VAPID) + Socket.IO + Resend (email)
 - **Database:** PostgreSQL 16 (Docker) + Redis 7 (Docker)
-- **Testing:** Vitest (400+ tests)
+- **Storage:** AWS S3
+- **Monitoring:** Sentry
+- **Testing:** Vitest (700+ tests)
 - **Validation:** class-validator + class-transformer
-- **Language:** TypeScript
+- **Language:** TypeScript strict mode
 
 ## კოდის სტილი
 - TypeScript strict mode
@@ -115,4 +156,4 @@ pnpm turbo build
 
 ## ბრანჩები
 - **main** — სტაბილური ვერსია
-- **test** — აქტიური განვითარება (ფაზა 2 დასრულების პროცესში)
+- **dev** — აქტიური განვითარება
