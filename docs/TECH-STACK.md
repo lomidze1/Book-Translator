@@ -10,120 +10,104 @@
 
 ---
 
-## Frontend — ვებ აპლიკაცია
+## Frontend — ვებ აპლიკაცია (`apps/web`)
 
 | ტექნოლოგია | დანიშნულება | რატომ |
 |---|---|---|
-| **Next.js 15** | React Framework (App Router) | SSR, SEO, API routes, მაღალი პერფორმანსი |
+| **Next.js 15** | React Framework (App Router) | SSR, SEO, მაღალი პერფორმანსი |
 | **React 19** | UI ბიბლიოთეკა | კომპონენტების არქიტექტურა |
-| **SCSS (Sass)** | CSS Framework | CSS modules, variables, mixins, nested selectors |
-| **shadcn/ui** | UI components (optional — for future use) | ლამაზი, კასტომიზებადი, accessible |
-| **TanStack Query** | სერვერის სტეიტი | caching, refetching, optimistic updates |
-| **Zustand** | კლიენტის სტეიტი | მარტივი, მსუბუქი state management |
-| **Socket.io-client** | WebSocket | თარგმნის რეალ-ტაიმ პროგრესი |
-| **React Hook Form + Zod** | ფორმები + ვალიდაცია | type-safe ფორმები |
+| **SCSS (Sass)** | სტილიზაცია | CSS modules, variables, mixins |
 | **next-intl** | ინტერნაციონალიზაცია | ქართული და ინგლისური UI |
+| **Socket.io-client** | WebSocket | რეალ-ტაიმ პროგრესი და ნოტიფიკაციები |
+| **@react-oauth/google** | Google OAuth | Google Sign-In frontend |
 
 ---
 
-## Frontend — მობილური აპლიკაცია
+## Frontend — მობილური აპლიკაცია (`apps/mobile`)
 
 | ტექნოლოგია | დანიშნულება | რატომ |
 |---|---|---|
 | **React Native 0.76+** | მობილური framework | iOS + Android ერთი codebase |
 | **Expo** | React Native toolkit | მარტივი build, OTA updates |
-| **React Navigation** | ნავიგაცია | სტანდარტული mobile navigation |
-| **NativeWind** | სტილიზაცია | TailwindCSS React Native-ში |
-| **Expo Notifications** | Push ნოტიფიკაციები | თარგმნა დასრულდა |
-| **MMKV** | ლოკალური storage | სწრაფი key-value storage |
+| **Expo Router** | ნავიგაცია | file-based routing |
 
 ---
 
-## Backend — API სერვერი
+## Backend — API სერვერი (`apps/api`)
 
 | ტექნოლოგია | დანიშნულება | რატომ |
 |---|---|---|
 | **NestJS 10+** | Backend Framework | მოდულური, scalable, TypeScript-native |
 | **Prisma** | ORM | type-safe DB queries, მარტივი მიგრაციები |
 | **PostgreSQL 16** | მონაცემთა ბაზა | რელაციური, საიმედო, JSON მხარდაჭერა |
-| **Redis** | Cache + Queue | Bull Queue, session cache, rate limiting |
-| **BullMQ** | Job Queue | თარგმნის სამუშაოების რიგი |
-| **Socket.io** | WebSocket სერვერი | რეალ-ტაიმ კომუნიკაცია |
-| **Passport.js** | ავტორიზაცია | JWT, Google OAuth, Phone OTP |
+| **Redis 7** | Cache + Queue | BullMQ, rate limiting, OTP storage |
+| **BullMQ** | Job Queue | თარგმნის, TTS, ნოტიფიკაციის async processing |
+| **Socket.io** | WebSocket სერვერი | რეალ-ტაიმ პროგრესი და ნოტიფიკაციები |
+| **google-auth-library** | Google OAuth | ID token verification |
 | **Multer** | ფაილის ატვირთვა | multipart/form-data |
 | **class-validator** | ვალიდაცია | DTO ვალიდაცია |
 | **Helmet** | უსაფრთხოება | HTTP headers |
-| **Throttler** | Rate Limiting | API-ს დაცვა |
+| **@nestjs/throttler** | Rate Limiting | API-ს დაცვა |
+| **Sentry** | Error tracking | production monitoring |
 
 ---
 
-## Translator Worker
+## AI თარგმანი (Translation Module)
 
 | ტექნოლოგია | დანიშნულება | რატომ |
 |---|---|---|
-| **BullMQ Worker** | Job processing | Queue-დან სამუშაოების აღება |
 | **@anthropic-ai/sdk** | Claude API | ძირითადი AI თარგმანი |
 | **pdf-parse** | PDF → ტექსტი | PDF ფაილების დამუშავება |
 | **epub2** | EPUB → თავები | EPUB ფაილების დამუშავება |
 | **mammoth** | DOCX → HTML/ტექსტი | Word ფაილების დამუშავება |
-| **franc** | ენის ამოცნობა | ატვირთული ფაილის ენის შემოწმება |
+| **BullMQ** | Job processing | Queue-დან სამუშაოების აღება |
+
+### რატომ Claude API?
+
+1. **დიდი კონტექსტის ფანჯარა (200K tokens)** — მთელი თავი ერთდროულად
+2. **ქართული ენის ხარისხი** — კარგი ქართული ენის მხარდაჭერა
+3. **კონტექსტუალური თარგმანი** — ესმის ნარატივი, პერსონაჟები, მეტაფორები
+4. **თანმიმდევრულობა** — system prompt-ით პერსონაჟების სახელების, ტერმინების თანმიმდევრულობა
+
+### თარგმანის ოპტიმიზაცია
+
+- **Context window management** — წინა თავის რეზიუმე შემდეგ თავის prompt-ში
+- **Glossary** — პერსონაჟების სახელების და ტერმინების ლექსიკონი
+- **Chunking** — დიდი თავები 8K-char ფრაგმენტებად
+- **Retry logic** — exponential backoff, 3 attempts (BullMQ)
 
 ---
 
-## Online Reader
+## TTS — ხმოვანი წაკითხვა (TTS Module)
 
 | ტექნოლოგია | დანიშნულება | რატომ |
 |---|---|---|
-| **epub.js** (ვებისთვის) | EPUB rendering | სტანდარტული ebook reader |
-| **Custom React Reader** | თარგმანის ჩვენება | კასტომ reader კომპონენტი |
+| **Google Cloud TTS (Neural2)** | ძირითადი TTS API | საუკეთესო ქართული ხმები |
+| **ElevenLabs** | ინგლისური TTS | მაღალხარისხიანი ბუნებრივი ხმები |
+| **Azure Cognitive Services** | სარეზერვო TTS | დამატებითი ენების მხარდაჭერა |
+| **fluent-ffmpeg** | აუდიო processing | ფრაგმენტების შეერთება MP3-ად |
+| **BullMQ** | Job processing | აუდიო გენერაციის async queue |
 
----
-
-## TTS Worker — ხმოვანი წაკითხვის სერვისი
-
-| ტექნოლოგია | დანიშნულება | რატომ |
-|---|---|---|
-| **BullMQ Worker** | Job processing | Queue-დან აუდიო გენერაციის სამუშაოების აღება |
-| **Google Cloud TTS (Neural2)** | Text-to-Speech API | საუკეთესო ქართული ხმები, ბუნებრივი ჟღერადობა |
-| **ffmpeg (fluent-ffmpeg)** | აუდიო processing | ფრაგმენტების შეერთება, ფორმატის კონვერტაცია, bitrate |
-| **AWS S3** | აუდიო ფაილების შენახვა | MP3/M4A ფაილების storage + streaming |
-| **Socket.io** | რეალ-ტაიმ პროგრესი | აუდიო გენერაციის პროგრესის ჩვენება |
-
-### მობილური აუდიო პლეიერი
-
-| ტექნოლოგია | დანიშნულება | რატომ |
-|---|---|---|
-| **expo-av** | აუდიო playback | Expo-ს ოფიციალური აუდიო ბიბლიოთეკა |
-| **react-native-track-player** | Background playback | Lock screen controls, notification player, CarPlay/Android Auto |
-| **@react-native-community/slider** | Progress slider | აუდიოში ნავიგაცია |
+### Provider Fallback სისტემა
+- ავტომატური health check-ები
+- provider failure → fallback სხვა provider-ზე
+- ენის მიხედვით provider-ის არჩევა (ქართული → Google Cloud)
 
 ### ვებ აუდიო პლეიერი
-
-| ტექნოლოგია | დანიშნულება | რატომ |
-|---|---|---|
-| **HTML5 Audio API** | აუდიო playback | ბრაუზერის ნეიტივი, არ სჭირდება ბიბლიოთეკა |
-| **Media Session API** | OS-level controls | ბრაუზერის მინი-პლეიერი, keyboard media keys |
-
-### რატომ Google Cloud TTS?
-
-1. **ქართული ენის მხარდაჭერა** — Neural2 ხმები ქართულისთვის (ka-GE)
-2. **ბუნებრივი ჟღერადობა** — WaveNet/Neural2 ტექნოლოგია, არა რობოტული
-3. **SSML მხარდაჭერა** — პაუზები, ინტონაცია, სიჩქარის კონტროლი
-4. **მაღალი throughput** — დიდი ტექსტის სწრაფი დამუშავება
-5. **ფასი** — ~$4/1M სიმბოლო (Neural2), ~$16/1M (Studio) — გონივრული
+- **HTML5 Audio API** — ბრაუზერის ნეიტივი playback
+- **Media Session API** — OS-level controls, keyboard media keys
 
 ---
 
-## Notification System (ნოტიფიკაციები)
+## Notification System
 
 | ტექნოლოგია | დანიშნულება | რატომ |
 |---|---|---|
-| **web-push** | Web Push API (VAPID) | W3C სტანდარტი, უფასო, ბრაუზერის vendor-ები უზრუნველყოფენ |
-| **BullMQ** (notification queue) | Async email/push dispatch | არ ანელებს translation/payment flow-ს |
-| **Socket.io** (/notifications) | In-app real-time delivery | მყისიერი WebSocket შეტყობინებები |
-| **Resend** | Email templates | თარგმანი, გადახდა, TTS completion emails (KA/EN) |
-| **Service Worker** (sw.js) | Push + notificationclick handlers | Browser push notifications, click navigation |
-| **socket.io-client** | Frontend WebSocket | real-time notification bell + toast |
+| **web-push** | Web Push API (VAPID) | W3C სტანდარტი, უფასო |
+| **BullMQ** | Async dispatch | არ ანელებს ძირითად flow-ს |
+| **Socket.io** | In-app real-time | მყისიერი WebSocket შეტყობინებები |
+| **Resend** | Email templates | ტრანზაქციული emails (KA/EN) |
+| **Service Worker** | Push handlers | Browser push notifications |
 
 ---
 
@@ -132,40 +116,34 @@
 | სერვისი | დანიშნულება |
 |---|---|
 | **Claude API (Anthropic)** | AI წიგნის თარგმანი |
+| **Google Cloud TTS** | ქართული ხმოვანი წაკითხვა |
 | **Google Books API** | წიგნების ძებნა, მეტადატა |
 | **Open Library API** | დამატებითი წიგნების ინფო |
 | **BOG Pay API** | საქართველოს ბანკის გადახდა |
 | **TBC Pay API** | თიბისის გადახდა |
-| **Twilio / MessageBird** | SMS OTP |
-| **Resend / SendGrid** | Email (ტრანზაქციული) |
+| **Resend** | ტრანზაქციული Email |
 | **Google OAuth** | სოციალური ავტორიზაცია |
 | **Sentry** | Error tracking |
+| **AWS S3** | ფაილების შენახვა |
 
 ---
 
 ## ინფრასტრუქტურა და DevOps
 
-| ტექნოლოგია | დანიშნულება | რატომ |
-|---|---|---|
-| **AWS S3** | ფაილების შენახვა | წიგნების PDF/EPUB + ნათარგმნი ფაილები |
-| **Vercel** | Web App hosting | Next.js-ის ოპტიმალური ჰოსტინგი |
-| **Railway** | API + Worker + DB + Redis | მარტივი deployment, auto-scaling |
-| **Docker** | კონტეინერიზაცია | თანმიმდევრული გარემო |
-| **GitHub Actions** | CI/CD | ავტომატური ტესტირება და deployment |
-
-### რატომ Vercel + Railway?
-
-- **Vercel** — Next.js-ის შემქმნელების პლატფორმა, ოპტიმალური CDN, edge functions, ავტომატური SSL
-- **Railway** — PostgreSQL, Redis, Node.js სერვისები ერთ ადგილას, მარტივი კონფიგურაცია, auto-scaling
-- ამ კომბინაციით ბიუჯეტი გონივრულია და ხარისხი მაღალი
-- თუ მომავალში საჭირო გახდება → AWS-ზე მიგრაცია მარტივია Docker-ის წყალობით
+| ტექნოლოგია | დანიშნულება |
+|---|---|
+| **AWS S3** | ფაილების შენახვა (წიგნები, აუდიო, თარგმანები) |
+| **Vercel** | Web App hosting (Next.js) |
+| **Railway** | API + DB + Redis hosting |
+| **Docker** | Development environment |
+| **GitHub Actions** | CI/CD (lint, test, build) |
 
 ### Docker (Development)
 
-| სერვისი | Image | Port | დანიშნულება |
-|---|---|---|---|
-| **PostgreSQL 16** | postgres:16-alpine | 5432 | მონაცემთა ბაზა |
-| **Redis 7** | redis:7-alpine | 6379 | Cache, Queue, OTP storage |
+| სერვისი | Image | Port |
+|---|---|---|
+| **PostgreSQL 16** | postgres:16-alpine | 5432 |
+| **Redis 7** | redis:7-alpine | 6379 |
 
 ---
 
@@ -175,26 +153,6 @@
 |---|---|
 | **ESLint** | კოდის ხარისხი |
 | **Prettier** | კოდის ფორმატირება |
-| **Vitest** | Unit/Integration ტესტები |
-| **Playwright** | E2E ტესტები (ვები) |
-| **Detox** | E2E ტესტები (მობილური) |
+| **Vitest** | Unit/Integration ტესტები (700+) |
 | **Husky** | Git hooks (pre-commit) |
 | **lint-staged** | staged ფაილების linting |
-
----
-
-## AI თარგმანის სტრატეგია
-
-### რატომ Claude API?
-
-1. **დიდი კონტექსტის ფანჯარა (200K tokens)** — შეიძლება მთელი თავი ერთდროულად
-2. **ქართული ენის ხარისხი** — Claude-ს კარგი ქართული ენის მხარდაჭერა აქვს
-3. **კონტექსტუალური თარგმანი** — ესმის ნარატივი, პერსონაჟები, მეტაფორები
-4. **თანმიმდევრულობა** — system prompt-ით პერსონაჟების სახელების, ტერმინების თანმიმდევრულობა
-
-### თარგმანის ოპტიმიზაცია
-
-- **Batch processing** — თავები/სექციები პარალელურად (rate limits-ის ფარგლებში)
-- **Context window management** — წინა თავის რეზიუმე შემდეგ თავის prompt-ში
-- **Glossary** — პერსონაჟების სახელების და ტერმინების ლექსიკონი, რომელიც მთელი წიგნის განმავლობაში ინარჩუნებს თანმიმდევრულობას
-- **Retry logic** — API შეცდომის შემთხვევაში ხელახლა ცდა exponential backoff-ით
