@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata, Viewport } from 'next';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
+import GoogleOAuthWrapper from '@/components/GoogleOAuthWrapper';
 import { ToastProvider } from '@/context/ToastContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -38,6 +39,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       languages: {
         ka: `${BASE_URL}/ka`,
         en: `${BASE_URL}/en`,
+        'x-default': `${BASE_URL}/ka`,
       },
     },
     openGraph: {
@@ -58,19 +60,6 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       index: true,
       follow: true,
     },
-    other: {
-      'script:ld+json': JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'WebSite',
-        name: 'Book Translator',
-        url: BASE_URL,
-        potentialAction: {
-          '@type': 'SearchAction',
-          target: `${BASE_URL}/${locale}/search?q={search_term_string}`,
-          'query-input': 'required name=search_term_string',
-        },
-      }),
-    },
   };
 }
 
@@ -89,10 +78,28 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <head />
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebSite',
+              name: 'Book Translator',
+              url: BASE_URL,
+              potentialAction: {
+                '@type': 'SearchAction',
+                target: `${BASE_URL}/${locale}/search?q={search_term_string}`,
+                'query-input': 'required name=search_term_string',
+              },
+            }).replace(/</g, '\\u003c'),
+          }}
+        />
+      </head>
       <body suppressHydrationWarning>
         <ServiceWorkerRegistrar />
         <NextIntlClientProvider>
+          <GoogleOAuthWrapper>
           <AuthProvider>
             <ToastProvider>
               <a href="#main-content" className="skip-to-content">
@@ -104,6 +111,7 @@ export default async function LocaleLayout({
               <ToastContainer />
             </ToastProvider>
           </AuthProvider>
+          </GoogleOAuthWrapper>
         </NextIntlClientProvider>
       </body>
     </html>

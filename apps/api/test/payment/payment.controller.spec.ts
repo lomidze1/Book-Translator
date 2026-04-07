@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { ForbiddenException } from '@nestjs/common';
 import { PaymentController } from '../../src/payment/payment.controller';
 
 describe('PaymentController', () => {
@@ -62,16 +63,30 @@ describe('PaymentController', () => {
   });
 
   describe('simulate', () => {
-    it('should call simulatePayment', async () => {
+    const originalEnv = process.env.NODE_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('should call simulatePayment in non-production', async () => {
+      process.env.NODE_ENV = 'development';
       await controller.simulate('pay-1', 'user-1');
 
       expect(paymentService.simulatePayment).toHaveBeenCalledWith('pay-1', 'user-1');
+    });
+
+    it('should throw ForbiddenException in production', async () => {
+      process.env.NODE_ENV = 'production';
+
+      await expect(controller.simulate('pay-1', 'user-1')).rejects.toThrow(ForbiddenException);
+      expect(paymentService.simulatePayment).not.toHaveBeenCalled();
     });
   });
 
   describe('bogCallback', () => {
     it('should handle BOG callback', async () => {
-      const payload = { order_id: 'test', status: 'success' };
+      const payload = { order_id: 'test', status: 'success' } as any;
 
       await controller.bogCallback(payload, 'sig-123');
 
@@ -81,7 +96,7 @@ describe('PaymentController', () => {
 
   describe('tbcCallback', () => {
     it('should handle TBC callback', async () => {
-      const payload = { PaymentId: 'test', Status: 'Succeeded' };
+      const payload = { PaymentId: 'test', Status: 'Succeeded' } as any;
 
       await controller.tbcCallback(payload, 'sig-456');
 

@@ -43,39 +43,46 @@ describe('Guards — Edge Cases & Security', () => {
     });
 
     describe('handleRequest edge cases', () => {
+      let nonPublicContext: ExecutionContext;
+
+      beforeEach(() => {
+        nonPublicContext = createMockContext();
+        mockReflector.getAllAndOverride.mockReturnValue(false);
+      });
+
       it('should throw UnauthorizedException for empty object user', () => {
         // Empty object is truthy, so should be returned
-        const result = guard.handleRequest(null, {}, null);
+        const result = guard.handleRequest(null, {}, null, nonPublicContext);
         expect(result).toEqual({});
       });
 
       it('should throw UnauthorizedException for user = 0 (falsy)', () => {
-        expect(() => guard.handleRequest(null, 0 as any, null)).toThrow(
+        expect(() => guard.handleRequest(null, 0 as any, null, nonPublicContext)).toThrow(
           UnauthorizedException,
         );
       });
 
       it('should throw UnauthorizedException for user = "" (falsy)', () => {
-        expect(() => guard.handleRequest(null, '' as any, null)).toThrow(
+        expect(() => guard.handleRequest(null, '' as any, null, nonPublicContext)).toThrow(
           UnauthorizedException,
         );
       });
 
       it('should return user with minimal properties', () => {
         const minimalUser = { id: '1' };
-        const result = guard.handleRequest(null, minimalUser, null);
+        const result = guard.handleRequest(null, minimalUser, null, nonPublicContext);
         expect(result).toEqual({ id: '1' });
       });
 
       it('should prefer throwing error over UnauthorizedException when both exist', () => {
         const customError = new Error('Custom auth error');
-        expect(() => guard.handleRequest(customError, null, null)).toThrow('Custom auth error');
+        expect(() => guard.handleRequest(customError, null, null, nonPublicContext)).toThrow('Custom auth error');
       });
 
       it('should throw error even when user exists', () => {
         const err = new UnauthorizedException('Token expired');
         const user = { id: 'user-1', role: 'ADMIN' };
-        expect(() => guard.handleRequest(err, user, null)).toThrow(UnauthorizedException);
+        expect(() => guard.handleRequest(err, user, null, nonPublicContext)).toThrow(UnauthorizedException);
       });
     });
 

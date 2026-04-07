@@ -326,8 +326,17 @@ export class BooksService {
   }
 
   async remove(id: string, userId: string) {
-    await this.findOne(id); // throws if not found
+    const book = await this.findOne(id); // throws if not found
     await this.verifyOwnership(id, userId);
+
+    // Clean up S3 files before cascade delete
+    if (book.originalFileUrl) {
+      try {
+        await this.s3.delete(book.originalFileUrl);
+      } catch (err) {
+        this.logger.warn(`Failed to delete S3 file for book ${id}: ${err}`);
+      }
+    }
 
     return this.prisma.book.delete({
       where: { id },

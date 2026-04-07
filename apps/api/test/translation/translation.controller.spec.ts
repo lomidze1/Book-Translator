@@ -25,7 +25,7 @@ describe('TranslationController', () => {
       const result = await controller.create(dto, 'user-1');
 
       expect(result).toEqual(expected);
-      expect(mockTranslationService.createTranslation).toHaveBeenCalledWith('book-1', 'user-1', 'ka');
+      expect(mockTranslationService.createTranslation).toHaveBeenCalledWith('book-1', 'user-1', 'ka', undefined);
     });
 
     it('should propagate service errors', async () => {

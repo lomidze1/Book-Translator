@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@book-translator/reader": "workspace:*",
+    "@react-oauth/google": "^0.13.4",
     "@sentry/nextjs": "^10.47.0",
     "next": "16.2.1",
     "next-intl": "^4.8.3",

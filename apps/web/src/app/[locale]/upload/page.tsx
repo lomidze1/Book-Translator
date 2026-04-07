@@ -15,6 +15,18 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       canonical: `${BASE_URL}/${locale}/upload`,
       languages: { ka: `${BASE_URL}/ka/upload`, en: `${BASE_URL}/en/upload` },
     },
+    openGraph: {
+      title: t('upload_title'),
+      description: t('upload_description'),
+      url: `${BASE_URL}/${locale}/upload`,
+      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: 'Book Translator' }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: t('upload_title'),
+      description: t('upload_description'),
+      images: [`${BASE_URL}/og-image.png`],
+    },
   };
 }
 

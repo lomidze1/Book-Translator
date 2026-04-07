@@ -27,6 +27,9 @@ describe('TranslationService', () => {
     translatedChapter: {
       upsert: vi.fn(),
     },
+    userBook: {
+      create: vi.fn(),
+    },
     chapter: {
       create: vi.fn(),
     },
@@ -61,20 +64,27 @@ describe('TranslationService', () => {
       mockPrisma.translation.create.mockResolvedValue({
         id: 'tr-1',
         bookId: 'book-1',
-        status: 'PENDING',
+        status: 'PAID',
         progress: 0,
+      });
+      // startTranslation is called in dev mode after create
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        bookId: 'book-1',
+        status: 'PAID',
       });
 
       const result = await service.createTranslation('book-1', 'user-1');
 
       expect(result.id).toBe('tr-1');
-      expect(result.status).toBe('PENDING');
+      expect(result.status).toBe('PAID');
       expect(mockPrisma.translation.create).toHaveBeenCalledWith({
         data: {
           bookId: 'book-1',
           sourceLanguage: 'en',
           targetLanguage: 'ka',
-          status: 'PENDING',
+          translationType: 'FAST',
+          status: 'PAID',
           progress: 0,
         },
       });
@@ -86,7 +96,7 @@ describe('TranslationService', () => {
       await expect(service.createTranslation('no-book', 'user-1')).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException if user does not own the book', async () => {
+    it('should auto-create UserBook if user does not own the book yet', async () => {
       mockPrisma.book.findUnique.mockResolvedValue({
         id: 'book-1',
         originalFileUrl: 's3://key',
@@ -94,8 +104,24 @@ describe('TranslationService', () => {
         userBooks: [],
         _count: { chapters: 1 },
       });
+      mockPrisma.translation.findFirst.mockResolvedValue(null);
+      mockPrisma.translation.create.mockResolvedValue({
+        id: 'tr-1',
+        bookId: 'book-1',
+        status: 'PAID',
+        progress: 0,
+      });
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        bookId: 'book-1',
+        status: 'PAID',
+      });
 
-      await expect(service.createTranslation('book-1', 'user-1')).rejects.toThrow(ForbiddenException);
+      await service.createTranslation('book-1', 'user-1');
+
+      expect(mockPrisma.userBook.create).toHaveBeenCalledWith({
+        data: { userId: 'user-1', bookId: 'book-1', type: 'UPLOADED' },
+      });
     });
 
     it('should throw BadRequestException if translation already exists', async () => {
@@ -120,7 +146,9 @@ describe('TranslationService', () => {
         _count: { chapters: 1 },
       });
       mockPrisma.translation.findFirst.mockResolvedValue(null);
-      mockPrisma.translation.create.mockResolvedValue({ id: 'tr-1' });
+      mockPrisma.translation.create.mockResolvedValue({ id: 'tr-1', status: 'PAID' });
+      // startTranslation is called in dev mode
+      mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', bookId: 'book-1', status: 'PAID' });
 
       await service.createTranslation('book-1', 'user-1');
 

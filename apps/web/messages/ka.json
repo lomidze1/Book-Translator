@@ -63,7 +63,8 @@
     "email_not_verified": "ელ-ფოსტა არ არის დადასტურებული.",
     "resend_verification": "ხელახლა გაგზავნა",
     "verification_sent": "დადასტურების ლინკი გაგზავნილია!",
-    "resend_cooldown": "ხელახლა გაგზავნა ({seconds}წმ)"
+    "resend_cooldown": "ხელახლა გაგზავნა ({seconds}წმ)",
+    "or_divider": "ან"
   },
   "register": {
     "title": "რეგისტრაცია",
@@ -102,7 +103,11 @@
     "error_password_strength": "მინიმუმ 1 დიდი ასო და 1 რიცხვი",
     "error_confirm_required": "პაროლის დადასტურება აუცილებელია",
     "show_password": "პაროლის ჩვენება",
-    "hide_password": "პაროლის დამალვა"
+    "hide_password": "პაროლის დამალვა",
+    "or_divider": "ან"
+  },
+  "google_auth": {
+    "error": "Google-ით შესვლა ვერ მოხერხდა. სცადეთ თავიდან."
   },
   "search": {
     "title": "წიგნის ძებნა",
@@ -281,12 +286,16 @@
     "change_password": "პაროლის შეცვლა",
     "my_translations": "ჩემი თარგმანები",
     "my_favorites": "რჩეულები",
-    "current_password": "მიმდინარე პაროლი",
     "new_password": "ახალი პაროლი",
     "confirm_password": "გაიმეორეთ პაროლი",
+    "change_password_description": "შეიყვანეთ ახალი პაროლი. დადასტურების ბმული გამოგეგზავნებათ ემაილზე.",
+    "change_password_submit": "პაროლის შეცვლა",
     "password_changed": "პაროლი წარმატებით შეიცვალა",
     "password_mismatch": "პაროლები არ ემთხვევა",
     "password_requirements": "მინიმუმ 8 სიმბოლო, 1 დიდი ასო და 1 ციფრი",
+    "email_sent_title": "შეამოწმეთ ემაილი",
+    "email_sent_description": "დადასტურების ბმული გამოგეგზავნათ ემაილზე. დააჭირეთ პაროლის შესაცვლელად.",
+    "open_email": "ემაილის გახსნა",
     "back_to_profile": "პროფილზე დაბრუნება",
     "no_translations": "თარგმნილი წიგნები ჯერ არ გაქვთ",
     "no_favorites": "რჩეული წიგნები ჯერ არ გაქვთ",
@@ -316,6 +325,16 @@
     "payment_provider": "პროვაიდერი",
     "payment_description": "აღწერა",
     "payment_status": "სტატუსი"
+  },
+  "confirm_password_change": {
+    "title": "პაროლის შეცვლის დადასტურება",
+    "confirming": "პაროლი იცვლება...",
+    "success": "პაროლი წარმატებით შეიცვალა!",
+    "redirecting": "გადამისამართება პროფილზე...",
+    "error_invalid": "ბმული არასწორია ან ვადაგასულია.",
+    "error_default": "რაღაც შეცდომა მოხდა. სცადეთ თავიდან.",
+    "back_to_profile": "პროფილზე დაბრუნება",
+    "try_again": "სცადეთ თავიდან"
   },
   "reader": {
     "back_to_book": "წიგნზე დაბრუნება",
@@ -487,6 +506,7 @@
     "verify_email_title": "ელ-ფოსტის დადასტურება",
     "payment_success_title": "გადახდა წარმატებულია",
     "payment_failure_title": "გადახდა ვერ მოხერხდა",
-    "site_name": "Book Translator"
+    "book_not_found": "წიგნი ვერ მოიძებნა",
+    "site_name": "Book Translator \u2014 წიგნების მთარგმნელი"
   }
 }

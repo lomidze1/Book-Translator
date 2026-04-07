@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
+import { getTranslations } from 'next-intl/server';
 import BookDetailPage from './BookDetailPage';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://booktranslator.ge';
@@ -19,7 +20,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale, id } = await params;
   const book = await fetchBook(id);
 
-  if (!book) return { title: 'Book Not Found' };
+  const seo = await getTranslations({ locale, namespace: 'seo' });
+  if (!book) return { title: seo('book_not_found') };
 
   const description = book.description?.substring(0, 160) || `${book.title} by ${book.author}`;
   const ogImage = book.coverUrl || `${BASE_URL}/og-image.png`;

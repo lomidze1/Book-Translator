@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 import styles from '../../login/page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -191,6 +192,25 @@ export default function LoginPage() {
             {loading ? t('loading') : t('submit')}
           </button>
         </form>
+
+        {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+          <>
+            <div className={styles.divider}>
+              <span>{t('or_divider')}</span>
+            </div>
+            <GoogleSignInButton
+              onError={(msg) => setError(msg)}
+              redirectTo={
+                (() => {
+                  const returnUrl = searchParams.get('returnUrl');
+                  return returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
+                    ? returnUrl
+                    : '/dashboard';
+                })()
+              }
+            />
+          </>
+        )}
 
         <p className={styles.forgotLink}>
           <Link href="/forgot-password">{t('forgot_password')}</Link>

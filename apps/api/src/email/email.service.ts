@@ -36,6 +36,23 @@ export class EmailService {
     console.log(`📧 Resend response:`, JSON.stringify(result));
   }
 
+  async sendPasswordChangeConfirmation(to: string, token: string, name?: string): Promise<void> {
+    if (!this.resend) {
+      console.warn(`⚠️  Email skipped (no API key): password change confirmation for ${to}`);
+      return;
+    }
+
+    const confirmUrl = `${process.env.FRONTEND_URL}/confirm-password-change?token=${token}`;
+    const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+
+    await this.resend.emails.send({
+      from,
+      to,
+      subject: 'პაროლის შეცვლის დადასტურება — Book Translator',
+      html: this.getPasswordChangeConfirmationTemplate(confirmUrl, name),
+    });
+  }
+
   async sendEmailVerification(to: string, token: string, name?: string): Promise<void> {
     if (!this.resend) {
       console.warn(`⚠️  Email skipped (no API key): verification for ${to}`);
@@ -247,6 +264,25 @@ export class EmailService {
         <a href="${listenUrl}" style="display: inline-block; background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">${ctaText}</a>
         <hr style="margin-top: 32px; border: none; border-top: 1px solid #e5e7eb;" />
         <p style="color: #6b7280; font-size: 12px;">${footer}</p>
+      </body>
+      </html>
+    `;
+  }
+
+  private getPasswordChangeConfirmationTemplate(confirmUrl: string, name?: string): string {
+    const greeting = name ? `გამარჯობა, ${name}!` : 'გამარჯობა!';
+    return `
+      <!DOCTYPE html>
+      <html>
+      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2>${greeting}</h2>
+        <p>თქვენ მოითხოვეთ პაროლის შეცვლა Book Translator-ზე.</p>
+        <p>დააჭირეთ ქვემოთ მოცემულ ღილაკს პაროლის შეცვლის დასადასტურებლად:</p>
+        <a href="${confirmUrl}" style="display: inline-block; background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">პაროლის შეცვლის დადასტურება</a>
+        <p>ეს ლინკი მოქმედებს <strong>1 საათის</strong> განმავლობაში.</p>
+        <p>თუ თქვენ არ მოითხოვეთ პაროლის შეცვლა, უგულებელყავით ეს წერილი.</p>
+        <hr style="margin-top: 32px; border: none; border-top: 1px solid #e5e7eb;" />
+        <p style="color: #6b7280; font-size: 12px;">Book Translator — წიგნების თარგმანი ქართულად</p>
       </body>
       </html>
     `;

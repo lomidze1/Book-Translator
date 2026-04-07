@@ -41,6 +41,7 @@ describe('JwtStrategy', () => {
     name: 'გიორგი',
     role: 'USER',
     avatar: null,
+    tokenVersion: 0,
   };
 
   beforeEach(() => {
@@ -67,6 +68,7 @@ describe('JwtStrategy', () => {
           name: true,
           role: true,
           avatar: true,
+          tokenVersion: true,
         },
       });
     });
@@ -109,6 +111,22 @@ describe('JwtStrategy', () => {
       expect(selectArg.name).toBe(true);
       expect(selectArg.role).toBe(true);
       expect(selectArg.avatar).toBe(true);
+    });
+
+    it('should throw UnauthorizedException when tokenVersion is revoked', async () => {
+      const payload: JwtPayload = { sub: 'user-123', email: 'test@example.com', tokenVersion: 0 };
+      mockPrismaService.user.findUnique.mockResolvedValue({ ...mockUser, tokenVersion: 1 });
+
+      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+      await expect(strategy.validate(payload)).rejects.toThrow('Token has been revoked');
+    });
+
+    it('should accept token when tokenVersion matches', async () => {
+      const payload: JwtPayload = { sub: 'user-123', email: 'test@example.com', tokenVersion: 2 };
+      mockPrismaService.user.findUnique.mockResolvedValue({ ...mockUser, tokenVersion: 2 });
+
+      const result = await strategy.validate(payload);
+      expect(result).toBeDefined();
     });
 
     it('should work with user that has ADMIN role', async () => {

@@ -9,9 +9,10 @@ import {
   UseGuards,
   ParseIntPipe,
   DefaultValuePipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { CreatePaymentDto } from './dto';
+import { CreatePaymentDto, BogCallbackDto, TbcCallbackDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -56,6 +57,9 @@ export class PaymentController {
   // Mock endpoint — simulate payment completion (dev only)
   @Post(':id/simulate')
   async simulate(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Payment simulation is not available in production');
+    }
     return this.paymentService.simulatePayment(id, userId);
   }
 
@@ -63,7 +67,7 @@ export class PaymentController {
   @Public()
   @Post('bog/callback')
   async bogCallback(
-    @Body() payload: Record<string, unknown>,
+    @Body() payload: BogCallbackDto,
     @Headers('x-bog-signature') signature?: string,
   ) {
     return this.paymentService.handleCallback('BOG', payload, signature);
@@ -72,7 +76,7 @@ export class PaymentController {
   @Public()
   @Post('tbc/callback')
   async tbcCallback(
-    @Body() payload: Record<string, unknown>,
+    @Body() payload: TbcCallbackDto,
     @Headers('x-tbc-signature') signature?: string,
   ) {
     return this.paymentService.handleCallback('TBC', payload, signature);

@@ -29,11 +29,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         name: true,
         role: true,
         avatar: true,
+        tokenVersion: true,
       },
     });
 
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+
+    // Reject tokens issued before password change or logout-all
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      throw new UnauthorizedException('Token has been revoked');
     }
 
     return user;

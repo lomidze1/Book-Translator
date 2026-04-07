@@ -3,10 +3,11 @@ import { AuthService } from './auth.service';
 import {
   RegisterDto, LoginDto, RefreshTokenDto, GoogleAuthDto,
   SendOtpDto, VerifyOtpDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto,
-  ChangePasswordDto,
+  RequestPasswordChangeDto, ConfirmPasswordChangeDto,
 } from './dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { Public } from './decorators/public.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -75,8 +76,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @CurrentUser() user: { id: string },
-    @Body() dto: ChangePasswordDto,
+    @Body() dto: RequestPasswordChangeDto,
   ) {
-    return this.authService.changePassword(user.id, dto.currentPassword, dto.newPassword);
+    return this.authService.requestPasswordChange(user.id, dto.newPassword);
+  }
+
+  @Post('confirm-password-change')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async confirmPasswordChange(@Body() dto: ConfirmPasswordChangeDto) {
+    return this.authService.confirmPasswordChange(dto.token);
   }
 }

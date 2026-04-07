@@ -113,38 +113,45 @@ describe('JwtAuthGuard', () => {
   // handleRequest
   // ============================================================
   describe('handleRequest', () => {
+    let nonPublicContext: ExecutionContext;
+
+    beforeEach(() => {
+      nonPublicContext = createMockExecutionContext();
+      mockReflector.getAllAndOverride.mockReturnValue(false);
+    });
+
     it('should return user when authentication succeeds', () => {
       const mockUser = { id: 'user-123', email: 'test@example.com', role: 'USER' };
 
-      const result = guard.handleRequest(null, mockUser, null);
+      const result = guard.handleRequest(null, mockUser, null, nonPublicContext);
 
       expect(result).toEqual(mockUser);
     });
 
     it('should throw UnauthorizedException when no user is returned', () => {
-      expect(() => guard.handleRequest(null, null, null)).toThrow(UnauthorizedException);
-      expect(() => guard.handleRequest(null, null, null)).toThrow('Authentication required');
+      expect(() => guard.handleRequest(null, null, null, nonPublicContext)).toThrow(UnauthorizedException);
+      expect(() => guard.handleRequest(null, null, null, nonPublicContext)).toThrow('Authentication required');
     });
 
     it('should throw the original error when an error is passed', () => {
       const error = new Error('Token expired');
 
-      expect(() => guard.handleRequest(error, null, null)).toThrow('Token expired');
+      expect(() => guard.handleRequest(error, null, null, nonPublicContext)).toThrow('Token expired');
     });
 
     it('should throw the error even when user is present', () => {
       const error = new UnauthorizedException('Custom error');
       const mockUser = { id: 'user-123' };
 
-      expect(() => guard.handleRequest(error, mockUser, null)).toThrow(UnauthorizedException);
+      expect(() => guard.handleRequest(error, mockUser, null, nonPublicContext)).toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException when user is undefined', () => {
-      expect(() => guard.handleRequest(null, undefined, null)).toThrow(UnauthorizedException);
+      expect(() => guard.handleRequest(null, undefined, null, nonPublicContext)).toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException when user is false', () => {
-      expect(() => guard.handleRequest(null, false, null)).toThrow(UnauthorizedException);
+      expect(() => guard.handleRequest(null, false, null, nonPublicContext)).toThrow(UnauthorizedException);
     });
   });
 });

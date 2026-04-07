@@ -454,7 +454,7 @@ describe('BooksService', () => {
 
       expect(result.duplicate).toBe(true);
       expect(result.translationAvailable).toBe(true);
-      expect(result.message).toContain('5₾');
+      expect(result.message).toBe('DUPLICATE_TRANSLATED');
     });
 
     it('should extract title from filename', async () => {
