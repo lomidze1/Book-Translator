@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ClaudeService } from '../../src/translation/claude.service';
+import { ConfigService } from '@nestjs/config';
 
 // Mock Anthropic SDK
 vi.mock('@anthropic-ai/sdk', () => {
@@ -8,13 +9,30 @@ vi.mock('@anthropic-ai/sdk', () => {
       create: vi.fn(),
     },
   }));
-  // Make it work as both `new Anthropic()` and `import Anthropic from ...`
   MockAnthropic.prototype.constructor = MockAnthropic;
   return {
     default: MockAnthropic,
     Anthropic: MockAnthropic,
   };
 });
+
+function createMockConfigService(overrides: Record<string, string> = {}): ConfigService {
+  const defaults: Record<string, string> = {
+    ANTHROPIC_API_KEY: 'test-key',
+    CLAUDE_MODEL: '',
+  };
+  const config = { ...defaults, ...overrides };
+  return {
+    get: vi.fn((key: string) => config[key] || undefined),
+  } as unknown as ConfigService;
+}
+
+function createService(configOverrides: Record<string, string> = {}): ClaudeService {
+  const configService = createMockConfigService(configOverrides);
+  const service = new ClaudeService(configService);
+  service.onModuleInit();
+  return service;
+}
 
 describe('ClaudeService', () => {
   let service: ClaudeService;
@@ -23,7 +41,7 @@ describe('ClaudeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.ANTHROPIC_API_KEY = 'test-key';
-    service = new ClaudeService();
+    service = createService();
     mockCreate = (service as any).client.messages.create;
   });
 
@@ -83,16 +101,23 @@ describe('ClaudeService', () => {
     });
 
     it('should throw if API key not set', async () => {
+      const origKey = process.env.ANTHROPIC_API_KEY;
       delete process.env.ANTHROPIC_API_KEY;
-      const noKeyService = new ClaudeService();
-
-      await expect(
-        noKeyService.translateChapter('text', {
-          bookTitle: 'Book',
-          chapterNumber: 1,
-          totalChapters: 1,
-        }),
-      ).rejects.toThrow('ANTHROPIC_API_KEY');
+      const origReadFileSync = require('fs').readFileSync;
+      require('fs').readFileSync = () => { throw new Error('no .env in test'); };
+      try {
+        const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
+        await expect(
+          noKeyService.translateChapter('text', {
+            bookTitle: 'Book',
+            chapterNumber: 1,
+            totalChapters: 1,
+          }),
+        ).rejects.toThrow();
+      } finally {
+        process.env.ANTHROPIC_API_KEY = origKey || 'test-key';
+        require('fs').readFileSync = origReadFileSync;
+      }
     });
 
     it('should handle multiple text blocks in response', async () => {
@@ -114,10 +139,8 @@ describe('ClaudeService', () => {
     });
 
     it('should use correct model from environment', () => {
-      process.env.CLAUDE_MODEL = 'claude-opus-4-20250514';
-      const customService = new ClaudeService();
+      const customService = createService({ CLAUDE_MODEL: 'claude-opus-4-20250514' });
       expect(customService.getModel()).toBe('claude-opus-4-20250514');
-      delete process.env.CLAUDE_MODEL;
     });
 
     it('should propagate API errors (network, rate limit)', async () => {
@@ -217,7 +240,7 @@ describe('ClaudeService', () => {
 
     it('should use default model when CLAUDE_MODEL not set', () => {
       delete process.env.CLAUDE_MODEL;
-      const defaultService = new ClaudeService();
+      const defaultService = createService();
       expect(defaultService.getModel()).toBe('claude-sonnet-4-20250514');
     });
   });
@@ -235,10 +258,19 @@ describe('ClaudeService', () => {
     });
 
     it('should return empty string if no API key', async () => {
+      const origKey = process.env.ANTHROPIC_API_KEY;
       delete process.env.ANTHROPIC_API_KEY;
-      const noKeyService = new ClaudeService();
-      const summary = await noKeyService.generateChapterSummary('text');
-      expect(summary).toBe('');
+      // Also prevent .env file fallback from finding the key
+      const origReadFileSync = require('fs').readFileSync;
+      require('fs').readFileSync = () => { throw new Error('no .env in test'); };
+      try {
+        const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
+        const summary = await noKeyService.generateChapterSummary('text');
+        expect(summary).toBe('');
+      } finally {
+        process.env.ANTHROPIC_API_KEY = origKey || 'test-key';
+        require('fs').readFileSync = origReadFileSync;
+      }
     });
 
     it('should truncate input to 3000 chars', async () => {

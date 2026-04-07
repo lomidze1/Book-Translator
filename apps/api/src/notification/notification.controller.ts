@@ -15,7 +15,7 @@ import { NotificationService } from './notification.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { SubscribePushDto } from './dto/subscribe-push.dto';
 
-@Controller('api/notifications')
+@Controller('notifications')
 @UseGuards(AuthGuard('jwt'))
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}

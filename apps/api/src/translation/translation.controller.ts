@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
 import { TranslationService } from './translation.service';
 import { CreateTranslationDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,11 +30,18 @@ export class TranslationController {
   }
 
   @Post(':id/retry')
-  async retryTranslation(@Param('id') id: string) {
+  async retryTranslation(@Param('id') id: string, @CurrentUser('id') userId: string) {
     // Dev only — restart a stuck translation
     if (process.env.NODE_ENV === 'production') {
-      return { error: 'Not available in production' };
+      throw new ForbiddenException('Not available in production');
     }
+
+    // Verify ownership
+    const translation = await this.translationService.getTranslation(id, userId);
+    if (!translation) {
+      throw new ForbiddenException('Translation not found or access denied');
+    }
+
     // Reset status to PAID and re-queue
     await this.translationService.updateProgress(id, 0, 'PAID');
     return this.translationService.startTranslation(id);

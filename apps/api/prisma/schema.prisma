@@ -29,6 +29,11 @@ model User {
   passwordResetToken       String?   @unique
   passwordResetExpires     DateTime?
 
+  // Pending password change (email confirmation flow)
+  pendingPasswordHash    String?
+  pendingPasswordToken   String?   @unique
+  pendingPasswordExpires DateTime?
+
   // Token versioning (increment to invalidate all sessions)
   tokenVersion  Int       @default(0)
 
@@ -51,6 +56,7 @@ model User {
 
   @@index([passwordResetToken, passwordResetExpires])
   @@index([emailVerificationToken, emailVerificationExpires])
+  @@index([pendingPasswordToken, pendingPasswordExpires])
 }
 
 enum Role {
@@ -105,6 +111,7 @@ model Book {
 
   @@index([googleBooksId])
   @@index([openLibraryId])
+  @@index([language])
   @@index([title])
   @@index([author])
 }
@@ -200,7 +207,7 @@ model UserBook {
   bookId        String
   book          Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
   type          UserBookType
-  translationId String?
+  translationId String? // NOTE: Currently unused — never set in any service. Kept to avoid migration risk.
 
   addedAt DateTime @default(now())
 
@@ -234,7 +241,7 @@ model Payment {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  @@index([userId])
+  @@index([userId, createdAt])
   @@index([status])
   @@index([provider])
   @@index([userId, status])
@@ -424,7 +431,6 @@ model NotificationPreference {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([userId])
 }
 
 model Notification {

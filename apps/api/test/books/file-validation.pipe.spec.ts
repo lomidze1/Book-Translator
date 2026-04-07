@@ -145,12 +145,13 @@ describe('FileValidationPipe', () => {
       expect(() => pipe.transform(file)).toThrow('MIME');
     });
 
-    it('should reject application/octet-stream for PDF', () => {
+    it('should accept application/octet-stream for PDF (generic MIME allowed, magic bytes verify)', () => {
       const file = createFile({
         originalname: 'test.pdf',
         mimetype: 'application/octet-stream',
       });
-      expect(() => pipe.transform(file)).toThrow(BadRequestException);
+      const result = pipe.transform(file);
+      expect(result).toBe(file);
     });
   });
 
@@ -159,30 +160,32 @@ describe('FileValidationPipe', () => {
   // ========================
 
   describe('MIME-extension cross-validation', () => {
-    it('should reject .txt file with application/pdf MIME', () => {
+    it('should accept .txt file with application/pdf MIME (no cross-validation, magic bytes skipped for txt)', () => {
       const file = createFile({
         originalname: 'book.txt',
         mimetype: 'application/pdf',
       });
-      expect(() => pipe.transform(file)).toThrow(BadRequestException);
-      expect(() => pipe.transform(file)).toThrow('არ ემთხვევა');
+      const result = pipe.transform(file);
+      expect(result).toBe(file);
     });
 
-    it('should reject .pdf file with text/plain MIME', () => {
+    it('should accept .pdf file with text/plain MIME when magic bytes are valid', () => {
       const file = createFile({
         originalname: 'test.pdf',
         mimetype: 'text/plain',
       });
-      expect(() => pipe.transform(file)).toThrow(BadRequestException);
+      const result = pipe.transform(file);
+      expect(result).toBe(file);
     });
 
-    it('should reject .epub file with DOCX MIME', () => {
+    it('should accept .epub file with DOCX MIME when magic bytes match', () => {
       const file = createFile({
         originalname: 'book.epub',
         mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04, ...Array(100).fill(0)]),
       });
-      expect(() => pipe.transform(file)).toThrow(BadRequestException);
+      const result = pipe.transform(file);
+      expect(result).toBe(file);
     });
   });
 

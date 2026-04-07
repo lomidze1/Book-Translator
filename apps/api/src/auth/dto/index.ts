@@ -8,3 +8,5 @@ export { ForgotPasswordDto } from './forgot-password.dto';
 export { ResetPasswordDto } from './reset-password.dto';
 export { VerifyEmailDto } from './verify-email.dto';
 export { ChangePasswordDto } from './change-password.dto';
+export { RequestPasswordChangeDto } from './request-password-change.dto';
+export { ConfirmPasswordChangeDto } from './confirm-password-change.dto';

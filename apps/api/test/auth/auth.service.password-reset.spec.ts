@@ -204,8 +204,9 @@ describe('AuthService — Password Reset', () => {
       mockPrisma.user.update.mockResolvedValue(existingUser);
       mockEmailService.sendPasswordResetEmail.mockRejectedValueOnce(new Error('SMTP error'));
 
-      // Should throw because email sending is not wrapped in try/catch in forgotPassword
-      await expect(authService.forgotPassword('user@example.com')).rejects.toThrow('SMTP error');
+      // Email failure is caught and logged — forgotPassword still resolves successfully
+      const result = await authService.forgotPassword('user@example.com');
+      expect(result).toEqual({ message: 'Reset link sent to email' });
     });
 
     it('should handle DB error gracefully', async () => {

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 import styles from '../../register/page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -384,6 +385,18 @@ export default function RegisterPage() {
             {loading ? t('loading') : t('submit')}
           </button>
         </form>
+
+        {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+          <>
+            <div className={styles.divider}>
+              <span>{t('or_divider')}</span>
+            </div>
+            <GoogleSignInButton
+              onError={(msg) => setServerError(msg)}
+              redirectTo="/dashboard"
+            />
+          </>
+        )}
 
         <p className={styles.switchLink}>
           {t('has_account')}{' '}

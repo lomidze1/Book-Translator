@@ -63,7 +63,8 @@
     "email_not_verified": "Email is not verified.",
     "resend_verification": "Resend",
     "verification_sent": "Verification link sent!",
-    "resend_cooldown": "Resend ({seconds}s)"
+    "resend_cooldown": "Resend ({seconds}s)",
+    "or_divider": "or"
   },
   "register": {
     "title": "Register",
@@ -102,7 +103,11 @@
     "error_password_strength": "At least 1 uppercase letter and 1 number",
     "error_confirm_required": "Password confirmation is required",
     "show_password": "Show password",
-    "hide_password": "Hide password"
+    "hide_password": "Hide password",
+    "or_divider": "or"
+  },
+  "google_auth": {
+    "error": "Google sign-in failed. Please try again."
   },
   "search": {
     "title": "Book Search",
@@ -281,12 +286,16 @@
     "change_password": "Change Password",
     "my_translations": "My Translations",
     "my_favorites": "Favorites",
-    "current_password": "Current Password",
     "new_password": "New Password",
     "confirm_password": "Confirm Password",
+    "change_password_description": "Enter your new password. A confirmation link will be sent to your email.",
+    "change_password_submit": "Change Password",
     "password_changed": "Password changed successfully",
     "password_mismatch": "Passwords do not match",
     "password_requirements": "At least 8 characters, 1 uppercase letter and 1 number",
+    "email_sent_title": "Check Your Email",
+    "email_sent_description": "We sent a confirmation link to your email. Click it to complete the password change.",
+    "open_email": "Open Email",
     "back_to_profile": "Back to Profile",
     "no_translations": "You have no translated books yet",
     "no_favorites": "You have no favorite books yet",
@@ -316,6 +325,16 @@
     "payment_provider": "Provider",
     "payment_description": "Description",
     "payment_status": "Status"
+  },
+  "confirm_password_change": {
+    "title": "Password Change Confirmation",
+    "confirming": "Confirming your password change...",
+    "success": "Password changed successfully!",
+    "redirecting": "Redirecting to profile...",
+    "error_invalid": "Invalid or expired confirmation link.",
+    "error_default": "Something went wrong. Please try again.",
+    "back_to_profile": "Back to Profile",
+    "try_again": "Try Again"
   },
   "reader": {
     "back_to_book": "Back to Book",
@@ -487,6 +506,7 @@
     "verify_email_title": "Email Verification",
     "payment_success_title": "Payment Successful",
     "payment_failure_title": "Payment Failed",
+    "book_not_found": "Book Not Found",
     "site_name": "Book Translator"
   }
 }

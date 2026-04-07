@@ -255,6 +255,27 @@
   font-weight: 500;
 }
 
+.divider {
+  display: flex;
+  align-items: center;
+  margin: $spacing-lg 0;
+  gap: $spacing-md;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--card-border);
+  }
+
+  span {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+}
+
 .switchLink {
   text-align: center;
   margin-top: $spacing-lg;

@@ -368,11 +368,11 @@ export class AuthService {
     });
 
     try {
-      this.logger.log(`Sending password reset email to ${user.email}`);
+      this.logger.log(`Sending password reset email to ${this.maskEmail(user.email!)}`);
       await this.emailService.sendPasswordResetEmail(user.email!, resetToken, user.name ?? undefined);
-      this.logger.log(`Password reset email sent successfully to ${user.email}`);
+      this.logger.log(`Password reset email sent successfully to ${this.maskEmail(user.email!)}`);
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${user.email}: ${error instanceof Error ? error.message : error}`);
+      this.logger.error(`Failed to send password reset email to ${this.maskEmail(user.email!)}: ${error instanceof Error ? error.message : error}`);
     }
 
     return { message: 'Reset link sent to email' };
@@ -411,27 +411,63 @@ export class AuthService {
     return { message: 'Password updated successfully' };
   }
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+  async requestPasswordChange(userId: string, newPassword: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { passwordHash: true },
     });
 
-    if (!user || !user.passwordHash) {
+    if (!user || !user.email) {
       throw new BadRequestException('Password change not available for this account');
     }
 
-    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!isValid) {
-      throw new UnauthorizedException('Current password is incorrect');
+    // Rate limit: max 3 requests per 15 minutes
+    const rateLimitKey = `password-change:rate:${userId}`;
+    const rateLimitCount = await this.redis.secureIncr(rateLimitKey);
+    if (rateLimitCount === 1) {
+      await this.redis.expire(rateLimitKey, FORGOT_PASSWORD_RATE_LIMIT_SECONDS);
+    }
+    if (rateLimitCount > FORGOT_PASSWORD_MAX_REQUESTS) {
+      throw new BadRequestException('Too many requests. Please try again later.');
     }
 
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const pendingPasswordHash = await bcrypt.hash(newPassword, 12);
+    const { token, hashedToken } = this.generateHashedToken();
 
     await this.prisma.user.update({
-      where: { id: userId },
+      where: { id: user.id },
       data: {
-        passwordHash,
+        pendingPasswordHash,
+        pendingPasswordToken: hashedToken,
+        pendingPasswordExpires: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+      },
+    });
+
+    await this.emailService.sendPasswordChangeConfirmation(user.email, token, user.name ?? undefined);
+
+    return { message: 'Confirmation email sent' };
+  }
+
+  async confirmPasswordChange(token: string): Promise<{ message: string }> {
+    const hashedToken = this.hashToken(token);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        pendingPasswordToken: hashedToken,
+        pendingPasswordExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired confirmation token');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: user.pendingPasswordHash,
+        pendingPasswordHash: null,
+        pendingPasswordToken: null,
+        pendingPasswordExpires: null,
         tokenVersion: { increment: 1 },
       },
     });
@@ -514,6 +550,18 @@ export class AuthService {
   // ========================
   // Private Helpers
   // ========================
+
+  /**
+   * Mask email for safe logging (e.g., "g***@example.com")
+   */
+  private maskEmail(email: string): string {
+    const [local, domain] = email.split('@');
+    if (!domain) return '***';
+    const masked = local.length > 1
+      ? `${local[0]}***`
+      : '***';
+    return `${masked}@${domain}`;
+  }
 
   private async generateTokens(userId: string, email: string | null, tokenVersion = 0): Promise<AuthTokens> {
     const accessSecret = process.env.JWT_ACCESS_SECRET;
