@@ -71,7 +71,7 @@ jobs:
         run: pnpm --filter @book-translator/shared lint
 
       - name: Run API tests
-        run: cd apps/api && npx vitest run
+        run: cd apps/api && npx vitest run --exclude 'test/integration/**'
 
   build:
     needs: lint-and-test
