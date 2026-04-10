@@ -17,7 +17,7 @@ export class ClaudeService implements OnModuleInit {
 
   onModuleInit() {
     // Try ConfigService first, then process.env, then manually parse .env
-    let apiKey = this.config.get<string>('ANTHROPIC_API_KEY') || process.env.ANTHROPIC_API_KEY;
+    let apiKey = this.config?.get<string>('ANTHROPIC_API_KEY') || process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
       // Fallback: manually parse .env file
