@@ -30,10 +30,14 @@ describe('Auth Integration Tests', () => {
 
   afterAll(async () => {
     // Cleanup test users
-    await prisma.user.deleteMany({
-      where: { email: { contains: '@integration-test.com' } },
-    });
-    await app.close();
+    if (prisma) {
+      await prisma.user.deleteMany({
+        where: { email: { contains: '@integration-test.com' } },
+      });
+    }
+    if (app) {
+      await app.close();
+    }
   });
 
   describe('POST /api/auth/register', () => {

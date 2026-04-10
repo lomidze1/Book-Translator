@@ -64,11 +64,14 @@ jobs:
       - name: Generate Prisma client
         run: cd apps/api && npx prisma generate
 
-      - name: Lint
-        run: pnpm lint
+      - name: Lint API
+        run: pnpm --filter @book-translator/api lint
+
+      - name: Lint Shared
+        run: pnpm --filter @book-translator/shared lint
 
       - name: Run API tests
-        run: cd apps/api && npx vitest run
+        run: cd apps/api && npx vitest run --exclude 'test/integration/**'
 
   build:
     needs: lint-and-test

@@ -48,10 +48,14 @@ describe('Notification Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({
-      where: { email: { contains: '@integration-test.com' } },
-    });
-    await app.close();
+    if (prisma) {
+      await prisma.user.deleteMany({
+        where: { email: { contains: '@integration-test.com' } },
+      });
+    }
+    if (app) {
+      await app.close();
+    }
   });
 
   describe('GET /api/notifications', () => {
