@@ -1,8 +1,10 @@
 import { Tabs } from 'expo-router';
 import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
 
 export default function TabsLayout() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -15,24 +17,32 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: t('tabs.dashboard'),
+          tabBarLabel: t('tabs.dashboard'),
+        }}
+      />
+      <Tabs.Screen
         name="library"
         options={{
-          title: 'ბიბლიოთეკა',
-          tabBarLabel: 'ბიბლიოთეკა',
+          title: t('tabs.library'),
+          tabBarLabel: t('tabs.library'),
+          href: null,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          title: 'ძებნა',
-          tabBarLabel: 'ძებნა',
+          title: t('tabs.search'),
+          tabBarLabel: t('tabs.search'),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'პროფილი',
-          tabBarLabel: 'პროფილი',
+          title: t('tabs.profile'),
+          tabBarLabel: t('tabs.profile'),
         }}
       />
     </Tabs>

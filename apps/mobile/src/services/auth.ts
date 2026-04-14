@@ -5,42 +5,44 @@ const REFRESH_TOKEN_KEY = 'refreshToken';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
 
-// Error messages in Georgian
-const ERRORS = {
-  login_failed: 'შესვლა ვერ მოხერხდა',
-  register_failed: 'რეგისტრაცია ვერ მოხერხდა',
-  invalid_credentials: 'არასწორი ელ-ფოსტა ან პაროლი',
-  email_exists: 'ეს ელ-ფოსტა უკვე რეგისტრირებულია',
-  weak_password: 'პაროლი ძალიან სუსტია (მინიმუმ 8 სიმბოლო)',
-  network_error: 'ქსელის შეცდომა. შეამოწმეთ ინტერნეტ კავშირი',
-  server_error: 'სერვერის შეცდომა. სცადეთ მოგვიანებით',
-  token_error: 'ავტორიზაციის შეცდომა. ხელახლა შედით',
-};
+// Stable error codes — UI translates via i18n (auth.errors.<code>)
+export const AUTH_ERROR_CODES = {
+  LOGIN_FAILED: 'auth.errors.login_failed',
+  REGISTER_FAILED: 'auth.errors.register_failed',
+  INVALID_CREDENTIALS: 'auth.errors.invalid_credentials',
+  EMAIL_EXISTS: 'auth.errors.email_exists',
+  WEAK_PASSWORD: 'auth.errors.weak_password',
+  NETWORK_ERROR: 'auth.errors.network_error',
+  SERVER_ERROR: 'auth.errors.server_error',
+  TOKEN_ERROR: 'auth.errors.token_error',
+  VALIDATION: 'auth.errors.validation',
+  RATE_LIMIT: 'auth.errors.rate_limit',
+} as const;
 
-function translateError(message: string): string {
+function classifyError(message: string, fallback: string): string {
   const lower = message.toLowerCase().replace(/_/g, ' ');
   if (lower.includes('invalid credentials') || lower.includes('unauthorized') || lower.includes('invalid email or password')) {
-    return ERRORS.invalid_credentials;
+    return AUTH_ERROR_CODES.INVALID_CREDENTIALS;
   }
   if (lower.includes('email already exists') || lower.includes('already exists') || lower.includes('already registered') || lower.includes('duplicate') || lower.includes('unique constraint')) {
-    return ERRORS.email_exists;
+    return AUTH_ERROR_CODES.EMAIL_EXISTS;
   }
   if (lower.includes('password') && (lower.includes('weak') || lower.includes('short') || lower.includes('at least') || lower.includes('must'))) {
-    return ERRORS.weak_password;
+    return AUTH_ERROR_CODES.WEAK_PASSWORD;
   }
   if (lower.includes('network') || lower.includes('fetch') || lower.includes('econnrefused')) {
-    return ERRORS.network_error;
+    return AUTH_ERROR_CODES.NETWORK_ERROR;
   }
   if (lower.includes('not found') || lower.includes('no user')) {
-    return ERRORS.invalid_credentials;
+    return AUTH_ERROR_CODES.INVALID_CREDENTIALS;
   }
   if (lower.includes('validation') || lower.includes('invalid')) {
-    return 'შეყვანილი მონაცემები არასწორია';
+    return AUTH_ERROR_CODES.VALIDATION;
   }
   if (lower.includes('too many') || lower.includes('rate limit') || lower.includes('throttle')) {
-    return 'ძალიან ბევრი მცდელობა. სცადეთ მოგვიანებით';
+    return AUTH_ERROR_CODES.RATE_LIMIT;
   }
-  return message;
+  return fallback;
 }
 
 export const authService = {
@@ -51,10 +53,10 @@ export const authService = {
   async setTokens(accessToken: string, refreshToken: string) {
     // Guard against undefined/null values — SecureStore only accepts strings
     if (!accessToken || typeof accessToken !== 'string') {
-      throw new Error(ERRORS.token_error);
+      throw new Error(AUTH_ERROR_CODES.TOKEN_ERROR);
     }
     if (!refreshToken || typeof refreshToken !== 'string') {
-      throw new Error(ERRORS.token_error);
+      throw new Error(AUTH_ERROR_CODES.TOKEN_ERROR);
     }
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
@@ -74,18 +76,18 @@ export const authService = {
         body: JSON.stringify({ email, password }),
       });
     } catch {
-      throw new Error(ERRORS.network_error);
+      throw new Error(AUTH_ERROR_CODES.NETWORK_ERROR);
     }
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(translateError(body.message || ERRORS.login_failed));
+      throw new Error(classifyError(body.message || '', AUTH_ERROR_CODES.LOGIN_FAILED));
     }
 
     const data = await res.json();
 
     if (!data.accessToken || !data.refreshToken) {
-      throw new Error(ERRORS.server_error);
+      throw new Error(AUTH_ERROR_CODES.SERVER_ERROR);
     }
 
     await this.setTokens(data.accessToken, data.refreshToken);
@@ -101,18 +103,18 @@ export const authService = {
         body: JSON.stringify({ email, password, name }),
       });
     } catch {
-      throw new Error(ERRORS.network_error);
+      throw new Error(AUTH_ERROR_CODES.NETWORK_ERROR);
     }
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(translateError(body.message || ERRORS.register_failed));
+      throw new Error(classifyError(body.message || '', AUTH_ERROR_CODES.REGISTER_FAILED));
     }
 
     const data = await res.json();
 
     if (!data.accessToken || !data.refreshToken) {
-      throw new Error(ERRORS.server_error);
+      throw new Error(AUTH_ERROR_CODES.SERVER_ERROR);
     }
 
     await this.setTokens(data.accessToken, data.refreshToken);

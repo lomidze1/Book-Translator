@@ -5,6 +5,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { apiRequest } from '@/services/api';
 import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
+import PaymentModal from '@/components/common/PaymentModal';
 
 interface BookData {
   id: string;
@@ -28,10 +30,12 @@ export default function BookDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [book, setBook] = useState<BookData | null>(null);
   const [translations, setTranslations] = useState<TranslationInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showPayment, setShowPayment] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -46,28 +50,22 @@ export default function BookDetailsScreen() {
           // No translations yet — that's okay
         }
       } catch {
-        setError('წიგნის ჩატვირთვა ვერ მოხერხდა');
+        setError(t('book.loading_error'));
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [id]);
+  }, [id, t]);
 
-  const completedTranslation = translations.find((t) => t.status === 'COMPLETED');
+  const completedTranslation = translations.find((tr) => tr.status === 'COMPLETED');
   const inProgressTranslation = translations.find(
-    (t) => t.status === 'IN_PROGRESS' || t.status === 'PAID',
+    (tr) => tr.status === 'IN_PROGRESS' || tr.status === 'PAID',
   );
 
   const statusLabel = (status: string) => {
-    switch (status) {
-      case 'COMPLETED': return 'დასრულებული';
-      case 'IN_PROGRESS': return 'მიმდინარე';
-      case 'PAID': return 'გადახდილი';
-      case 'PENDING': return 'მოლოდინში';
-      case 'FAILED': return 'წარუმატებელი';
-      default: return status;
-    }
+    const key = `book.status_${status.toLowerCase()}` as const;
+    return t(key);
   };
 
   const statusColor = (status: string) => {
@@ -92,7 +90,7 @@ export default function BookDetailsScreen() {
       <SafeAreaView style={[s.center, { backgroundColor: theme.background }]}>
         <Text style={[s.errorText, { color: theme.error }]}>{error}</Text>
         <TouchableOpacity style={[s.btn, { backgroundColor: theme.primary }]} onPress={() => router.back()}>
-          <Text style={s.btnText}>უკან</Text>
+          <Text style={s.btnText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -126,7 +124,7 @@ export default function BookDetailsScreen() {
             {book.pageCount && (
               <View style={[s.metaChip, { backgroundColor: theme.surface }]}>
                 <Text style={[s.metaText, { color: theme.textSecondary }]}>
-                  {book.pageCount} გვერდი
+                  {book.pageCount} {t('book.pages')}
                 </Text>
               </View>
             )}
@@ -147,12 +145,12 @@ export default function BookDetailsScreen() {
         {/* Translation Status */}
         {translations.length > 0 && (
           <View style={[s.section, { borderTopColor: theme.border }]}>
-            <Text style={[s.sectionTitle, { color: theme.text }]}>თარგმანის სტატუსი</Text>
+            <Text style={[s.sectionTitle, { color: theme.text }]}>{t('book.translation_status')}</Text>
             {translations.map((tr) => (
               <View key={tr.id} style={[s.translationRow, { borderColor: theme.border }]}>
                 <View style={s.translationInfo}>
                   <Text style={[s.translationType, { color: theme.text }]}>
-                    {tr.translationType === 'FAST' ? 'სწრაფი' : 'ეკონომიური'}
+                    {tr.translationType === 'FAST' ? t('book.type_fast') : t('book.type_standard')}
                   </Text>
                   <Text style={[s.translationStatus, { color: statusColor(tr.status) }]}>
                     {statusLabel(tr.status)}
@@ -175,26 +173,40 @@ export default function BookDetailsScreen() {
               style={[s.btn, s.btnPrimary, { backgroundColor: theme.primary }]}
               onPress={() => router.push(`/reader/${book.id}`)}
             >
-              <Text style={s.btnText}>წაკითხვა</Text>
+              <Text style={s.btnText}>{t('book.read')}</Text>
             </TouchableOpacity>
           )}
           {inProgressTranslation && !completedTranslation && (
             <View style={[s.btn, s.btnDisabled, { backgroundColor: theme.surface }]}>
               <Text style={[s.btnDisabledText, { color: theme.textSecondary }]}>
-                თარგმნა მიმდინარეობს ({Math.round(inProgressTranslation.progress)}%)
+                {t('book.translation_in_progress', { progress: Math.round(inProgressTranslation.progress) })}
               </Text>
             </View>
           )}
           {translations.length === 0 && (
             <TouchableOpacity
               style={[s.btn, s.btnPrimary, { backgroundColor: theme.primary }]}
-              onPress={() => router.back()}
+              onPress={() => setShowPayment(true)}
             >
-              <Text style={s.btnText}>თარგმნის შეკვეთა</Text>
+              <Text style={s.btnText}>{t('book.order_translation')}</Text>
             </TouchableOpacity>
           )}
         </View>
       </ScrollView>
+
+      <PaymentModal
+        visible={showPayment}
+        onClose={() => setShowPayment(false)}
+        onSuccess={() => {
+          setShowPayment(false);
+          // Refresh translations
+          apiRequest<TranslationInfo[]>(`/translations/book/${id}`)
+            .then(setTranslations)
+            .catch(() => {});
+        }}
+        bookId={book.id}
+        type="TRANSLATION"
+      />
     </SafeAreaView>
   );
 }

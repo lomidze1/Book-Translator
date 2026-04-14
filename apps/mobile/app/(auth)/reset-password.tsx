@@ -1,18 +1,20 @@
-'use client';
-
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform,
   ScrollView,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
+import { useToast } from '@/context/ToastContext';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
+  const { showToast } = useToast();
   const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -22,27 +24,27 @@ export default function ResetPasswordScreen() {
 
   const handleReset = async () => {
     if (!token.trim()) {
-      Alert.alert('შეცდომა', 'შეიყვანეთ კოდი ელ-ფოსტიდან');
+      showToast(t('reset_password.error_token_empty'), 'error');
       return;
     }
     if (!newPassword) {
-      Alert.alert('შეცდომა', 'შეიყვანეთ ახალი პაროლი');
+      showToast(t('reset_password.error_password_empty'), 'error');
       return;
     }
     if (newPassword.length < 8) {
-      Alert.alert('შეცდომა', 'პაროლი მინიმუმ 8 სიმბოლო უნდა იყოს');
+      showToast(t('reset_password.error_password_min'), 'error');
       return;
     }
     if (!/[A-Z]/.test(newPassword)) {
-      Alert.alert('შეცდომა', 'პაროლი უნდა შეიცავდეს მინიმუმ 1 დიდ ასოს');
+      showToast(t('reset_password.error_password_uppercase'), 'error');
       return;
     }
     if (!/[0-9]/.test(newPassword)) {
-      Alert.alert('შეცდომა', 'პაროლი უნდა შეიცავდეს მინიმუმ 1 ციფრს');
+      showToast(t('reset_password.error_password_digit'), 'error');
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('შეცდომა', 'პაროლები არ ემთხვევა');
+      showToast(t('reset_password.error_password_mismatch'), 'error');
       return;
     }
 
@@ -58,14 +60,14 @@ export default function ResetPasswordScreen() {
         const body = await res.json().catch(() => ({}));
         const msg = (body.message || '').toLowerCase();
         if (msg.includes('invalid') || msg.includes('expired')) {
-          throw new Error('კოდი არასწორია ან ვადაგასულია. სცადეთ თავიდან');
+          throw new Error(t('reset_password.error_invalid_token'));
         }
-        throw new Error('შეცდომა. სცადეთ მოგვიანებით');
+        throw new Error(t('reset_password.error_default'));
       }
 
       setSuccess(true);
     } catch (err: any) {
-      Alert.alert('შეცდომა', err.message || 'ქსელის შეცდომა');
+      showToast(err.message || t('reset_password.error_network'), 'error');
     } finally {
       setLoading(false);
     }
@@ -76,16 +78,16 @@ export default function ResetPasswordScreen() {
       <View style={[s.container, { backgroundColor: theme.background }]}>
         <View style={s.inner}>
           <Text style={s.icon}>✅</Text>
-          <Text style={[s.title, { color: theme.text }]}>პაროლი შეიცვალა!</Text>
+          <Text style={[s.title, { color: theme.text }]}>{t('reset_password.success_title')}</Text>
           <Text style={[s.description, { color: theme.textSecondary }]}>
-            თქვენი პაროლი წარმატებით განახლდა. ახლა შეგიძლიათ შეხვიდეთ ახალი პაროლით.
+            {t('reset_password.success_description')}
           </Text>
 
           <TouchableOpacity
             style={[s.button, { backgroundColor: theme.primary }]}
             onPress={() => router.replace('/(auth)/login')}
           >
-            <Text style={s.buttonText}>შესვლის გვერდზე</Text>
+            <Text style={s.buttonText}>{t('reset_password.go_to_login')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -99,15 +101,15 @@ export default function ResetPasswordScreen() {
     >
       <ScrollView contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
         <Text style={s.icon}>🔐</Text>
-        <Text style={[s.title, { color: theme.text }]}>ახალი პაროლი</Text>
+        <Text style={[s.title, { color: theme.text }]}>{t('reset_password.title')}</Text>
         <Text style={[s.description, { color: theme.textSecondary }]}>
-          ელ-ფოსტიდან დააკოპირეთ კოდი (ბმულის ბოლო ნაწილი token= შემდეგ) და შეიყვანეთ ახალი პაროლი.
+          {t('reset_password.subtitle')}
         </Text>
 
-        <Text style={[s.label, { color: theme.textSecondary }]}>კოდი ელ-ფოსტიდან</Text>
+        <Text style={[s.label, { color: theme.textSecondary }]}>{t('reset_password.token_label')}</Text>
         <TextInput
           style={[s.input, s.tokenInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.surface }]}
-          placeholder="ჩასვით კოდი აქ..."
+          placeholder={t('reset_password.token_placeholder')}
           value={token}
           onChangeText={setToken}
           autoCapitalize="none"
@@ -115,11 +117,11 @@ export default function ResetPasswordScreen() {
           placeholderTextColor={theme.textSecondary}
         />
 
-        <Text style={[s.label, { color: theme.textSecondary }]}>ახალი პაროლი</Text>
+        <Text style={[s.label, { color: theme.textSecondary }]}>{t('reset_password.password_label')}</Text>
         <View style={[s.passwordContainer, { borderColor: theme.border }]}>
           <TextInput
             style={[s.passwordInput, { color: theme.text }]}
-            placeholder="მინ. 8 სიმბოლო, 1 დიდი ასო, 1 ციფრი"
+            placeholder={t('reset_password.password_placeholder')}
             value={newPassword}
             onChangeText={setNewPassword}
             secureTextEntry={!showPassword}
@@ -132,11 +134,11 @@ export default function ResetPasswordScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={[s.label, { color: theme.textSecondary }]}>გაიმეორეთ პაროლი</Text>
+        <Text style={[s.label, { color: theme.textSecondary }]}>{t('reset_password.confirm_label')}</Text>
         <View style={[s.passwordContainer, { borderColor: theme.border }]}>
           <TextInput
             style={[s.passwordInput, { color: theme.text }]}
-            placeholder="იგივე პაროლი"
+            placeholder={t('reset_password.confirm_placeholder')}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry={!showPassword}
@@ -145,7 +147,7 @@ export default function ResetPasswordScreen() {
         </View>
 
         {newPassword && confirmPassword && newPassword !== confirmPassword && (
-          <Text style={s.errorHint}>პაროლები არ ემთხვევა</Text>
+          <Text style={s.errorHint}>{t('reset_password.error_password_mismatch')}</Text>
         )}
 
         <TouchableOpacity
@@ -153,14 +155,14 @@ export default function ResetPasswordScreen() {
           onPress={handleReset}
           disabled={loading}
         >
-          <Text style={s.buttonText}>{loading ? 'იცვლება...' : 'პაროლის შეცვლა'}</Text>
+          <Text style={s.buttonText}>{loading ? t('reset_password.loading') : t('reset_password.submit')}</Text>
         </TouchableOpacity>
 
         <Link href="/(auth)/forgot-password" style={s.link}>
-          <Text style={[s.linkText, { color: theme.primary }]}>ახალი კოდის მოთხოვნა</Text>
+          <Text style={[s.linkText, { color: theme.primary }]}>{t('reset_password.request_new_code')}</Text>
         </Link>
         <Link href="/(auth)/login" style={s.link}>
-          <Text style={[s.linkText, { color: theme.primary }]}>შესვლის გვერდზე დაბრუნება</Text>
+          <Text style={[s.linkText, { color: theme.primary }]}>{t('reset_password.back_to_login')}</Text>
         </Link>
       </ScrollView>
     </KeyboardAvoidingView>

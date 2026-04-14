@@ -53,7 +53,8 @@ export class ParsingService {
   }
 
   private async parseEpub(buffer: Buffer): Promise<ParsedBook> {
-    const EPub = (await import('epub2')).default;
+    const epub2Module = await import('epub2');
+    const EPub = (epub2Module as any).default || epub2Module;
 
     // Use secure random filename in temp directory
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'epub-'));

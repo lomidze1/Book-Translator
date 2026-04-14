@@ -51,6 +51,7 @@ export function useAudioPlayer(
 
   const soundRef = useRef<any>(null);
   const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nextChapterRef = useRef<() => void>(() => {});
 
   const currentAudio = chapters.find(
     (c) => c.chapterNumber === state.currentChapter && c.status === 'COMPLETED',
@@ -110,9 +111,9 @@ export function useAudioPlayer(
               isPlaying: status.isPlaying || false,
             }));
 
-            // Auto-advance when finished
+            // Auto-advance when finished (via ref to avoid stale closure)
             if (status.didJustFinish) {
-              nextChapter();
+              nextChapterRef.current();
             }
           },
         );
@@ -205,6 +206,11 @@ export function useAudioPlayer(
     }
   }, [chapters, state.currentChapter]);
 
+  // Keep ref in sync so the audio status callback always sees the latest closure
+  useEffect(() => {
+    nextChapterRef.current = nextChapter;
+  }, [nextChapter]);
+
   const prevChapter = useCallback(() => {
     // If position > 3s, restart current chapter
     if (state.position > 3000) {
@@ -212,13 +218,13 @@ export function useAudioPlayer(
       return;
     }
 
-    const prev = [...chapters]
+    const prevCh = [...chapters]
       .reverse()
       .find((c) => c.chapterNumber < state.currentChapter && c.status === 'COMPLETED');
-    if (prev) {
+    if (prevCh) {
       setState((prev) => ({
         ...prev,
-        currentChapter: prev.chapterNumber,
+        currentChapter: prevCh.chapterNumber,
         position: 0,
       }));
     }

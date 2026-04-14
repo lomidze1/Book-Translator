@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { authService } from '@/services/auth';
 import { apiRequest } from '@/services/api';
-import { colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
 
 interface UserProfile {
   id: string;
@@ -16,23 +17,26 @@ interface UserProfile {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const { t } = useTranslation();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     apiRequest<UserProfile>('/users/profile')
-      .then(setUser)
-      .catch(() => {
-        router.replace('/(auth)/login');
-      })
-      .finally(() => setLoading(false));
-  }, [router]);
+      .then((data) => { if (!cancelled) setUser(data); })
+      .catch(() => { if (!cancelled) router.replace('/(auth)/login'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogout = () => {
-    Alert.alert('გასვლა', 'დარწმუნებული ხართ?', [
-      { text: 'გაუქმება', style: 'cancel' },
+    Alert.alert(t('profile.logout'), t('profile.logout_confirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'გასვლა',
+        text: t('profile.logout'),
         style: 'destructive',
         onPress: async () => {
           await authService.logout();
@@ -43,49 +47,71 @@ export default function ProfileScreen() {
   };
 
   if (loading) {
-    return <View style={s.center}><Text style={s.text}>იტვირთება...</Text></View>;
+    return (
+      <View style={[s.center, { backgroundColor: theme.background }]}>
+        <Text style={[s.text, { color: theme.textSecondary }]}>{t('profile.loading')}</Text>
+      </View>
+    );
   }
 
   if (!user) return null;
 
   return (
-    <View style={s.container}>
-      <View style={s.header}>
-        <View style={s.avatar}>
+    <View style={[s.container, { backgroundColor: theme.background }]}>
+      <View style={[s.header, { borderBottomColor: theme.border }]}>
+        <View style={[s.avatar, { backgroundColor: theme.primary }]}>
           <Text style={s.avatarText}>{user.name?.[0]?.toUpperCase() || '?'}</Text>
         </View>
-        <Text style={s.name}>{user.name}</Text>
-        <Text style={s.email}>{user.email}</Text>
+        <Text style={[s.name, { color: theme.text }]}>{user.name}</Text>
+        <Text style={[s.email, { color: theme.textSecondary }]}>{user.email}</Text>
       </View>
 
       <View style={s.section}>
-        <TouchableOpacity style={s.menuItem} onPress={() => router.push('/(tabs)/library')}>
-          <Text style={s.menuText}>ჩემი ბიბლიოთეკა</Text>
+        <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/(tabs)/library')}>
+          <Text style={[s.menuText, { color: theme.text }]}>{t('profile.my_library')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/translations')}>
+          <Text style={[s.menuText, { color: theme.text }]}>{t('profile.my_translations')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/favorites')}>
+          <Text style={[s.menuText, { color: theme.text }]}>{t('profile.my_favorites')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/payments')}>
+          <Text style={[s.menuText, { color: theme.text }]}>{t('profile.my_payments')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/notifications')}>
+          <Text style={[s.menuText, { color: theme.text }]}>{t('profile.notifications')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/settings')}>
+          <Text style={[s.menuText, { color: theme.text }]}>{t('profile.settings')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/change-password')}>
+          <Text style={[s.menuText, { color: theme.text }]}>{t('profile.change_password')}</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-        <Text style={s.logoutText}>გასვლა</Text>
+      <TouchableOpacity style={[s.logoutBtn, { backgroundColor: theme.error }]} onPress={handleLogout}>
+        <Text style={s.logoutText}>{t('profile.logout')}</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.light.background },
+  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  text: { color: colors.light.textSecondary },
-  header: { alignItems: 'center', paddingVertical: 32, borderBottomWidth: 1, borderBottomColor: colors.light.border },
+  text: {},
+  header: { alignItems: 'center', paddingVertical: 32, borderBottomWidth: 1 },
   avatar: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: colors.light.primary,
+    width: 72, height: 72, borderRadius: 36,
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
   avatarText: { fontSize: 28, fontWeight: '700', color: '#fff' },
-  name: { fontSize: 20, fontWeight: '600', color: colors.light.text },
-  email: { fontSize: 14, color: colors.light.textSecondary, marginTop: 2 },
+  name: { fontSize: 20, fontWeight: '600' },
+  email: { fontSize: 14, marginTop: 2 },
   section: { paddingVertical: 8 },
-  menuItem: { paddingVertical: 14, paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: colors.light.border },
-  menuText: { fontSize: 16, color: colors.light.text },
-  logoutBtn: { marginTop: 32, marginHorizontal: 24, paddingVertical: 14, backgroundColor: colors.light.error, borderRadius: 8, alignItems: 'center' },
+  menuItem: { paddingVertical: 14, paddingHorizontal: 24, borderBottomWidth: 1 },
+  menuText: { fontSize: 16 },
+  logoutBtn: { marginTop: 32, marginHorizontal: 24, paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
   logoutText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
