@@ -1,24 +1,26 @@
-'use client';
-
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
+import { useToast } from '@/context/ToastContext';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   const handleSubmit = async () => {
     if (!email.trim()) {
-      Alert.alert('შეცდომა', 'შეიყვანეთ ელ-ფოსტა');
+      showToast(t('forgot_password.error_empty'), 'error');
       return;
     }
 
@@ -34,14 +36,14 @@ export default function ForgotPasswordScreen() {
         const body = await res.json().catch(() => ({}));
         const msg = body.message || '';
         if (msg.toLowerCase().includes('too many')) {
-          throw new Error('ძალიან ბევრი მცდელობა. სცადეთ 15 წუთში');
+          throw new Error(t('forgot_password.error_rate_limit'));
         }
-        throw new Error('შეცდომა. სცადეთ მოგვიანებით');
+        throw new Error(t('forgot_password.error_default'));
       }
 
       setSent(true);
     } catch (err: any) {
-      Alert.alert('შეცდომა', err.message || 'ქსელის შეცდომა');
+      showToast(err.message || t('common.network_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -51,33 +53,32 @@ export default function ForgotPasswordScreen() {
     return (
       <View style={[s.container, { backgroundColor: theme.background }]}>
         <View style={s.inner}>
-          <Text style={[s.icon]}>✉️</Text>
-          <Text style={[s.title, { color: theme.text }]}>შეამოწმეთ ელ-ფოსტა</Text>
+          <Text style={s.icon}>✉️</Text>
+          <Text style={[s.title, { color: theme.text }]}>{t('forgot_password.success_title')}</Text>
           <Text style={[s.description, { color: theme.textSecondary }]}>
-            პაროლის აღდგენის ბმული გამოგზავნილია მისამართზე:{'\n'}
+            {t('forgot_password.success_description')}{'\n'}
             <Text style={{ fontWeight: '600', color: theme.text }}>{email}</Text>
           </Text>
           <Text style={[s.hint, { color: theme.textSecondary }]}>
-            ბმული მოქმედებს 1 საათის განმავლობაში.{'\n'}
-            თუ ვერ იპოვეთ, შეამოწმეთ სპამის საქაღალდე.
+            {t('forgot_password.success_hint')}
           </Text>
 
           <TouchableOpacity
             style={[s.button, { backgroundColor: theme.primary }]}
             onPress={() => router.push('/(auth)/reset-password')}
           >
-            <Text style={s.buttonText}>კოდი მაქვს, პაროლის შეცვლა</Text>
+            <Text style={s.buttonText}>{t('forgot_password.have_code')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[s.secondaryButton, { borderColor: theme.border }]}
             onPress={() => { setSent(false); setEmail(''); }}
           >
-            <Text style={[s.secondaryButtonText, { color: theme.primary }]}>სხვა ელ-ფოსტაზე გაგზავნა</Text>
+            <Text style={[s.secondaryButtonText, { color: theme.primary }]}>{t('forgot_password.resend')}</Text>
           </TouchableOpacity>
 
           <Link href="/(auth)/login" style={s.link}>
-            <Text style={[s.linkText, { color: theme.primary }]}>შესვლის გვერდზე დაბრუნება</Text>
+            <Text style={[s.linkText, { color: theme.primary }]}>{t('forgot_password.back_to_login')}</Text>
           </Link>
         </View>
       </View>
@@ -90,15 +91,15 @@ export default function ForgotPasswordScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={s.inner}>
-        <Text style={[s.icon]}>🔑</Text>
-        <Text style={[s.title, { color: theme.text }]}>დაგავიწყდათ პაროლი?</Text>
+        <Text style={s.icon}>🔑</Text>
+        <Text style={[s.title, { color: theme.text }]}>{t('forgot_password.title')}</Text>
         <Text style={[s.description, { color: theme.textSecondary }]}>
-          შეიყვანეთ თქვენი ელ-ფოსტა და გამოგიგზავნით პაროლის აღდგენის ბმულს.
+          {t('forgot_password.subtitle')}
         </Text>
 
         <TextInput
           style={[s.input, { borderColor: theme.border, color: theme.text }]}
-          placeholder="ელ-ფოსტა"
+          placeholder={t('forgot_password.email')}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -112,11 +113,11 @@ export default function ForgotPasswordScreen() {
           onPress={handleSubmit}
           disabled={loading}
         >
-          <Text style={s.buttonText}>{loading ? 'იგზავნება...' : 'გაგზავნა'}</Text>
+          <Text style={s.buttonText}>{loading ? t('forgot_password.loading') : t('forgot_password.submit')}</Text>
         </TouchableOpacity>
 
         <Link href="/(auth)/login" style={s.link}>
-          <Text style={[s.linkText, { color: theme.primary }]}>უკან შესვლის გვერდზე</Text>
+          <Text style={[s.linkText, { color: theme.primary }]}>{t('forgot_password.back')}</Text>
         </Link>
       </View>
     </KeyboardAvoidingView>

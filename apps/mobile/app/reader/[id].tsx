@@ -1,12 +1,19 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView,
-  Dimensions, Modal, TextInput, FlatList, ActivityIndicator,
+  useWindowDimensions, Modal, TextInput, FlatList, ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { apiRequest } from '@/services/api';
 import { authService } from '@/services/auth';
+import { bookCacheService } from '@/services/book-cache';
 import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
+import { useToast } from '@/context/ToastContext';
+import ColorPicker, { HIGHLIGHT_HEX, type HighlightColor } from '@/components/reader/ColorPicker';
+
+// ── Types ──
 
 interface TranslatedChapter {
   id: string;
@@ -35,70 +42,163 @@ interface NoteItem {
   createdAt: string;
 }
 
-const HIGHLIGHT_COLORS = ['yellow', 'green', 'blue', 'red'] as const;
-const HIGHLIGHT_HEX: Record<string, string> = {
-  yellow: '#facc15', green: '#22c55e', blue: '#3b82f6', red: '#ef4444',
+interface HighlightItem {
+  id: string;
+  chapterNumber: number;
+  startPosition: number;
+  endPosition: number;
+  selectedText: string;
+  color: string;
+  createdAt: string;
+}
+
+interface ReaderSettings {
+  fontFamily: string;
+  fontSize: number;
+  lineHeight: number;
+  theme: string;
+}
+
+const DEFAULT_SETTINGS: ReaderSettings = {
+  fontFamily: 'default', fontSize: 18, lineHeight: 1.8, theme: 'light',
 };
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const READER_SETTINGS_KEY = 'reader-settings';
+const READER_THEMES: Record<string, { background: string; text: string }> = {
+  light: { background: '#ffffff', text: '#1a1a1a' },
+  sepia: { background: '#f4ecd8', text: '#5c4b37' },
+  dark: { background: '#1a1a1a', text: '#e0e0e0' },
+};
+
+const FONT_MAP: Record<string, string | undefined> = {
+  default: undefined,
+  serif: 'serif',
+  'sans-serif': 'sans-serif',
+  bpg: undefined, // BPG not bundled on mobile — fallback to default
+};
 
 export default function MobileReaderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { theme, isDark, toggleTheme } = useTheme();
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  const { height: screenHeight } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
+  const isScrolling = useRef(false);
+
   const [translation, setTranslation] = useState<TranslationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [percentage, setPercentage] = useState(0);
   const [activeChapter, setActiveChapter] = useState(1);
-  const [fontSize, setFontSize] = useState(18);
   const [showControls, setShowControls] = useState(true);
   const [token, setToken] = useState<string | null>(null);
+  const [isOfflineCached, setIsOfflineCached] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  // Bookmarks state
+  // Reader settings
+  const [readerSettings, setReaderSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+
+  // Bookmarks
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
   const [showBookmarks, setShowBookmarks] = useState(false);
 
-  // Notes state
+  // Notes
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [showNotes, setShowNotes] = useState(false);
   const [noteText, setNoteText] = useState('');
-  const [editingNote, setEditingNote] = useState(false);
+
+  // Highlights
+  const [highlights, setHighlights] = useState<HighlightItem[]>([]);
+  const [showHighlights, setShowHighlights] = useState(false);
 
   const bookId = translation?.book.id;
 
+  // ── Load reader settings ──
+  useEffect(() => {
+    AsyncStorage.getItem(READER_SETTINGS_KEY).then((raw) => {
+      if (raw) {
+        try { setReaderSettings(JSON.parse(raw)); } catch {}
+      }
+    });
+  }, []);
+
+  const updateReaderSetting = useCallback(<K extends keyof ReaderSettings>(key: K, value: ReaderSettings[K]) => {
+    setReaderSettings((prev) => {
+      const updated = { ...prev, [key]: value };
+      AsyncStorage.setItem(READER_SETTINGS_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // ── Load translation (API with offline fallback) ──
   useEffect(() => {
     async function load() {
-      const t = await authService.getToken();
-      if (!t) { setError('გთხოვთ შეხვიდეთ'); setLoading(false); return; }
-      setToken(t);
+      const tkn = await authService.getToken();
+      if (!tkn) { setError(t('reader.login_required')); setLoading(false); return; }
+      setToken(tkn);
 
       try {
         const translations = await apiRequest<any[]>(`/translations/book/${id}`);
         const completed = translations.find((tr: any) => tr.status === 'COMPLETED');
-        if (!completed) { setError('თარგმანი ჯერ მზად არ არის'); setLoading(false); return; }
+        if (!completed) { setError(t('reader.not_ready')); setLoading(false); return; }
+
+        // Check offline cache status
+        bookCacheService.isCached(completed.id).then(setIsOfflineCached);
 
         const full = await apiRequest<TranslationData>(`/translations/${completed.id}`);
+
+        // Store book metadata for offline matching
+        AsyncStorage.setItem(`book_meta_${completed.id}`, JSON.stringify({ bookId: id })).catch(() => {});
         setTranslation(full);
       } catch {
-        setError('შეცდომა მონაცემების ჩატვირთვისას');
+        // Try offline cache for this specific book
+        try {
+          const keys = await AsyncStorage.getAllKeys();
+          const cacheKeys = keys.filter((k) => k.startsWith('book_cache_') && k !== 'book_cache_index');
+          for (const key of cacheKeys) {
+            const translationId = key.replace('book_cache_', '');
+            const cached = await bookCacheService.getCachedTranslation(translationId);
+            if (cached && cached.length > 0) {
+              // Verify this cache belongs to the requested book by checking stored metadata
+              const metaRaw = await AsyncStorage.getItem(`book_meta_${translationId}`);
+              if (metaRaw) {
+                const meta = JSON.parse(metaRaw);
+                if (meta.bookId !== id) continue;
+              }
+              setTranslation({
+                id: translationId,
+                book: { id: id!, title: '', author: undefined },
+                translatedChapters: cached,
+              });
+              setIsOfflineCached(true);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch {}
+        setError(t('reader.load_error'));
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [id]);
+  }, [id, t]);
 
-  // Load bookmarks & notes
+  // ── Load bookmarks, notes, highlights ──
   useEffect(() => {
     if (!token || !bookId) return;
     apiRequest<BookmarkItem[]>(`/reader/bookmarks/${bookId}`)
       .then(setBookmarks).catch(() => {});
     apiRequest<NoteItem[]>(`/reader/notes/${bookId}`)
       .then(setNotes).catch(() => {});
+    apiRequest<HighlightItem[]>(`/reader/highlights/${bookId}`)
+      .then(setHighlights).catch(() => {});
   }, [token, bookId]);
 
+  // ── Scroll tracking ──
   const handleScroll = useCallback((e: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     const scrollHeight = contentSize.height - layoutMeasurement.height;
@@ -113,7 +213,7 @@ export default function MobileReaderScreen() {
     }
   }, [translation]);
 
-  // Save progress
+  // ── Save progress (debounced) ──
   useEffect(() => {
     if (!token || !translation || percentage === 0) return;
     const timer = setTimeout(() => {
@@ -129,9 +229,9 @@ export default function MobileReaderScreen() {
       }).catch(() => {});
     }, 5000);
     return () => clearTimeout(timer);
-  }, [percentage, token, translation]);
+  }, [percentage, activeChapter, token, translation]);
 
-  // Bookmark toggle
+  // ── Bookmark toggle ──
   const toggleBookmark = async () => {
     if (!bookId) return;
     const existing = bookmarks.find((b) => b.chapterNumber === activeChapter);
@@ -148,10 +248,9 @@ export default function MobileReaderScreen() {
       } catch {}
     }
   };
-
   const isChapterBookmarked = bookmarks.some((b) => b.chapterNumber === activeChapter);
 
-  // Add note
+  // ── Notes ──
   const handleAddNote = async () => {
     if (!bookId || !noteText.trim()) return;
     try {
@@ -161,7 +260,6 @@ export default function MobileReaderScreen() {
       });
       setNotes((prev) => [...prev, created]);
       setNoteText('');
-      setEditingNote(false);
     } catch {}
   };
 
@@ -170,6 +268,63 @@ export default function MobileReaderScreen() {
     setNotes((prev) => prev.filter((n) => n.id !== noteId));
   };
 
+  // ── Highlights ──
+  const addHighlight = async (color: HighlightColor) => {
+    if (!bookId) return;
+    try {
+      const created = await apiRequest<HighlightItem>('/reader/highlights', {
+        method: 'POST',
+        body: JSON.stringify({
+          bookId,
+          chapterNumber: activeChapter,
+          startPosition: 0,
+          endPosition: 0,
+          selectedText: `Chapter ${activeChapter} highlight`,
+          color,
+        }),
+      });
+      setHighlights((prev) => [...prev, created]);
+      showToast(t('reader.highlights'), 'success');
+    } catch {}
+  };
+
+  const updateHighlightColor = async (highlightId: string, color: HighlightColor) => {
+    try {
+      await apiRequest(`/reader/highlights/${highlightId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ color }),
+      });
+      setHighlights((prev) =>
+        prev.map((h) => (h.id === highlightId ? { ...h, color } : h))
+      );
+    } catch {}
+  };
+
+  const deleteHighlight = async (highlightId: string) => {
+    await apiRequest(`/reader/highlights/${highlightId}`, { method: 'DELETE' }).catch(() => {});
+    setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+  };
+
+  // ── Offline download ──
+  const handleDownloadOffline = async () => {
+    if (!translation) return;
+    setDownloading(true);
+    try {
+      await bookCacheService.cacheTranslation(translation.id, translation.translatedChapters);
+      setIsOfflineCached(true);
+      showToast(t('reader.offline_available'), 'success');
+    } catch {
+      showToast(t('common.error'), 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // ── Reader theme ──
+  const readerTheme = READER_THEMES[readerSettings.theme] || READER_THEMES.light;
+  const fontFamily = FONT_MAP[readerSettings.fontFamily];
+
+  // ── Loading / Error states ──
   if (loading) {
     return (
       <SafeAreaView style={[s.center, { backgroundColor: theme.background }]}>
@@ -183,7 +338,7 @@ export default function MobileReaderScreen() {
       <SafeAreaView style={[s.center, { backgroundColor: theme.background }]}>
         <Text style={[s.errorText, { color: theme.error }]}>{error}</Text>
         <TouchableOpacity style={[s.backBtn, { backgroundColor: theme.primary }]} onPress={() => router.back()}>
-          <Text style={s.backBtnText}>უკან</Text>
+          <Text style={s.backBtnText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -193,72 +348,93 @@ export default function MobileReaderScreen() {
     (a, b) => a.chapter.number - b.chapter.number,
   );
 
+  const fontLabels: Record<string, string> = {
+    default: t('reader.font_default'),
+    serif: t('reader.font_serif'),
+    'sans-serif': t('reader.font_sans'),
+    bpg: t('reader.font_bpg'),
+  };
+
   return (
-    <SafeAreaView style={[s.container, { backgroundColor: theme.background }]}>
-      {/* Top bar */}
+    <SafeAreaView style={[s.container, { backgroundColor: readerTheme.background }]}>
+      {/* ── Top bar ── */}
       {showControls && (
-        <View style={[s.topBar, { borderBottomColor: theme.border, backgroundColor: theme.background }]}>
+        <View style={[s.topBar, { borderBottomColor: theme.border, backgroundColor: readerTheme.background }]}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={[s.topBarBtn, { color: theme.primary }]}>&#8592; უკან</Text>
+            <Text style={[s.topBarBtn, { color: theme.primary }]}>&#8592; {t('common.back')}</Text>
           </TouchableOpacity>
-          <Text style={[s.topBarTitle, { color: theme.text }]} numberOfLines={1}>
+          <Text style={[s.topBarTitle, { color: readerTheme.text }]} numberOfLines={1}>
             {translation.book.title}
           </Text>
           <View style={s.topBarRight}>
-            {/* Bookmark */}
             <TouchableOpacity onPress={toggleBookmark}>
               <Text style={[s.toolBtn, { color: isChapterBookmarked ? '#facc15' : theme.textSecondary }]}>
                 {isChapterBookmarked ? '★' : '☆'}
               </Text>
             </TouchableOpacity>
-            {/* Notes */}
+            <TouchableOpacity onPress={() => setShowHighlights(true)}>
+              <Text style={[s.toolBtn, { color: theme.textSecondary }]}>🖍</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowNotes(true)}>
               <Text style={[s.toolBtn, { color: theme.textSecondary }]}>📝</Text>
             </TouchableOpacity>
-            {/* Bookmarks list */}
             <TouchableOpacity onPress={() => setShowBookmarks(true)}>
               <Text style={[s.toolBtn, { color: theme.textSecondary }]}>🔖</Text>
             </TouchableOpacity>
-            {/* Theme toggle */}
-            <TouchableOpacity onPress={toggleTheme}>
-              <Text style={[s.toolBtn, { color: theme.textSecondary }]}>
-                {isDark ? '☀️' : '🌙'}
-              </Text>
-            </TouchableOpacity>
-            {/* Font controls */}
-            <TouchableOpacity onPress={() => setFontSize((v) => Math.max(14, v - 2))}>
-              <Text style={[s.fontBtn, { color: theme.primary }]}>A-</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setFontSize((v) => Math.min(28, v + 2))}>
-              <Text style={[s.fontBtn, { color: theme.primary }]}>A+</Text>
+            <TouchableOpacity onPress={() => setShowSettingsPanel(true)}>
+              <Text style={[s.toolBtn, { color: theme.textSecondary }]}>⚙️</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
 
+      {/* ── Content ── */}
       <ScrollView
         ref={scrollRef}
         style={s.scrollView}
         contentContainerStyle={s.scrollContent}
         onScroll={handleScroll}
         scrollEventThrottle={100}
-        onTouchEnd={() => setShowControls(!showControls)}
+        onScrollBeginDrag={() => { isScrolling.current = true; }}
+        onScrollEndDrag={() => { isScrolling.current = false; }}
+        onTouchEnd={() => { if (!isScrolling.current) setShowControls((prev) => !prev); }}
       >
         {chapters.map((ch) => (
           <View key={ch.id} style={s.chapter}>
-            <Text style={[s.chapterTitle, { color: theme.text, borderBottomColor: theme.border }]}>
-              {ch.chapter.title || `თავი ${ch.chapter.number}`}
+            <Text style={[s.chapterTitle, { color: readerTheme.text, borderBottomColor: theme.border }]}>
+              {ch.chapter.title || t('reader.chapter', { number: ch.chapter.number })}
             </Text>
-            <Text style={[s.chapterText, { fontSize, color: theme.text }]}>
+            <Text
+              style={[
+                s.chapterText,
+                {
+                  fontSize: readerSettings.fontSize,
+                  lineHeight: readerSettings.fontSize * readerSettings.lineHeight,
+                  color: readerTheme.text,
+                  ...(fontFamily ? { fontFamily } : {}),
+                },
+              ]}
+            >
               {ch.translatedContent}
             </Text>
           </View>
         ))}
       </ScrollView>
 
-      {/* Bottom progress */}
+      {/* ── Bottom progress ── */}
       {showControls && (
-        <View style={[s.bottomBar, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
+        <View style={[s.bottomBar, { borderTopColor: theme.border, backgroundColor: readerTheme.background }]}>
+          {/* Offline indicator */}
+          {isOfflineCached && (
+            <Text style={[s.offlineBadge, { color: '#22c55e' }]}>✓</Text>
+          )}
+          {!isOfflineCached && !downloading && (
+            <TouchableOpacity onPress={handleDownloadOffline} style={s.downloadBtn}>
+              <Text style={[s.downloadText, { color: theme.primary }]}>↓</Text>
+            </TouchableOpacity>
+          )}
+          {downloading && <ActivityIndicator size="small" color={theme.primary} style={s.downloadBtn} />}
+
           <View style={[s.progressBar, { backgroundColor: theme.border }]}>
             <View style={[s.progressFill, { width: `${percentage}%`, backgroundColor: theme.primary }]} />
           </View>
@@ -266,18 +442,149 @@ export default function MobileReaderScreen() {
         </View>
       )}
 
-      {/* Bookmarks Modal */}
+      {/* ── Settings Panel Modal ── */}
+      <Modal visible={showSettingsPanel} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContent, { backgroundColor: theme.background, maxHeight: screenHeight * 0.7 }]}>
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: theme.text }]}>{t('reader.settings_panel')}</Text>
+              <TouchableOpacity onPress={() => setShowSettingsPanel(false)}>
+                <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.close')}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Font Size */}
+            <View style={s.settingRow}>
+              <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.font_size')}</Text>
+              <View style={s.stepperRow}>
+                <TouchableOpacity style={[s.stepBtn, { borderColor: theme.border }]}
+                  onPress={() => updateReaderSetting('fontSize', Math.max(14, readerSettings.fontSize - 2))}>
+                  <Text style={[s.stepText, { color: theme.primary }]}>A-</Text>
+                </TouchableOpacity>
+                <Text style={[s.stepValue, { color: theme.text }]}>{readerSettings.fontSize}</Text>
+                <TouchableOpacity style={[s.stepBtn, { borderColor: theme.border }]}
+                  onPress={() => updateReaderSetting('fontSize', Math.min(28, readerSettings.fontSize + 2))}>
+                  <Text style={[s.stepText, { color: theme.primary }]}>A+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Font Family */}
+            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.font_family')}</Text>
+            <View style={s.chipRow}>
+              {Object.entries(fontLabels).map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[s.chip, readerSettings.fontFamily === key && { backgroundColor: theme.primary }]}
+                  onPress={() => updateReaderSetting('fontFamily', key)}
+                >
+                  <Text style={{ fontSize: 12, color: readerSettings.fontFamily === key ? '#fff' : theme.text }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Line Height */}
+            <View style={s.settingRow}>
+              <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.line_height')}</Text>
+              <View style={s.stepperRow}>
+                <TouchableOpacity style={[s.stepBtn, { borderColor: theme.border }]}
+                  onPress={() => updateReaderSetting('lineHeight', Math.max(1.4, +(readerSettings.lineHeight - 0.2).toFixed(1)))}>
+                  <Text style={[s.stepText, { color: theme.primary }]}>-</Text>
+                </TouchableOpacity>
+                <Text style={[s.stepValue, { color: theme.text }]}>{readerSettings.lineHeight.toFixed(1)}</Text>
+                <TouchableOpacity style={[s.stepBtn, { borderColor: theme.border }]}
+                  onPress={() => updateReaderSetting('lineHeight', Math.min(2.2, +(readerSettings.lineHeight + 0.2).toFixed(1)))}>
+                  <Text style={[s.stepText, { color: theme.primary }]}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Reader Theme */}
+            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.reader_theme')}</Text>
+            <View style={s.chipRow}>
+              {[
+                { key: 'light', label: t('settings.theme_light'), bg: '#fff', fg: '#1a1a1a' },
+                { key: 'sepia', label: t('settings.theme_sepia'), bg: '#f4ecd8', fg: '#5c4b37' },
+                { key: 'dark', label: t('settings.theme_dark'), bg: '#1a1a1a', fg: '#e0e0e0' },
+              ].map((rt) => (
+                <TouchableOpacity
+                  key={rt.key}
+                  style={[
+                    s.themeChip,
+                    { backgroundColor: rt.bg, borderColor: readerSettings.theme === rt.key ? theme.primary : theme.border },
+                  ]}
+                  onPress={() => updateReaderSetting('theme', rt.key)}
+                >
+                  <Text style={{ color: rt.fg, fontSize: 12 }}>{rt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Highlights Modal ── */}
+      <Modal visible={showHighlights} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContent, { backgroundColor: theme.background, maxHeight: screenHeight * 0.7 }]}>
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: theme.text }]}>{t('reader.highlights')}</Text>
+              <TouchableOpacity onPress={() => setShowHighlights(false)}>
+                <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.close')}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick add */}
+            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>
+              {t('reader.chapter', { number: activeChapter })}
+            </Text>
+            <ColorPicker onSelect={addHighlight} />
+
+            {highlights.length === 0 ? (
+              <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('reader.highlights_empty')}</Text>
+            ) : (
+              <FlatList
+                data={highlights}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View style={[s.highlightCard, { borderColor: theme.border, borderLeftColor: HIGHLIGHT_HEX[item.color as HighlightColor] || '#facc15' }]}>
+                    <View style={s.highlightHeader}>
+                      <Text style={[s.noteChapter, { color: theme.textSecondary }]}>
+                        {t('reader.chapter', { number: item.chapterNumber })}
+                      </Text>
+                      <View style={s.highlightActions}>
+                        <ColorPicker
+                          selected={item.color as HighlightColor}
+                          onSelect={(c) => updateHighlightColor(item.id, c)}
+                        />
+                        <TouchableOpacity onPress={() => deleteHighlight(item.id)}>
+                          <Text style={[s.deleteBtn, { color: theme.error }]}>{t('common.delete')}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <Text style={[s.highlightText, { color: theme.text }]} numberOfLines={2}>
+                      {item.selectedText}
+                    </Text>
+                  </View>
+                )}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Bookmarks Modal ── */}
       <Modal visible={showBookmarks} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: theme.background }]}>
+          <View style={[s.modalContent, { backgroundColor: theme.background, maxHeight: screenHeight * 0.7 }]}>
             <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: theme.text }]}>სანიშნეები</Text>
+              <Text style={[s.modalTitle, { color: theme.text }]}>{t('reader.bookmarks')}</Text>
               <TouchableOpacity onPress={() => setShowBookmarks(false)}>
-                <Text style={[s.modalClose, { color: theme.primary }]}>დახურვა</Text>
+                <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.close')}</Text>
               </TouchableOpacity>
             </View>
             {bookmarks.length === 0 ? (
-              <Text style={[s.emptyText, { color: theme.textSecondary }]}>სანიშნეები არ არის</Text>
+              <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('reader.bookmarks_empty')}</Text>
             ) : (
               <FlatList
                 data={bookmarks}
@@ -288,7 +595,7 @@ export default function MobileReaderScreen() {
                     onPress={() => { setShowBookmarks(false); setActiveChapter(item.chapterNumber); }}
                   >
                     <Text style={[s.listItemText, { color: theme.text }]}>
-                      თავი {item.chapterNumber}
+                      {t('reader.chapter', { number: item.chapterNumber })}
                     </Text>
                     <Text style={[s.listItemDate, { color: theme.textSecondary }]}>
                       {new Date(item.createdAt).toLocaleDateString('ka-GE')}
@@ -301,22 +608,21 @@ export default function MobileReaderScreen() {
         </View>
       </Modal>
 
-      {/* Notes Modal */}
+      {/* ── Notes Modal ── */}
       <Modal visible={showNotes} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: theme.background }]}>
+          <View style={[s.modalContent, { backgroundColor: theme.background, maxHeight: screenHeight * 0.7 }]}>
             <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: theme.text }]}>შენიშვნები</Text>
+              <Text style={[s.modalTitle, { color: theme.text }]}>{t('reader.notes')}</Text>
               <TouchableOpacity onPress={() => setShowNotes(false)}>
-                <Text style={[s.modalClose, { color: theme.primary }]}>დახურვა</Text>
+                <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.close')}</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Add note */}
             <View style={s.addNoteRow}>
               <TextInput
                 style={[s.noteInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.surface }]}
-                placeholder="შენიშვნის დამატება..."
+                placeholder={t('reader.note_placeholder')}
                 placeholderTextColor={theme.textSecondary}
                 value={noteText}
                 onChangeText={setNoteText}
@@ -332,7 +638,7 @@ export default function MobileReaderScreen() {
             </View>
 
             {notes.length === 0 ? (
-              <Text style={[s.emptyText, { color: theme.textSecondary }]}>შენიშვნები არ არის</Text>
+              <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('reader.notes_empty')}</Text>
             ) : (
               <FlatList
                 data={notes}
@@ -341,10 +647,10 @@ export default function MobileReaderScreen() {
                   <View style={[s.noteCard, { borderColor: theme.border, backgroundColor: theme.surface }]}>
                     <View style={s.noteHeader}>
                       <Text style={[s.noteChapter, { color: theme.textSecondary }]}>
-                        თავი {item.chapterNumber}
+                        {t('reader.chapter', { number: item.chapterNumber })}
                       </Text>
                       <TouchableOpacity onPress={() => deleteNote(item.id)}>
-                        <Text style={[s.deleteBtn, { color: theme.error }]}>წაშლა</Text>
+                        <Text style={[s.deleteBtn, { color: theme.error }]}>{t('common.delete')}</Text>
                       </TouchableOpacity>
                     </View>
                     <Text style={[s.noteContent, { color: theme.text }]}>{item.content}</Text>
@@ -373,7 +679,6 @@ const s = StyleSheet.create({
   topBarTitle: { flex: 1, fontSize: 14, fontWeight: '500', textAlign: 'center', marginHorizontal: 4 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolBtn: { fontSize: 18 },
-  fontBtn: { fontSize: 15, fontWeight: '600' },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20 },
   chapter: { marginBottom: 48 },
@@ -381,20 +686,34 @@ const s = StyleSheet.create({
     fontSize: 22, fontWeight: '700', marginBottom: 16, paddingBottom: 8,
     borderBottomWidth: 1,
   },
-  chapterText: { lineHeight: 32 },
+  chapterText: {},
   bottomBar: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8,
     borderTopWidth: 1,
   },
+  offlineBadge: { fontSize: 14, fontWeight: '700', marginRight: 8 },
+  downloadBtn: { marginRight: 8 },
+  downloadText: { fontSize: 18, fontWeight: '700' },
   progressBar: { flex: 1, height: 4, borderRadius: 2, marginRight: 12, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2 },
   progressText: { fontSize: 13, width: 36 },
-  // Modal styles
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end',
+  // Settings panel
+  settingRow: { marginBottom: 12 },
+  settingLabel: { fontSize: 13, marginBottom: 6, marginTop: 4 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stepBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  stepText: { fontSize: 16, fontWeight: '600' },
+  stepValue: { fontSize: 16, fontWeight: '500', width: 40, textAlign: 'center' },
+  chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 },
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.05)' },
+  themeChip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+    borderWidth: 2, minWidth: 60, alignItems: 'center',
   },
+  // Modals
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: {
-    maxHeight: SCREEN_HEIGHT * 0.7, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32,
   },
   modalHeader: {
@@ -410,6 +729,15 @@ const s = StyleSheet.create({
   },
   listItemText: { fontSize: 15, fontWeight: '500' },
   listItemDate: { fontSize: 13 },
+  // Highlights
+  highlightCard: {
+    borderWidth: 1, borderLeftWidth: 4, borderRadius: 8, padding: 10, marginBottom: 8,
+  },
+  highlightHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4,
+  },
+  highlightActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  highlightText: { fontSize: 13, lineHeight: 18 },
   // Notes
   addNoteRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   noteInput: {
@@ -420,12 +748,8 @@ const s = StyleSheet.create({
     width: 44, height: 44, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
   },
   addNoteBtnText: { color: '#fff', fontSize: 22, fontWeight: '600' },
-  noteCard: {
-    borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 8,
-  },
-  noteHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6,
-  },
+  noteCard: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 8 },
+  noteHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   noteChapter: { fontSize: 12, fontWeight: '500' },
   deleteBtn: { fontSize: 13, fontWeight: '500' },
   noteContent: { fontSize: 14, lineHeight: 20 },

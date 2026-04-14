@@ -105,7 +105,7 @@ class AudioCacheService {
         remoteUrl,
         localPath,
         {},
-        (downloadProgress) => {
+        (downloadProgress: { totalBytesWritten: number; totalBytesExpectedToWrite: number }) => {
           const pct = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
           onProgress?.(pct);
         },

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, type ThemeColors } from './colors';
@@ -26,25 +26,33 @@ const THEME_KEY = 'app_theme_mode';
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>('system');
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(THEME_KEY).then((saved) => {
-      if (saved === 'light' || saved === 'dark' || saved === 'system') {
-        setModeState(saved);
-      }
-    });
+    AsyncStorage.getItem(THEME_KEY)
+      .then((saved) => {
+        if (saved === 'light' || saved === 'dark' || saved === 'system') {
+          setModeState(saved);
+        }
+      })
+      .finally(() => setHydrated(true));
   }, []);
 
-  const setMode = (newMode: ThemeMode) => {
+  const setMode = useCallback((newMode: ThemeMode) => {
     setModeState(newMode);
     AsyncStorage.setItem(THEME_KEY, newMode);
-  };
+  }, []);
 
   const isDark = mode === 'dark' || (mode === 'system' && systemScheme === 'dark');
 
-  const toggleTheme = () => {
-    setMode(isDark ? 'light' : 'dark');
-  };
+  const toggleTheme = useCallback(() => {
+    setModeState((prev) => {
+      const effectiveDark = prev === 'dark' || (prev === 'system' && systemScheme === 'dark');
+      const next = effectiveDark ? 'light' : 'dark';
+      AsyncStorage.setItem(THEME_KEY, next);
+      return next;
+    });
+  }, [systemScheme]);
 
   const value = useMemo(
     () => ({
@@ -54,8 +62,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setMode,
       toggleTheme,
     }),
-    [isDark, mode],
+    [isDark, mode, setMode, toggleTheme],
   );
+
+  // Avoid flash: don't render children until persisted theme is loaded
+  if (!hydrated) return null;
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
