@@ -75,12 +75,9 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
-        { id: 'ch-2', number: 2 },
+        { id: 'ch-1', number: 1, originalContent: 'Chapter 1 text' },
+        { id: 'ch-2', number: 2, originalContent: 'Chapter 2 text' },
       ]);
-      mockPrisma.chapter.findUnique
-        .mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'Chapter 1 text' })
-        .mockResolvedValueOnce({ id: 'ch-2', number: 2, originalContent: 'Chapter 2 text' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Test Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
@@ -117,12 +114,9 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
-        { id: 'ch-2', number: 2 },
+        { id: 'ch-1', number: 1, originalContent: 'Ch 1' },
+        { id: 'ch-2', number: 2, originalContent: 'Ch 2' },
       ]);
-      mockPrisma.chapter.findUnique
-        .mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'Ch 1' })
-        .mockResolvedValueOnce({ id: 'ch-2', number: 2, originalContent: 'Ch 2' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
@@ -151,8 +145,7 @@ describe('TranslationProcessor', () => {
 
     it('should fail if book not found', async () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
-      mockPrisma.chapter.findMany.mockResolvedValue([{ id: 'ch-1', number: 1 }]);
-      mockPrisma.chapter.findUnique.mockResolvedValue({ id: 'ch-1', number: 1, originalContent: 'text' });
+      mockPrisma.chapter.findMany.mockResolvedValue([{ id: 'ch-1', number: 1, originalContent: 'text' }]);
       mockPrisma.book.findUnique.mockResolvedValue(null);
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
 
@@ -164,9 +157,8 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
+        { id: 'ch-1', number: 1, originalContent: 'text' },
       ]);
-      mockPrisma.chapter.findUnique.mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'text' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
@@ -188,14 +180,10 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
-        { id: 'ch-2', number: 2 },
-        { id: 'ch-3', number: 3 },
+        { id: 'ch-1', number: 1, originalContent: 'text1' },
+        { id: 'ch-2', number: 2, originalContent: 'text2' },
+        { id: 'ch-3', number: 3, originalContent: 'text3' },
       ]);
-      mockPrisma.chapter.findUnique
-        .mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'text1' })
-        .mockResolvedValueOnce({ id: 'ch-2', number: 2, originalContent: 'text2' })
-        .mockResolvedValueOnce({ id: 'ch-3', number: 3, originalContent: 'text3' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
@@ -219,12 +207,9 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
-        { id: 'ch-2', number: 2 },
+        { id: 'ch-1', number: 1, originalContent: 'text1' },
+        { id: 'ch-2', number: 2, originalContent: 'text2' },
       ]);
-      mockPrisma.chapter.findUnique
-        .mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'text1' })
-        .mockResolvedValueOnce({ id: 'ch-2', number: 2, originalContent: 'text2' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
@@ -249,9 +234,8 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
+        { id: 'ch-1', number: 1, originalContent: 'glossary test text' },
       ]);
-      mockPrisma.chapter.findUnique.mockResolvedValue({ id: 'ch-1', number: 1, originalContent: 'glossary test text' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({
         id: 'tr-1',
@@ -275,9 +259,8 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
+        { id: 'ch-1', number: 1, originalContent: 'text' },
       ]);
-      mockPrisma.chapter.findUnique.mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'text' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
@@ -300,9 +283,8 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
+        { id: 'ch-1', number: 1, originalContent: 'text' },
       ]);
-      mockPrisma.chapter.findUnique.mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'text' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
@@ -322,9 +304,8 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
+        { id: 'ch-1', number: 1, originalContent: 'text' },
       ]);
-      mockPrisma.chapter.findUnique.mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'text' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});
@@ -343,9 +324,8 @@ describe('TranslationProcessor', () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
       mockPrisma.chapter.findMany.mockResolvedValue([
-        { id: 'ch-1', number: 1 },
+        { id: 'ch-1', number: 1, originalContent: 'text' },
       ]);
-      mockPrisma.chapter.findUnique.mockResolvedValueOnce({ id: 'ch-1', number: 1, originalContent: 'text' });
       mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
       mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
       mockPrisma.translation.update.mockResolvedValue({});

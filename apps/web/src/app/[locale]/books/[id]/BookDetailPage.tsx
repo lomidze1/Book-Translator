@@ -326,7 +326,7 @@ export default function BookDetailsPage() {
 
             {book.description && (
               <div className={styles.description}>
-                <h3>{t('description')}</h3>
+                <h2>{t('description')}</h2>
                 <p>{book.description}</p>
               </div>
             )}
@@ -414,7 +414,7 @@ export default function BookDetailsPage() {
 
             {book.chapters.length > 0 && (
               <div className={styles.chapters}>
-                <h3>{t('chapters', { count: book.chapters.length })}</h3>
+                <h2>{t('chapters', { count: book.chapters.length })}</h2>
                 <ul>
                   {book.chapters.map((ch) => (
                     <li key={ch.id}>

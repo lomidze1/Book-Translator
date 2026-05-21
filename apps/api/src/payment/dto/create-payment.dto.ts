@@ -8,8 +8,8 @@ export class CreatePaymentDto {
   @IsIn(['TRANSLATION', 'PURCHASE_ORIGINAL', 'PURCHASE_TRANSLATION'])
   type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
 
-  @IsIn(['BOG', 'TBC'])
-  provider: 'BOG' | 'TBC';
+  @IsIn(['FLITT'])
+  provider: 'FLITT';
 
   @IsOptional()
   @IsString()

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import styles from './PaymentModal.module.scss';
 
@@ -28,7 +28,6 @@ export default function PaymentModal({
   onSuccess,
 }: PaymentModalProps) {
   const t = useTranslations('payment');
-  const [provider, setProvider] = useState<'BOG' | 'TBC' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
@@ -66,7 +65,6 @@ export default function PaymentModal({
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    // Focus first focusable element in modal
     const timer = setTimeout(() => {
       const firstFocusable = modalRef.current?.querySelector<HTMLElement>('button');
       firstFocusable?.focus();
@@ -80,8 +78,6 @@ export default function PaymentModal({
   }, [onClose]);
 
   const handlePay = useCallback(async () => {
-    if (!provider) return;
-
     setLoading(true);
     setError('');
 
@@ -96,7 +92,7 @@ export default function PaymentModal({
         body: JSON.stringify({
           bookId,
           type,
-          provider,
+          provider: 'FLITT',
           translationId,
         }),
       });
@@ -120,7 +116,7 @@ export default function PaymentModal({
     } finally {
       setLoading(false);
     }
-  }, [provider, bookId, type, translationId, onSuccess, t]);
+  }, [bookId, type, translationId, onSuccess, t]);
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
@@ -149,32 +145,14 @@ export default function PaymentModal({
           <div className={styles.description}>{bookTitle}</div>
         </div>
 
-        <div className={styles.providers} role="radiogroup" aria-label={t('choose_provider')}>
-          <div className={styles.providerLabel}>{t('choose_provider')}</div>
-          <button
-            className={`${styles.providerBtn} ${provider === 'BOG' ? styles.selected : ''}`}
-            onClick={() => setProvider('BOG')}
-            role="radio"
-            aria-checked={provider === 'BOG'}
-          >
-            {t('provider_bog')}
-          </button>
-          <button
-            className={`${styles.providerBtn} ${provider === 'TBC' ? styles.selected : ''}`}
-            onClick={() => setProvider('TBC')}
-            role="radio"
-            aria-checked={provider === 'TBC'}
-          >
-            {t('provider_tbc')}
-          </button>
-        </div>
+        <div className={styles.providerInfo}>{t('provider_flitt_note')}</div>
 
         {error && <div className={styles.error} role="alert">{error}</div>}
 
         <button
           className={styles.payBtn}
           onClick={handlePay}
-          disabled={!provider || loading}
+          disabled={loading}
           aria-busy={loading}
         >
           {loading ? t('processing') : t('pay_button', { amount, currency: currency === 'GEL' ? '₾' : '$' })}

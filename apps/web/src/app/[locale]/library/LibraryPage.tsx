@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -79,7 +80,14 @@ export default function LibraryPage() {
             {filtered.map((item) => (
               <Link key={item.id} href={`/books/${item.book.id}`} className={styles.bookCard}>
                 {item.book.coverUrl ? (
-                  <img src={item.book.coverUrl} alt={item.book.title} className={styles.bookCover} />
+                  <Image
+                    src={item.book.coverUrl}
+                    alt={item.book.title}
+                    width={140}
+                    height={210}
+                    className={styles.bookCover}
+                    sizes="(max-width: 640px) 30vw, 140px"
+                  />
                 ) : (
                   <div className={styles.bookCoverPlaceholder}>
                     {item.book.title?.[0] || '?'}

@@ -40,7 +40,12 @@ describe('TtsService — estimate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.TTS_PRIMARY_PROVIDER = 'google-cloud';
-    service = new (TtsService as any)(mockPrisma, mockS3, mockProviderManager);
+    service = new (TtsService as any)(
+      mockPrisma,
+      mockS3,
+      mockProviderManager,
+      { get: (k: string) => process.env[k] } as any,
+    );
 
     mockPrisma.book.findUnique.mockResolvedValue({
       id: bookId,

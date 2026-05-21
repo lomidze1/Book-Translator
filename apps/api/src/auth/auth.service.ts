@@ -1,5 +1,6 @@
 import { Injectable, ConflictException, UnauthorizedException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -46,15 +47,22 @@ const RESEND_VERIFICATION_MAX_REQUESTS = 3;
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private googleClient: OAuth2Client;
+  private readonly googleClient: OAuth2Client;
+  private readonly googleClientId: string | undefined;
+  private readonly accessSecret: string | undefined;
+  private readonly refreshSecret: string | undefined;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly redis: RedisService,
     private readonly emailService: EmailService,
+    private readonly config: ConfigService,
   ) {
-    this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    this.googleClientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    this.accessSecret = this.config.get<string>('JWT_ACCESS_SECRET');
+    this.refreshSecret = this.config.get<string>('JWT_REFRESH_SECRET');
+    this.googleClient = new OAuth2Client(this.googleClientId);
   }
 
   // ========================
@@ -155,13 +163,12 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
-    const refreshSecret = process.env.JWT_REFRESH_SECRET;
-    if (!refreshSecret) {
+    if (!this.refreshSecret) {
       throw new UnauthorizedException('Server configuration error');
     }
     try {
       const payload = this.jwtService.verify(refreshToken, {
-        secret: refreshSecret,
+        secret: this.refreshSecret,
       });
 
       const user = await this.prisma.user.findUnique({
@@ -564,9 +571,7 @@ export class AuthService {
   }
 
   private async generateTokens(userId: string, email: string | null, tokenVersion = 0): Promise<AuthTokens> {
-    const accessSecret = process.env.JWT_ACCESS_SECRET;
-    const refreshSecret = process.env.JWT_REFRESH_SECRET;
-    if (!accessSecret || !refreshSecret) {
+    if (!this.accessSecret || !this.refreshSecret) {
       throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET environment variables are required');
     }
 
@@ -574,11 +579,11 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: accessSecret,
+        secret: this.accessSecret,
         expiresIn: '15m',
       }),
       this.jwtService.signAsync(payload, {
-        secret: refreshSecret,
+        secret: this.refreshSecret,
         expiresIn: '7d',
       }),
     ]);
@@ -605,7 +610,7 @@ export class AuthService {
     try {
       const ticket = await this.googleClient.verifyIdToken({
         idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: this.googleClientId,
       });
 
       const payload = ticket.getPayload();

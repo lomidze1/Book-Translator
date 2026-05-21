@@ -57,7 +57,13 @@ describe('AuthService — Email Verification', () => {
     vi.clearAllMocks();
     mockRedis.get.mockResolvedValue(null);
     mockRedis.incr.mockResolvedValue(1);
-    authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedis, mockEmailService);
+    authService = new (AuthService as any)(
+      mockPrisma,
+      mockJwt,
+      mockRedis,
+      mockEmailService,
+      { get: (k: string) => process.env[k] } as any,
+    );
   });
 
   // ============================================================

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import Image from 'next/image';
@@ -40,7 +41,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function SearchPage() {
   const t = useTranslations('search');
-  const [query, setQuery] = useState('');
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get('q') ?? '';
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -61,6 +64,16 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Auto-execute when the URL carries a ?q= param. Powers Google's sitelinks
+  // searchbox (declared via the WebSite/SearchAction JSON-LD in the layout).
+  useEffect(() => {
+    if (initialQuery.trim()) {
+      search(initialQuery);
+    }
+    // Only on initial mount — subsequent searches are user-driven.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

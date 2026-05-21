@@ -3,6 +3,8 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ParsingService } from '../parsing/parsing.service';
+import { fetchWithTimeout } from '../common/fetch';
+import { clampPagination } from '../common/pagination';
 import { TRANSLATION_QUEUE, getRedisConnection } from './translation.constants';
 
 @Injectable()
@@ -70,8 +72,9 @@ export class TranslationService {
       await this.parseAndSaveChapters(book.id, book.originalFileUrl, book.originalFormat || 'PDF');
     }
 
-    // In development, skip payment — set status to PAID directly
-    const isDev = process.env.NODE_ENV !== 'production';
+    // In development, skip payment — set status to PAID directly.
+    // Fail-secure: must be explicitly 'development' (default: production payment flow).
+    const isDev = process.env.NODE_ENV === 'development';
     const initialStatus = isDev ? 'PAID' : 'PENDING';
 
     const translation = await this.prisma.translation.create({
@@ -165,7 +168,7 @@ export class TranslationService {
     return translation;
   }
 
-  async getTranslationsByBook(bookId: string, userId: string) {
+  async getTranslationsByBook(bookId: string, userId: string, page = 1, limit = 50) {
     // Verify book ownership first
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
@@ -180,13 +183,17 @@ export class TranslationService {
       throw new ForbiddenException('You do not have access to this book');
     }
 
+    const { skip, take } = clampPagination(page, limit);
     return this.prisma.translation.findMany({
       where: { bookId },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take,
     });
   }
 
-  async getMyTranslations(userId: string) {
+  async getMyTranslations(userId: string, page = 1, limit = 50) {
+    const { skip, take } = clampPagination(page, limit, { defaultLimit: 50, maxLimit: 100 });
     return this.prisma.translation.findMany({
       where: {
         book: {
@@ -197,6 +204,8 @@ export class TranslationService {
         book: { select: { id: true, title: true, author: true, coverUrl: true } },
       },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take,
     });
   }
 
@@ -227,9 +236,9 @@ export class TranslationService {
   }
 
   private async parseAndSaveChapters(bookId: string, s3Key: string, format: string) {
-    // Download from S3
+    // Download from S3 (large files — give a generous timeout).
     const url = await this.s3.getPresignedUrl(s3Key);
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url, {}, 60_000);
     const buffer = Buffer.from(await response.arrayBuffer());
 
     // Parse

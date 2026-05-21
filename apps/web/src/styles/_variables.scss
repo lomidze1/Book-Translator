@@ -9,8 +9,12 @@ $color-foreground-dark: #ededed;
 $color-border: #e2e8f0;
 
 // Typography
-$font-family-sans: 'Geist', Arial, Helvetica, sans-serif;
-$font-family-mono: 'Geist Mono', monospace;
+// Fonts are loaded by next/font in [locale]/layout.tsx and exposed via
+// CSS variables on <html>. Falls back to system Georgian-aware sans for
+// pages outside the [locale] tree.
+$font-family-sans: var(--font-sans), 'Noto Sans Georgian', system-ui, sans-serif;
+$font-family-serif: var(--font-serif), 'Noto Serif Georgian', Georgia, serif;
+$font-family-mono: ui-monospace, 'SF Mono', Consolas, monospace;
 
 // Breakpoints
 $breakpoint-sm: 640px;

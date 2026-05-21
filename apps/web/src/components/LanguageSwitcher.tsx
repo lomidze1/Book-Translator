@@ -1,38 +1,42 @@
 'use client';
 
 import { useLocale } from 'next-intl';
-import { usePathname } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 import styles from './LanguageSwitcher.module.scss';
 
+/**
+ * Locale switcher rendered as real `<a>` links so search engines (and Google's
+ * hreflang discovery in particular) can follow each language version. The
+ * previous implementation used `window.location.href` from a button click,
+ * which is invisible to crawlers.
+ */
 export default function LanguageSwitcher() {
   const locale = useLocale();
   const pathname = usePathname();
 
-  const switchLocale = (newLocale: 'ka' | 'en') => {
-    const search = window.location.search;
-    const hash = window.location.hash;
-    window.location.href = `/${newLocale}${pathname}${search}${hash}`;
-  };
-
   return (
     <div className={styles.switcher}>
-      <button
+      <Link
+        href={pathname}
+        locale="ka"
         className={`${styles.btn} ${locale === 'ka' ? styles.active : ''}`}
-        onClick={() => switchLocale('ka')}
         aria-label="ქართული ენა"
         aria-current={locale === 'ka' ? 'true' : undefined}
+        hrefLang="ka"
       >
         ქარ
-      </button>
+      </Link>
       <span className={styles.divider}>|</span>
-      <button
+      <Link
+        href={pathname}
+        locale="en"
         className={`${styles.btn} ${locale === 'en' ? styles.active : ''}`}
-        onClick={() => switchLocale('en')}
         aria-label="English language"
         aria-current={locale === 'en' ? 'true' : undefined}
+        hrefLang="en"
       >
         Eng
-      </button>
+      </Link>
     </div>
   );
 }

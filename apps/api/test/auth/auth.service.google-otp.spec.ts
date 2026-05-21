@@ -56,7 +56,13 @@ describe('AuthService — Google Auth & OTP (coverage)', () => {
     mockRedisService.incr.mockResolvedValue(1);
     mockRedisService.secureGet.mockResolvedValue(null);
     mockRedisService.secureIncr.mockResolvedValue(1);
-    authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedisService);
+    authService = new (AuthService as any)(
+      mockPrisma,
+      mockJwt,
+      mockRedisService,
+      {} as any,
+      { get: (k: string) => process.env[k] } as any,
+    );
   });
 
   // ============================================================

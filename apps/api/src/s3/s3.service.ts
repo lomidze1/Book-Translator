@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
   PutObjectCommand,
@@ -13,14 +14,16 @@ export class S3Service implements OnModuleInit {
   private client!: S3Client;
   private bucket!: string;
 
+  constructor(private readonly config: ConfigService) {}
+
   async onModuleInit() {
-    this.bucket = process.env.AWS_S3_BUCKET || '';
-    const region = process.env.AWS_REGION;
-    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    this.bucket = this.config.get<string>('AWS_S3_BUCKET') || '';
+    const region = this.config.get<string>('AWS_REGION');
+    const accessKeyId = this.config.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.config.get<string>('AWS_SECRET_ACCESS_KEY');
 
     if (!this.bucket || !accessKeyId || !secretAccessKey) {
-      if (process.env.NODE_ENV === 'test') {
+      if (this.config.get<string>('NODE_ENV') === 'test') {
         // Allow tests to run without real AWS credentials
         this.bucket = 'test-bucket';
         this.client = new S3Client({ region: 'eu-central-1' });

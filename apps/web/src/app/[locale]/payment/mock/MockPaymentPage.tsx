@@ -20,17 +20,17 @@ export default function MockPaymentPage() {
   const simulatePayment = async (status: 'success' | 'failed') => {
     setProcessing(true);
 
-    const provider = orderId.startsWith('tbc_') ? 'tbc' : 'bog';
-
     try {
-      await fetch(`${API_URL}/api/payments/${provider}/callback`, {
+      // Mock mode: server accepts any payload and skips signature verification.
+      await fetch(`${API_URL}/api/payments/flitt/callback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_id: orderId,
-          orderId,
-          status: status === 'success' ? 'success' : 'FAILED',
-          amount: parseFloat(amount),
+          order_status: status === 'success' ? 'approved' : 'declined',
+          amount: Math.round(parseFloat(amount) * 100),
+          currency,
+          signature: 'mock',
         }),
       });
 

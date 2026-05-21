@@ -168,11 +168,7 @@ export default function PaymentsPage() {
                 <div key={item.id} className={styles.paymentItem}>
                   <div className={styles.paymentMain}>
                     <div className={styles.paymentIcon}>
-                      {item.provider === 'BOG' ? (
-                        <span className={styles.providerBog}>BOG</span>
-                      ) : (
-                        <span className={styles.providerTbc}>TBC</span>
-                      )}
+                      <span className={styles.providerFlitt}>Flitt</span>
                     </div>
                     <div className={styles.paymentInfo}>
                       <p className={styles.paymentDesc}>{item.description}</p>

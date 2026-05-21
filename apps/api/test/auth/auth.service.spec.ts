@@ -56,7 +56,13 @@ describe('AuthService', () => {
     mockRedisService.get.mockResolvedValue(null);
     mockRedisService.incr.mockResolvedValue(1);
     // Directly instantiate with mocks (bypass NestJS DI)
-    authService = new (AuthService as any)(mockPrismaService, mockJwtService, mockRedisService);
+    authService = new (AuthService as any)(
+      mockPrismaService,
+      mockJwtService,
+      mockRedisService,
+      {} as any,
+      { get: (k: string) => process.env[k] } as any,
+    );
   });
 
   // ============================================================

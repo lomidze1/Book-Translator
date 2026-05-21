@@ -28,7 +28,7 @@
 - API: GOOGLE_CLIENT_ID (OAuth)
 - API: GOOGLE_CLOUD_TTS_KEY (TTS)
 - API: RESEND_API_KEY (Email)
-- API: BOG_CLIENT_ID, BOG_SECRET, TBC_CLIENT_ID, TBC_SECRET (Payments)
+- API: FLITT_MERCHANT_ID, FLITT_SECRET_KEY (Payments)
 - API: SENTRY_DSN
 - API: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (Web Push)
 - Web: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_GOOGLE_CLIENT_ID
@@ -49,10 +49,11 @@
 - CORS policy კონფიგურაცია
 - IAM user/policy production-ისთვის
 
-## 8. Payment Providers — Production Credentials
-- BOG Pay (iPay) — production API credentials
-- TBC Pay — production API credentials
-- Webhook URLs-ის დარეგისტრირება
+## 8. Payment Provider — Flitt Production Credentials
+- Flitt (TBC Bank subsidiary) production merchant_id + secret_key
+- Webhook URL-ის დარეგისტრირება Flitt-ის dashboard-ში: `https://<api-domain>/api/payments/flitt/callback`
+- Server IP allowlist (Flitt callback servers): `54.154.216.60`, `3.75.125.89`
+- Docs: https://docs.flitt.com/getting-started/redirect
 
 ## 9. Sentry — Production
 - Production project-ის შექმნა (API + Web)

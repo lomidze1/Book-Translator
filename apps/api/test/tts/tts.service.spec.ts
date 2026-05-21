@@ -41,7 +41,12 @@ describe('TtsService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new (TtsService as any)(mockPrisma, mockS3, mockProviderManager);
+    service = new (TtsService as any)(
+      mockPrisma,
+      mockS3,
+      mockProviderManager,
+      { get: (k: string) => process.env[k] } as any,
+    );
 
     // Default: book exists and user owns it
     mockPrisma.book.findUnique.mockResolvedValue({

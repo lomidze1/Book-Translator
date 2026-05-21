@@ -16,34 +16,14 @@ export class ClaudeService implements OnModuleInit {
   constructor(private readonly config: ConfigService) {}
 
   onModuleInit() {
-    // Try ConfigService first, then process.env, then manually parse .env
-    let apiKey = this.config?.get<string>('ANTHROPIC_API_KEY') || process.env.ANTHROPIC_API_KEY;
-
-    if (!apiKey) {
-      // Fallback: manually parse .env file
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const envPath = path.resolve(__dirname, '../../.env');
-        const envContent = fs.readFileSync(envPath, 'utf-8');
-        const match = envContent.match(/^ANTHROPIC_API_KEY=(.+)$/m);
-        if (match) {
-          apiKey = match[1].trim();
-          process.env.ANTHROPIC_API_KEY = apiKey; // Set for other services
-          this.logger.log('Loaded ANTHROPIC_API_KEY from .env file directly');
-        }
-      } catch (err) {
-        this.logger.warn(`Could not read .env: ${err}`);
-      }
-    }
-
-    this._model = this.config.get<string>('CLAUDE_MODEL') || process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
+    const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
+    this._model = this.config.get<string>('CLAUDE_MODEL') || 'claude-sonnet-4-20250514';
 
     if (apiKey) {
       this.client = new Anthropic({ apiKey });
-      this.logger.log(`✅ Claude API initialized (model: ${this._model}, key: ${apiKey.slice(0, 12)}...)`);
+      this.logger.log(`Claude API initialized (model: ${this._model})`);
     } else {
-      this.logger.error('❌ ANTHROPIC_API_KEY not set — translation DISABLED');
+      this.logger.error('ANTHROPIC_API_KEY not set — translation DISABLED');
     }
   }
 

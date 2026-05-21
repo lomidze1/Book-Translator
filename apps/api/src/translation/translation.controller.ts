@@ -1,4 +1,15 @@
-import { Controller, Post, Get, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  ForbiddenException,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { TranslationService } from './translation.service';
 import { CreateTranslationDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -15,8 +26,12 @@ export class TranslationController {
   }
 
   @Get('my')
-  async getMyTranslations(@CurrentUser('id') userId: string) {
-    return this.translationService.getMyTranslations(userId);
+  async getMyTranslations(
+    @CurrentUser('id') userId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.translationService.getMyTranslations(userId, page, limit);
   }
 
   @Get(':id')
@@ -25,8 +40,13 @@ export class TranslationController {
   }
 
   @Get('book/:bookId')
-  async getByBook(@Param('bookId') bookId: string, @CurrentUser('id') userId: string) {
-    return this.translationService.getTranslationsByBook(bookId, userId);
+  async getByBook(
+    @Param('bookId') bookId: string,
+    @CurrentUser('id') userId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.translationService.getTranslationsByBook(bookId, userId, page, limit);
   }
 
   @Post(':id/retry')

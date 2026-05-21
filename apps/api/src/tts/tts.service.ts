@@ -6,6 +6,7 @@ import {
   Logger,
   OnModuleDestroy,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
@@ -15,21 +16,34 @@ import { ProviderManager } from './providers/provider-manager';
 import { Voice } from './providers/tts-provider.interface';
 import type { TtsJobData } from './tts.processor';
 
+const PRESIGNED_URL_MAX_EXPIRY = 14400; // 4 hours
+
 @Injectable()
 export class TtsService implements OnModuleDestroy {
   private readonly logger = new Logger(TtsService.name);
   private queue: Queue | null = null;
+  private readonly presignedExpiry: number;
+  private readonly defaultVoiceId: string;
+  private readonly defaultProvider: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
     private readonly providerManager: ProviderManager,
+    private readonly config: ConfigService,
   ) {
+    this.presignedExpiry = Math.min(
+      parseInt(this.config.get<string>('TTS_PRESIGNED_URL_EXPIRY') || String(PRESIGNED_URL_MAX_EXPIRY), 10),
+      PRESIGNED_URL_MAX_EXPIRY,
+    );
+    this.defaultVoiceId = this.config.get<string>('ELEVENLABS_DEFAULT_VOICE_ID') || 'default';
+    this.defaultProvider = this.config.get<string>('TTS_PRIMARY_PROVIDER') || 'elevenlabs';
+
     try {
       this.queue = new Queue(TTS_QUEUE, { connection: getRedisConnection() });
-      this.logger.log('✅ TTS Queue initialized');
+      this.logger.log('TTS Queue initialized');
     } catch (err) {
-      this.logger.error(`❌ TTS queue init failed: ${err instanceof Error ? err.message : err}`);
+      this.logger.error(`TTS queue init failed: ${err instanceof Error ? err.message : err}`);
     }
   }
 
@@ -58,7 +72,7 @@ export class TtsService implements OnModuleDestroy {
 
     return this.s3.getPresignedUrl(
       audioChapter.audioUrl,
-      Math.min(Math.min(parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'), 14400), 14400),
+      this.presignedExpiry,
     );
   }
 
@@ -95,9 +109,9 @@ export class TtsService implements OnModuleDestroy {
   async synthesize(userId: string, dto: SynthesizeDto) {
     const { translation, book } = await this.validateAndGetTranslation(dto.bookId, userId);
 
-    const voiceId = dto.voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'default';
+    const voiceId = dto.voiceId || this.defaultVoiceId;
     const speed = dto.speed || 1.0;
-    const providerName = dto.provider || process.env.TTS_PRIMARY_PROVIDER || 'elevenlabs';
+    const providerName = dto.provider || this.defaultProvider;
 
     // Get or create AudioBook
     let audioBook = await this.prisma.audioBook.findFirst({
@@ -128,7 +142,7 @@ export class TtsService implements OnModuleDestroy {
         status: 'ready',
         audioUrl: await this.s3.getPresignedUrl(
           existingChapter.audioUrl,
-          Math.min(parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'), 14400),
+          this.presignedExpiry,
         ),
       };
     }
@@ -196,9 +210,9 @@ export class TtsService implements OnModuleDestroy {
   async synthesizeBook(userId: string, dto: SynthesizeBookDto) {
     const { translation } = await this.validateAndGetTranslation(dto.bookId, userId);
 
-    const voiceId = dto.voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'default';
+    const voiceId = dto.voiceId || this.defaultVoiceId;
     const speed = dto.speed || 1.0;
-    const providerName = dto.provider || process.env.TTS_PRIMARY_PROVIDER || 'elevenlabs';
+    const providerName = dto.provider || this.defaultProvider;
 
     // Get all translated chapters
     const translatedChapters = await this.prisma.translatedChapter.findMany({
@@ -368,7 +382,7 @@ export class TtsService implements OnModuleDestroy {
 
     return this.s3.getPresignedUrl(
       audioChapter.audioUrl,
-      Math.min(parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'), 14400),
+      this.presignedExpiry,
     );
   }
 
@@ -424,7 +438,7 @@ export class TtsService implements OnModuleDestroy {
       (sum, tc) => sum + (tc.translatedContent?.length || 0), 0,
     );
 
-    const provider = providerName || process.env.TTS_PRIMARY_PROVIDER || 'google-cloud';
+    const provider = providerName || this.config.get<string>('TTS_PRIMARY_PROVIDER') || 'google-cloud';
     const costEstimate = this.providerManager.estimateCost(totalCharacters, provider);
     const costUsd = costEstimate.costUsd;
     const estimatedAudioMinutes = costEstimate.estimatedAudioMinutes;
@@ -504,7 +518,7 @@ export class TtsService implements OnModuleDestroy {
           translatedText: translatedChapter.translatedContent,
           voiceId: audioBook.voiceId,
           speed: 1.0,
-          provider: (process.env.TTS_PRIMARY_PROVIDER || 'google-cloud') as 'google-cloud' | 'elevenlabs' | 'azure',
+          provider: (this.config.get<string>('TTS_PRIMARY_PROVIDER') || 'google-cloud') as 'google-cloud' | 'elevenlabs' | 'azure',
           totalChapters: audioBook.totalChapters,
           completedSoFar: audioBook.completedChapters,
         };

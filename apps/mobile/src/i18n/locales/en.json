@@ -227,9 +227,7 @@
   },
   "payment": {
     "title": "Payment",
-    "choose_provider": "Choose payment method",
-    "provider_bog": "BOG",
-    "provider_tbc": "TBC",
+    "provider_flitt_note": "Secure payment via Flitt (TBC Bank).",
     "amount_label": "Amount",
     "pay_button": "Pay",
     "processing": "Processing...",

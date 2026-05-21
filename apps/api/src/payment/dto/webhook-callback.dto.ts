@@ -1,33 +1,25 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 /**
- * BOG webhook callback payload.
- * Validates required fields from BOG payment gateway.
+ * Flitt webhook callback payload.
+ * Reference: https://docs.flitt.com/api/callbacks/
+ *
+ * Required fields are validated up-front; the full payload is preserved
+ * (no whitelist stripping) so the HMAC signature can be verified by the
+ * provider. See PaymentController for the per-route ValidationPipe config.
  */
-export class BogCallbackDto {
+export class FlittCallbackDto {
   @IsString()
   @IsNotEmpty()
   order_id: string;
 
   @IsString()
   @IsNotEmpty()
-  status: string;
-
-  [key: string]: unknown;
-}
-
-/**
- * TBC webhook callback payload.
- * Validates required fields from TBC payment gateway.
- */
-export class TbcCallbackDto {
-  @IsString()
-  @IsNotEmpty()
-  PaymentId: string;
+  order_status: string;
 
   @IsString()
   @IsNotEmpty()
-  Status: string;
+  signature: string;
 
   [key: string]: unknown;
 }

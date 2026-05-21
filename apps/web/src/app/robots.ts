@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/api/', '/*/verify-email', '/*/reset-password', '/*/payment/', '/*/books/*/read', '/*/dashboard', '/*/library', '/*/settings', '/*/profile'],
+      disallow: ['/api/', '/*/login', '/*/register', '/*/forgot-password', '/*/verify-email', '/*/reset-password', '/*/confirm-password-change', '/*/payment/', '/*/books/*/read', '/*/dashboard', '/*/library', '/*/settings', '/*/profile'],
     },
     sitemap: `${baseUrl}/sitemap.xml`,
   };

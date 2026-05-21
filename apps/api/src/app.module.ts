@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { S3Module } from './s3/s3.module';
@@ -14,12 +15,15 @@ import { ReaderModule } from './reader/reader.module';
 import { TtsModule } from './tts/tts.module';
 import { NotificationModule } from './notification/notification.module';
 import { HealthController } from './health.controller';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      // Resolve .env relative to the module file so it loads regardless of CWD
+      // (handles Turbo, integration tests, and other non-apps/api invocations).
+      envFilePath: [join(__dirname, '..', '.env'), '.env'],
     }),
     ThrottlerModule.forRoot([
       {
@@ -50,6 +54,10 @@ import { HealthController } from './health.controller';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
     },
   ],
 })

@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Script from 'next/script';
 import { getTranslations } from 'next-intl/server';
 import BookDetailPage from './BookDetailPage';
 
@@ -34,6 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       languages: {
         ka: `${BASE_URL}/ka/books/${id}`,
         en: `${BASE_URL}/en/books/${id}`,
+        'x-default': `${BASE_URL}/ka/books/${id}`,
       },
     },
     openGraph: {
@@ -55,28 +55,48 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function Page({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = await params;
   const book = await fetchBook(id);
+  const t = await getTranslations({ locale, namespace: 'navbar' });
 
-  const jsonLd = book ? Object.fromEntries(
-    Object.entries({
-      '@context': 'https://schema.org',
-      '@type': 'Book',
-      name: book.title,
-      author: book.author ? { '@type': 'Person', name: book.author } : null,
-      isbn: book.isbn || null,
-      description: book.description || null,
-      image: book.coverUrl || null,
-      inLanguage: book.language || 'en',
-      numberOfPages: book.pageCount || null,
-      url: `${BASE_URL}/${locale}/books/${id}`,
-    }).filter(([, v]) => v != null)
-  ) : null;
+  const bookJsonLd = book
+    ? Object.fromEntries(
+        Object.entries({
+          '@context': 'https://schema.org',
+          '@type': 'Book',
+          name: book.title,
+          author: book.author ? { '@type': 'Person', name: book.author } : null,
+          isbn: book.isbn || null,
+          description: book.description || null,
+          image: book.coverUrl || null,
+          inLanguage: book.language || 'en',
+          numberOfPages: book.pageCount || null,
+          url: `${BASE_URL}/${locale}/books/${id}`,
+        }).filter(([, v]) => v != null),
+      )
+    : null;
+
+  const breadcrumbJsonLd = book
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: t('search'), item: `${BASE_URL}/${locale}/search` },
+          { '@type': 'ListItem', position: 2, name: book.title, item: `${BASE_URL}/${locale}/books/${id}` },
+        ],
+      }
+    : null;
 
   return (
     <>
-      {jsonLd && (
+      {bookJsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(bookJsonLd).replace(/</g, '\\u003c') }}
+        />
+      )}
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, '\\u003c') }}
         />
       )}
       <BookDetailPage />

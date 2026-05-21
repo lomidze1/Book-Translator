@@ -28,7 +28,7 @@ export class TtsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly prisma: PrismaService,
   ) {}
 
-  handleConnection(client: Socket): void {
+  async handleConnection(client: Socket): Promise<void> {
     try {
       const token =
         (client.handshake.auth as any)?.token ||
@@ -41,6 +41,24 @@ export class TtsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       const payload = this.jwtService.verify(token);
+
+      // Match JwtStrategy: verify the token wasn't revoked by a password change
+      // or logout-all (tokenVersion bump).
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { tokenVersion: true },
+      });
+      if (!user) {
+        this.logger.warn(`TTS client rejected (user not found): ${client.id}`);
+        client.disconnect();
+        return;
+      }
+      if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+        this.logger.warn(`TTS client rejected (token revoked): ${client.id}`);
+        client.disconnect();
+        return;
+      }
+
       (client as any).userId = payload.sub;
       this.logger.log(`TTS client connected: ${client.id} (user: ${payload.sub})`);
     } catch {

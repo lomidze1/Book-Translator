@@ -6,7 +6,10 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { ReaderService } from './reader.service';
 import {
@@ -61,8 +64,10 @@ export class ReaderController {
   getBookmarks(
     @CurrentUser() user: { id: string },
     @Param('bookId') bookId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
   ) {
-    return this.readerService.getBookmarks(user.id, bookId);
+    return this.readerService.getBookmarks(user.id, bookId, page, limit);
   }
 
   @Delete('bookmarks/:id')
@@ -89,8 +94,10 @@ export class ReaderController {
   getHighlights(
     @CurrentUser() user: { id: string },
     @Param('bookId') bookId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
   ) {
-    return this.readerService.getHighlights(user.id, bookId);
+    return this.readerService.getHighlights(user.id, bookId, page, limit);
   }
 
   @Patch('highlights/:id')
@@ -126,8 +133,10 @@ export class ReaderController {
   getNotes(
     @CurrentUser() user: { id: string },
     @Param('bookId') bookId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
   ) {
-    return this.readerService.getNotes(user.id, bookId);
+    return this.readerService.getNotes(user.id, bookId, page, limit);
   }
 
   @Patch('notes/:id')

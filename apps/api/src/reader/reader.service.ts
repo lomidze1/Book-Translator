@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { clampPagination } from '../common/pagination';
 import {
   SaveProgressDto,
   CreateBookmarkDto,
@@ -82,10 +83,13 @@ export class ReaderService {
     }
   }
 
-  async getBookmarks(userId: string, bookId: string) {
+  async getBookmarks(userId: string, bookId: string, page = 1, limit = 100) {
+    const { skip, take } = clampPagination(page, limit);
     return this.prisma.bookmark.findMany({
       where: { userId, bookId },
       orderBy: { createdAt: 'asc' },
+      skip,
+      take,
     });
   }
 
@@ -129,11 +133,14 @@ export class ReaderService {
     });
   }
 
-  async getHighlights(userId: string, bookId: string) {
+  async getHighlights(userId: string, bookId: string, page = 1, limit = 100) {
+    const { skip, take } = clampPagination(page, limit);
     return this.prisma.highlight.findMany({
       where: { userId, bookId },
       include: { notes: true },
       orderBy: { createdAt: 'asc' },
+      skip,
+      take,
     });
   }
 
@@ -204,11 +211,14 @@ export class ReaderService {
     });
   }
 
-  async getNotes(userId: string, bookId: string) {
+  async getNotes(userId: string, bookId: string, page = 1, limit = 100) {
+    const { skip, take } = clampPagination(page, limit);
     return this.prisma.note.findMany({
       where: { userId, bookId },
       include: { highlight: true },
       orderBy: { createdAt: 'asc' },
+      skip,
+      take,
     });
   }
 

@@ -6,8 +6,7 @@ describe('PaymentService', () => {
   let service: PaymentService;
   let prisma: any;
   let config: any;
-  let bogProvider: any;
-  let tbcProvider: any;
+  let flittProvider: any;
   let translationService: any;
   let notificationService: any;
 
@@ -30,29 +29,16 @@ describe('PaymentService', () => {
       userBook: { upsert: vi.fn() },
     };
 
-    bogProvider = {
+    flittProvider = {
       createOrder: vi.fn().mockResolvedValue({
-        orderId: 'bog_order_123',
-        paymentUrl: 'https://ipay.ge/checkout/test',
+        orderId: 'bt_order_123',
+        paymentUrl: 'https://pay.flitt.com/merchants/1/default/index.html?token=xyz',
       }),
       validateCallback: vi.fn().mockReturnValue({
-        orderId: 'bog_order_123',
+        orderId: 'bt_order_123',
         transactionId: 'tx_123',
         status: 'COMPLETED',
         amount: 10,
-      }),
-    };
-
-    tbcProvider = {
-      createOrder: vi.fn().mockResolvedValue({
-        orderId: 'tbc_order_123',
-        paymentUrl: 'https://tbc.ge/pay/test',
-      }),
-      validateCallback: vi.fn().mockReturnValue({
-        orderId: 'tbc_order_123',
-        transactionId: 'tx_tbc_456',
-        status: 'COMPLETED',
-        amount: 5,
       }),
     };
 
@@ -69,7 +55,8 @@ describe('PaymentService', () => {
           PRICE_EXISTING: '5',
           PRICE_CURRENCY: 'GEL',
         };
-        return map[key] || undefined;
+        // Fall through to process.env for env-driven values like NODE_ENV.
+        return map[key] ?? process.env[key];
       }),
     };
 
@@ -77,7 +64,7 @@ describe('PaymentService', () => {
       notify: vi.fn().mockResolvedValue(undefined),
     };
 
-    service = new PaymentService(prisma, config, bogProvider, tbcProvider, translationService, notificationService);
+    service = new PaymentService(prisma, config, flittProvider, translationService, notificationService);
   });
 
   describe('createPayment', () => {
@@ -98,33 +85,26 @@ describe('PaymentService', () => {
         currency: 'GEL',
         status: 'PENDING',
         type: 'TRANSLATION',
-        provider: 'BOG',
+        provider: 'FLITT',
       });
       prisma.payment.update.mockResolvedValue({ id: 'pay-1', status: 'PROCESSING' });
     });
 
-    it('should create a payment with BOG provider', async () => {
-      const result = await service.createPayment(userId, bookId, 'TRANSLATION', 'BOG', 'trans-1');
+    it('should create a payment with Flitt provider', async () => {
+      const result = await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', 'trans-1');
 
       expect(result.paymentId).toBe('pay-1');
-      expect(result.paymentUrl).toBe('https://ipay.ge/checkout/test');
-      expect(result.orderId).toBe('bog_order_123');
+      expect(result.paymentUrl).toBe('https://pay.flitt.com/merchants/1/default/index.html?token=xyz');
+      expect(result.orderId).toBe('bt_order_123');
       expect(result.amount).toBe(10);
       expect(result.currency).toBe('GEL');
-    });
-
-    it('should create a payment with TBC provider', async () => {
-      const result = await service.createPayment(userId, bookId, 'TRANSLATION', 'TBC', 'trans-1');
-
-      expect(result.paymentUrl).toBe('https://tbc.ge/pay/test');
-      expect(tbcProvider.createOrder).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if book not found', async () => {
       prisma.book.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.createPayment(userId, bookId, 'TRANSLATION', 'BOG'),
+        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT'),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -136,7 +116,7 @@ describe('PaymentService', () => {
       });
 
       await expect(
-        service.createPayment(userId, bookId, 'TRANSLATION', 'BOG'),
+        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT'),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -147,7 +127,7 @@ describe('PaymentService', () => {
         userBooks: [],
       });
 
-      const result = await service.createPayment(userId, bookId, 'PURCHASE_ORIGINAL', 'BOG');
+      const result = await service.createPayment(userId, bookId, 'PURCHASE_ORIGINAL', 'FLITT');
       expect(result.paymentId).toBe('pay-1');
     });
 
@@ -155,12 +135,12 @@ describe('PaymentService', () => {
       prisma.payment.findFirst.mockResolvedValue({ id: 'existing' });
 
       await expect(
-        service.createPayment(userId, bookId, 'TRANSLATION', 'BOG'),
+        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT'),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should set correct price for TRANSLATION type (10 GEL)', async () => {
-      await service.createPayment(userId, bookId, 'TRANSLATION', 'BOG');
+      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT');
 
       expect(prisma.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -170,7 +150,7 @@ describe('PaymentService', () => {
     });
 
     it('should set correct price for PURCHASE_TRANSLATION type (5 GEL)', async () => {
-      await service.createPayment(userId, bookId, 'PURCHASE_TRANSLATION', 'BOG');
+      await service.createPayment(userId, bookId, 'PURCHASE_TRANSLATION', 'FLITT');
 
       expect(prisma.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -185,7 +165,7 @@ describe('PaymentService', () => {
         title: 'Test Book',
         userBooks: [],
       });
-      await service.createPayment(userId, bookId, 'PURCHASE_ORIGINAL', 'BOG');
+      await service.createPayment(userId, bookId, 'PURCHASE_ORIGINAL', 'FLITT');
 
       expect(prisma.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -195,10 +175,10 @@ describe('PaymentService', () => {
     });
 
     it('should mark payment as FAILED if provider throws', async () => {
-      bogProvider.createOrder.mockRejectedValue(new Error('Provider error'));
+      flittProvider.createOrder.mockRejectedValue(new Error('Provider error'));
 
       await expect(
-        service.createPayment(userId, bookId, 'TRANSLATION', 'BOG'),
+        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT'),
       ).rejects.toThrow(BadRequestException);
 
       expect(prisma.payment.update).toHaveBeenCalledWith(
@@ -215,16 +195,28 @@ describe('PaymentService', () => {
         userBooks: [{ userId }],
       });
 
-      await service.createPayment(userId, bookId, 'TRANSLATION', 'BOG');
+      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT');
 
       const callArgs = prisma.payment.create.mock.calls[0][0];
       expect(callArgs.data.description).not.toContain('\n');
-      expect(callArgs.data.description.length).toBeLessThanOrEqual(220); // type + ": " + 200 chars
+      expect(callArgs.data.description.length).toBeLessThanOrEqual(220);
+    });
+
+    it('should build callback URL pointing at the Flitt route', async () => {
+      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT');
+
+      const callbackArg = flittProvider.createOrder.mock.calls[0][3];
+      expect(callbackArg).toContain('/api/payments/flitt/callback');
     });
   });
 
   describe('handleCallback', () => {
-    const payload = { order_id: 'bog_order_123', status: 'success', amount: 10 };
+    const payload = {
+      order_id: 'bt_order_123',
+      order_status: 'approved',
+      amount: 1000,
+      signature: 'deadbeef',
+    };
 
     beforeEach(() => {
       prisma.payment.findUnique.mockResolvedValue({
@@ -239,8 +231,8 @@ describe('PaymentService', () => {
       prisma.translation.update.mockResolvedValue({});
     });
 
-    it('should process BOG callback and complete payment', async () => {
-      const result = await service.handleCallback('BOG', payload);
+    it('should process Flitt callback and complete payment', async () => {
+      const result = await service.handleCallback('FLITT', payload);
 
       expect(result.status).toBe('COMPLETED');
       expect(prisma.payment.updateMany).toHaveBeenCalledWith(
@@ -253,24 +245,8 @@ describe('PaymentService', () => {
       );
     });
 
-    it('should process TBC callback', async () => {
-      const tbcPayload = { PaymentId: 'tbc_order_123', Status: 'Succeeded', Amount: 5 };
-      prisma.payment.findUnique.mockResolvedValue({
-        id: 'pay-2',
-        userId: 'user-1',
-        status: 'PROCESSING',
-        type: 'PURCHASE_TRANSLATION',
-        translationId: 'trans-2',
-        amount: 5,
-      });
-
-      const result = await service.handleCallback('TBC', tbcPayload);
-      expect(result.status).toBe('COMPLETED');
-      expect(tbcProvider.validateCallback).toHaveBeenCalledWith(tbcPayload, undefined);
-    });
-
     it('should update translation to PAID and start translation', async () => {
-      await service.handleCallback('BOG', payload);
+      await service.handleCallback('FLITT', payload);
 
       expect(prisma.translation.update).toHaveBeenCalledWith({
         where: { id: 'trans-1' },
@@ -283,7 +259,7 @@ describe('PaymentService', () => {
       prisma.payment.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.handleCallback('BOG', payload),
+        service.handleCallback('FLITT', payload),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -295,7 +271,7 @@ describe('PaymentService', () => {
         amount: 10,
       });
 
-      const result = await service.handleCallback('BOG', payload);
+      const result = await service.handleCallback('FLITT', payload);
       expect(result.status).toBe('COMPLETED');
       expect(prisma.payment.updateMany).not.toHaveBeenCalled();
     });
@@ -308,64 +284,65 @@ describe('PaymentService', () => {
         amount: 10,
       });
 
-      const result = await service.handleCallback('BOG', payload);
+      const result = await service.handleCallback('FLITT', payload);
       expect(result.status).toBe('FAILED');
       expect(prisma.payment.updateMany).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException on invalid signature', async () => {
-      bogProvider.validateCallback.mockImplementation(() => {
-        throw new Error('Invalid BOG callback signature');
+      flittProvider.validateCallback.mockImplementation(() => {
+        throw new Error('Invalid Flitt callback signature');
       });
 
       await expect(
-        service.handleCallback('BOG', payload, 'bad-sig'),
+        service.handleCallback('FLITT', payload),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('should handle FAILED callback status', async () => {
-      bogProvider.validateCallback.mockReturnValue({
-        orderId: 'bog_order_123',
+      flittProvider.validateCallback.mockReturnValue({
+        orderId: 'bt_order_123',
         transactionId: 'tx_123',
         status: 'FAILED',
         amount: 10,
       });
       prisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
-      const result = await service.handleCallback('BOG', payload);
+      const result = await service.handleCallback('FLITT', payload);
       expect(result.status).toBe('FAILED');
       expect(translationService.startTranslation).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException on amount mismatch', async () => {
-      bogProvider.validateCallback.mockReturnValue({
-        orderId: 'bog_order_123',
+      flittProvider.validateCallback.mockReturnValue({
+        orderId: 'bt_order_123',
         transactionId: 'tx_123',
         status: 'COMPLETED',
         amount: 5, // expected 10
       });
 
       await expect(
-        service.handleCallback('BOG', payload),
+        service.handleCallback('FLITT', payload),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should skip amount check when validation amount is 0', async () => {
-      bogProvider.validateCallback.mockReturnValue({
-        orderId: 'bog_order_123',
+    it('should reject zero-amount callback when expected amount is non-zero', async () => {
+      flittProvider.validateCallback.mockReturnValue({
+        orderId: 'bt_order_123',
         transactionId: 'tx_123',
         status: 'COMPLETED',
-        amount: 0, // no amount in callback
+        amount: 0,
       });
 
-      const result = await service.handleCallback('BOG', payload);
-      expect(result.status).toBe('COMPLETED');
+      await expect(
+        service.handleCallback('FLITT', payload),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should handle concurrent callback (updateMany returns 0)', async () => {
       prisma.payment.updateMany.mockResolvedValue({ count: 0 });
 
-      const result = await service.handleCallback('BOG', payload);
+      const result = await service.handleCallback('FLITT', payload);
       expect(result.status).toBe('PROCESSING');
       expect(translationService.startTranslation).not.toHaveBeenCalled();
     });
@@ -377,8 +354,8 @@ describe('PaymentService', () => {
     });
 
     it('should create userBook on PURCHASE_TRANSLATION completion', async () => {
-      bogProvider.validateCallback.mockReturnValue({
-        orderId: 'bog_order_123',
+      flittProvider.validateCallback.mockReturnValue({
+        orderId: 'bt_order_123',
         transactionId: 'tx_123',
         status: 'COMPLETED',
         amount: 5,
@@ -393,7 +370,7 @@ describe('PaymentService', () => {
       });
       prisma.translation.findUnique.mockResolvedValue({ bookId: 'book-1' });
 
-      await service.handleCallback('BOG', payload);
+      await service.handleCallback('FLITT', payload);
 
       expect(prisma.userBook.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -409,8 +386,8 @@ describe('PaymentService', () => {
     });
 
     it('should create userBook on PURCHASE_ORIGINAL completion', async () => {
-      bogProvider.validateCallback.mockReturnValue({
-        orderId: 'bog_order_123',
+      flittProvider.validateCallback.mockReturnValue({
+        orderId: 'bt_order_123',
         transactionId: 'tx_123',
         status: 'COMPLETED',
         amount: 1,
@@ -425,7 +402,7 @@ describe('PaymentService', () => {
       });
       prisma.translation.findUnique.mockResolvedValue({ bookId: 'book-1' });
 
-      await service.handleCallback('BOG', payload);
+      await service.handleCallback('FLITT', payload);
 
       expect(prisma.userBook.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -435,8 +412,8 @@ describe('PaymentService', () => {
     });
 
     it('should skip userBook creation when translationId is null for PURCHASE type', async () => {
-      bogProvider.validateCallback.mockReturnValue({
-        orderId: 'bog_order_123',
+      flittProvider.validateCallback.mockReturnValue({
+        orderId: 'bt_order_123',
         transactionId: 'tx_123',
         status: 'COMPLETED',
         amount: 5,
@@ -450,7 +427,7 @@ describe('PaymentService', () => {
         amount: 5,
       });
 
-      await service.handleCallback('BOG', payload);
+      await service.handleCallback('FLITT', payload);
 
       expect(prisma.userBook.upsert).not.toHaveBeenCalled();
     });

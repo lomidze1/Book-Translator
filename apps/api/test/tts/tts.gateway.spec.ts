@@ -12,6 +12,9 @@ describe('TtsGateway', () => {
     audioBook: {
       findUnique: vi.fn(),
     },
+    user: {
+      findUnique: vi.fn(),
+    },
   };
 
   const createMockClient = (token?: string) => ({
@@ -40,30 +43,52 @@ describe('TtsGateway', () => {
   });
 
   describe('handleConnection', () => {
-    it('should authenticate client with valid JWT', () => {
-      mockJwtService.verify.mockReturnValue({ sub: 'user-1' });
+    it('should authenticate client with valid JWT and matching tokenVersion', async () => {
+      mockJwtService.verify.mockReturnValue({ sub: 'user-1', tokenVersion: 0 });
+      mockPrisma.user.findUnique.mockResolvedValue({ tokenVersion: 0 });
       const client = createMockClient('valid-token');
 
-      gateway.handleConnection(client as any);
+      await gateway.handleConnection(client as any);
 
       expect(mockJwtService.verify).toHaveBeenCalledWith('valid-token');
       expect(client.disconnect).not.toHaveBeenCalled();
       expect((client as any).userId).toBe('user-1');
     });
 
-    it('should disconnect client with no token', () => {
+    it('should disconnect client with no token', async () => {
       const client = createMockClient(undefined);
 
-      gateway.handleConnection(client as any);
+      await gateway.handleConnection(client as any);
 
       expect(client.disconnect).toHaveBeenCalled();
     });
 
-    it('should disconnect client with invalid token', () => {
+    it('should disconnect client with invalid token', async () => {
       mockJwtService.verify.mockImplementation(() => { throw new Error('invalid'); });
       const client = createMockClient('bad-token');
 
-      gateway.handleConnection(client as any);
+      await gateway.handleConnection(client as any);
+
+      expect(client.disconnect).toHaveBeenCalled();
+    });
+
+    it('should disconnect client when tokenVersion does not match (revoked token)', async () => {
+      mockJwtService.verify.mockReturnValue({ sub: 'user-1', tokenVersion: 0 });
+      mockPrisma.user.findUnique.mockResolvedValue({ tokenVersion: 1 });
+      const client = createMockClient('stale-token');
+
+      await gateway.handleConnection(client as any);
+
+      expect(client.disconnect).toHaveBeenCalled();
+      expect((client as any).userId).toBeUndefined();
+    });
+
+    it('should disconnect client when user no longer exists', async () => {
+      mockJwtService.verify.mockReturnValue({ sub: 'user-1', tokenVersion: 0 });
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const client = createMockClient('valid-token');
+
+      await gateway.handleConnection(client as any);
 
       expect(client.disconnect).toHaveBeenCalled();
     });

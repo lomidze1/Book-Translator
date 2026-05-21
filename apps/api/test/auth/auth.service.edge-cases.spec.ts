@@ -56,7 +56,13 @@ describe('AuthService — Edge Cases & Security', () => {
     process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
     mockRedisService.get.mockResolvedValue(null);
     mockRedisService.incr.mockResolvedValue(1);
-    authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedisService);
+    authService = new (AuthService as any)(
+      mockPrisma,
+      mockJwt,
+      mockRedisService,
+      {} as any,
+      { get: (k: string) => process.env[k] } as any,
+    );
   });
 
   // ============================================================
@@ -351,11 +357,20 @@ describe('AuthService — Edge Cases & Security', () => {
       const originalSecret = process.env.JWT_REFRESH_SECRET;
       process.env.JWT_REFRESH_SECRET = 'my-refresh-secret';
 
+      // Re-instantiate so the service picks up the new env value through ConfigService.
+      const svc = new (AuthService as any)(
+        mockPrisma,
+        mockJwt,
+        mockRedisService,
+        {} as any,
+        { get: (k: string) => process.env[k] } as any,
+      );
+
       mockJwt.verify.mockReturnValue({ sub: 'user-1', tokenVersion: 0 });
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: null, tokenVersion: 0 });
       mockJwt.signAsync.mockResolvedValue('token');
 
-      await authService.refreshTokens('some-token');
+      await svc.refreshTokens('some-token');
 
       expect(mockJwt.verify).toHaveBeenCalledWith('some-token', {
         secret: 'my-refresh-secret',
@@ -465,6 +480,15 @@ describe('AuthService — Edge Cases & Security', () => {
       const originalSecret = process.env.JWT_ACCESS_SECRET;
       process.env.JWT_ACCESS_SECRET = 'my-access-secret';
 
+      // Re-instantiate so the service picks up the new env value through ConfigService.
+      const svc = new (AuthService as any)(
+        mockPrisma,
+        mockJwt,
+        mockRedisService,
+        {} as any,
+        { get: (k: string) => process.env[k] } as any,
+      );
+
       const user = {
         id: 'user-1',
         email: 'test@example.com',
@@ -477,7 +501,7 @@ describe('AuthService — Edge Cases & Security', () => {
       (bcrypt.compare as any).mockResolvedValue(true);
       mockJwt.signAsync.mockResolvedValue('token');
 
-      await authService.login({ email: 'test@example.com', password: 'password123' });
+      await svc.login({ email: 'test@example.com', password: 'password123' });
 
       expect(mockJwt.signAsync).toHaveBeenCalledWith(
         expect.any(Object),

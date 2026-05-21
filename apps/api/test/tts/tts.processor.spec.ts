@@ -68,6 +68,7 @@ describe('TtsProcessor', () => {
     processor = new (TtsProcessor as any)(
       mockPrisma, mockS3, mockGateway, mockProviderManager,
       { notify: vi.fn().mockResolvedValue(undefined) },
+      { get: (k: string) => process.env[k] } as any,
     );
 
     // Default: single chunk, successful synthesis

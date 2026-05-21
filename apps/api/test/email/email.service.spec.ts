@@ -17,7 +17,7 @@ describe('EmailService', () => {
     process.env.RESEND_API_KEY = 're_test_key';
     process.env.FRONTEND_URL = 'http://localhost:3000';
     process.env.EMAIL_FROM = 'noreply@book-translator.ge';
-    emailService = new EmailService();
+    emailService = new EmailService({ get: (key: string) => process.env[key] } as any);
   });
 
   it('should be defined', () => {
@@ -47,7 +47,7 @@ describe('EmailService', () => {
 
     it('should use FRONTEND_URL from env for reset link', async () => {
       process.env.FRONTEND_URL = 'https://book-translator.ge';
-      emailService = new EmailService();
+      emailService = new EmailService({ get: (key: string) => process.env[key] } as any);
 
       await emailService.sendPasswordResetEmail('user@example.com', 'token123');
 
