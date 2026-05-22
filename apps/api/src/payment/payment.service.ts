@@ -11,6 +11,7 @@ import { FlittProvider } from './providers/flitt.provider';
 import { PaymentProviderInterface, CallbackValidation } from './providers/payment-provider.interface';
 import { TranslationService } from '../translation/translation.service';
 import { NotificationService } from '../notification/notification.service';
+import { devShortcutsEnabled } from '../common/dev-shortcuts';
 
 export type PaymentProviderName = 'FLITT';
 
@@ -119,10 +120,22 @@ export class PaymentService {
     translationId?: string,
     translationType?: 'FAST' | 'STANDARD',
   ) {
-    // Verify book exists
+    // For TRANSLATION we need translationType up-front so we don't even fetch the book
+    // when the request is malformed.
+    if (type === 'TRANSLATION' && !translationType) {
+      throw new BadRequestException(
+        'translationType (FAST | STANDARD) is required for TRANSLATION payments',
+      );
+    }
+
+    // Verify book exists. Pull chapters so we can derive page count for books that
+    // were uploaded without a pageCount (same logic as getBookPricing).
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
-      include: { userBooks: true },
+      include: {
+        userBooks: true,
+        chapters: { select: { wordCount: true } },
+      },
     });
 
     if (!book) {
@@ -151,8 +164,15 @@ export class PaymentService {
       throw new BadRequestException('You already have a pending payment for this item');
     }
 
+    // Derive page count: prefer book.pageCount, else words / 250.
+    let effectivePageCount = book.pageCount || 0;
+    if (effectivePageCount === 0 && book.chapters.length > 0) {
+      const totalWords = book.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+      effectivePageCount = Math.ceil(totalWords / 250);
+    }
+
     // Determine amount and currency (dynamic based on page count)
-    const { amount, currency } = this.getPrice(type, book.pageCount || 0, translationType);
+    const { amount, currency } = this.getPrice(type, effectivePageCount, translationType);
 
     // Get provider
     const provider = this.providers[providerName];
@@ -336,10 +356,11 @@ export class PaymentService {
     return payment;
   }
 
-  // Mock: simulate successful payment (development only)
+  // Mock: simulate successful payment (development only).
+  // Fail-secure: requires both NODE_ENV=development AND ENABLE_DEV_SHORTCUTS=true.
   async simulatePayment(paymentId: string, userId: string) {
-    if (this.config.get<string>('NODE_ENV') === 'production') {
-      throw new ForbiddenException('Payment simulation is not available in production');
+    if (!devShortcutsEnabled()) {
+      throw new ForbiddenException('Payment simulation is not available in this environment');
     }
 
     const payment = await this.findPaymentForUser(paymentId, userId);
@@ -451,11 +472,19 @@ export class PaymentService {
   ) {
     switch (type) {
       case 'TRANSLATION':
-        if (pageCount && translationType) {
-          return this.calculatePrice(pageCount, translationType);
+        // translationType is required for TRANSLATION — refuse to fall back to minimum.
+        // Falling back silently caused every translation to bill PRICE_MIN regardless of size.
+        if (!translationType) {
+          throw new BadRequestException(
+            'translationType is required for TRANSLATION payments',
+          );
         }
-        // Fallback to minimum price
-        return { amount: parseFloat(this.config.get('PRICE_MIN') || '10'), currency: this.config.get('PRICE_CURRENCY') || 'GEL' };
+        if (!pageCount || pageCount <= 0) {
+          throw new BadRequestException(
+            'Cannot price a TRANSLATION for a book with unknown page count',
+          );
+        }
+        return this.calculatePrice(pageCount, translationType);
       case 'PURCHASE_TRANSLATION':
         return this.getExistingTranslationPrice();
       case 'PURCHASE_ORIGINAL':

@@ -84,12 +84,18 @@ export class FlittProvider implements PaymentProviderInterface {
       };
     }
 
+    // Defense in depth: strip control characters before shipping to Flitt.
+    // payment.service already strips \n\r from book titles, but a malicious
+    // upload could still slip in other ASCII control chars (\x00..\x1f, \x7f)
+    // that could confuse Flitt's request parser or downstream invoicing.
+    const sanitizedDesc = description.replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 1024);
+
     const requestParams: Record<string, unknown> = {
       merchant_id: this.merchantId!,
       order_id: orderId,
       amount: amountMinor,
       currency,
-      order_desc: description.slice(0, 1024),
+      order_desc: sanitizedDesc,
       server_callback_url: callbackUrl,
       response_url: `${this.frontendUrl}/payment/success?order=${orderId}`,
     };

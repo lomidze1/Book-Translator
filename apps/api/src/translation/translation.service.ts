@@ -5,7 +5,8 @@ import { S3Service } from '../s3/s3.service';
 import { ParsingService } from '../parsing/parsing.service';
 import { fetchWithTimeout } from '../common/fetch';
 import { clampPagination } from '../common/pagination';
-import { TRANSLATION_QUEUE, getRedisConnection } from './translation.constants';
+import { TRANSLATION_QUEUE, TRANSLATION_JOB_OPTIONS, getRedisConnection } from './translation.constants';
+import { devShortcutsEnabled } from '../common/dev-shortcuts';
 
 @Injectable()
 export class TranslationService {
@@ -73,8 +74,10 @@ export class TranslationService {
     }
 
     // In development, skip payment — set status to PAID directly.
-    // Fail-secure: must be explicitly 'development' (default: production payment flow).
-    const isDev = process.env.NODE_ENV === 'development';
+    // Fail-secure: requires NODE_ENV=development AND ENABLE_DEV_SHORTCUTS=true.
+    // Either alone is not enough — a misconfigured env (NODE_ENV empty,
+    // 'staging', 'test') used to unlock the payment-skip path.
+    const isDev = devShortcutsEnabled();
     const initialStatus = isDev ? 'PAID' : 'PENDING';
 
     const translation = await this.prisma.translation.create({
@@ -127,13 +130,11 @@ export class TranslationService {
     // Add to queue
     if (this.queue) {
       this.logger.log(`Adding translation ${translationId} to queue...`);
-      await this.queue.add('translate-book', {
-        translationId: translation.id,
-        bookId: translation.bookId,
-      }, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-      });
+      await this.queue.add(
+        'translate-book',
+        { translationId: translation.id, bookId: translation.bookId },
+        TRANSLATION_JOB_OPTIONS,
+      );
       this.logger.log(`Translation ${translationId} added to queue`);
     } else {
       this.logger.warn(`Queue unavailable — cannot process translation ${translationId}`);

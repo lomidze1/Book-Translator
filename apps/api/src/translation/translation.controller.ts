@@ -14,6 +14,7 @@ import { TranslationService } from './translation.service';
 import { CreateTranslationDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { devShortcutsEnabled } from '../common/dev-shortcuts';
 
 @Controller('translations')
 @UseGuards(JwtAuthGuard)
@@ -51,9 +52,9 @@ export class TranslationController {
 
   @Post(':id/retry')
   async retryTranslation(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    // Dev only — restart a stuck translation
-    if (process.env.NODE_ENV === 'production') {
-      throw new ForbiddenException('Not available in production');
+    // Dev only — restart a stuck translation. Fail-secure (see dev-shortcuts.ts).
+    if (!devShortcutsEnabled()) {
+      throw new ForbiddenException('Not available in this environment');
     }
 
     // Verify ownership

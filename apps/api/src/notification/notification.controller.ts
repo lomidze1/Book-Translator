@@ -16,6 +16,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { NotificationService } from './notification.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { SubscribePushDto } from './dto/subscribe-push.dto';
+import { UnsubscribePushDto } from './dto/unsubscribe-push.dto';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
@@ -73,9 +74,9 @@ export class NotificationController {
   @Delete('push/unsubscribe')
   async unsubscribePush(
     @CurrentUser('id') userId: string,
-    @Body('endpoint') endpoint: string,
+    @Body() dto: UnsubscribePushDto,
   ) {
-    await this.notificationService.unsubscribePush(userId, endpoint);
+    await this.notificationService.unsubscribePush(userId, dto.endpoint);
     return { success: true };
   }
 }

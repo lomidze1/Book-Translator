@@ -14,4 +14,9 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   translationId?: string;
+
+  // Required when type === 'TRANSLATION' (server enforces this). Determines price tier.
+  @IsOptional()
+  @IsIn(['FAST', 'STANDARD'])
+  translationType?: 'FAST' | 'STANDARD';
 }

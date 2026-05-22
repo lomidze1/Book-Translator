@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PaymentService } from '../../src/payment/payment.service';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -75,7 +75,11 @@ describe('PaymentService', () => {
       prisma.book.findUnique.mockResolvedValue({
         id: bookId,
         title: 'Test Book',
+        // 50 pages × 0.15 FAST = 7.5 → clamped up to PRICE_MIN (10) for the
+        // legacy "10 GEL" assertions.
+        pageCount: 50,
         userBooks: [{ userId }],
+        chapters: [],
       });
       prisma.payment.findFirst.mockResolvedValue(null);
       prisma.payment.create.mockResolvedValue({
@@ -91,7 +95,7 @@ describe('PaymentService', () => {
     });
 
     it('should create a payment with Flitt provider', async () => {
-      const result = await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', 'trans-1');
+      const result = await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', 'trans-1', 'FAST');
 
       expect(result.paymentId).toBe('pay-1');
       expect(result.paymentUrl).toBe('https://pay.flitt.com/merchants/1/default/index.html?token=xyz');
@@ -104,7 +108,7 @@ describe('PaymentService', () => {
       prisma.book.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT'),
+        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', undefined, 'FAST'),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -112,11 +116,13 @@ describe('PaymentService', () => {
       prisma.book.findUnique.mockResolvedValue({
         id: bookId,
         title: 'Test Book',
+        pageCount: 50,
         userBooks: [{ userId: 'other-user' }],
+        chapters: [],
       });
 
       await expect(
-        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT'),
+        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', undefined, 'FAST'),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -124,7 +130,9 @@ describe('PaymentService', () => {
       prisma.book.findUnique.mockResolvedValue({
         id: bookId,
         title: 'Test Book',
+        pageCount: 50,
         userBooks: [],
+        chapters: [],
       });
 
       const result = await service.createPayment(userId, bookId, 'PURCHASE_ORIGINAL', 'FLITT');
@@ -135,12 +143,20 @@ describe('PaymentService', () => {
       prisma.payment.findFirst.mockResolvedValue({ id: 'existing' });
 
       await expect(
+        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', undefined, 'FAST'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for TRANSLATION without translationType', async () => {
+      // Regression for the PRICE_MIN-fallback bug: server must reject the
+      // request rather than silently bill the minimum price.
+      await expect(
         service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT'),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should set correct price for TRANSLATION type (10 GEL)', async () => {
-      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT');
+    it('should set correct price for TRANSLATION type (10 GEL with 50 pages × FAST)', async () => {
+      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', undefined, 'FAST');
 
       expect(prisma.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -163,7 +179,9 @@ describe('PaymentService', () => {
       prisma.book.findUnique.mockResolvedValue({
         id: bookId,
         title: 'Test Book',
+        pageCount: 50,
         userBooks: [],
+        chapters: [],
       });
       await service.createPayment(userId, bookId, 'PURCHASE_ORIGINAL', 'FLITT');
 
@@ -178,7 +196,7 @@ describe('PaymentService', () => {
       flittProvider.createOrder.mockRejectedValue(new Error('Provider error'));
 
       await expect(
-        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT'),
+        service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', undefined, 'FAST'),
       ).rejects.toThrow(BadRequestException);
 
       expect(prisma.payment.update).toHaveBeenCalledWith(
@@ -192,10 +210,12 @@ describe('PaymentService', () => {
       prisma.book.findUnique.mockResolvedValue({
         id: bookId,
         title: 'Title\nWith\rNewlines' + 'x'.repeat(300),
+        pageCount: 50,
         userBooks: [{ userId }],
+        chapters: [],
       });
 
-      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT');
+      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', undefined, 'FAST');
 
       const callArgs = prisma.payment.create.mock.calls[0][0];
       expect(callArgs.data.description).not.toContain('\n');
@@ -203,7 +223,7 @@ describe('PaymentService', () => {
     });
 
     it('should build callback URL pointing at the Flitt route', async () => {
-      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT');
+      await service.createPayment(userId, bookId, 'TRANSLATION', 'FLITT', undefined, 'FAST');
 
       const callbackArg = flittProvider.createOrder.mock.calls[0][3];
       expect(callbackArg).toContain('/api/payments/flitt/callback');
@@ -500,15 +520,38 @@ describe('PaymentService', () => {
   });
 
   describe('simulatePayment', () => {
+    const origEnv = process.env.NODE_ENV;
+    const origShortcuts = process.env.ENABLE_DEV_SHORTCUTS;
+
+    beforeEach(() => {
+      // simulatePayment now requires both env vars (see common/dev-shortcuts.ts).
+      process.env.NODE_ENV = 'development';
+      process.env.ENABLE_DEV_SHORTCUTS = 'true';
+    });
+
+    afterEach(() => {
+      process.env.NODE_ENV = origEnv;
+      if (origShortcuts === undefined) {
+        delete process.env.ENABLE_DEV_SHORTCUTS;
+      } else {
+        process.env.ENABLE_DEV_SHORTCUTS = origShortcuts;
+      }
+    });
+
     it('should block in production', async () => {
-      const origEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
 
       await expect(
         service.simulatePayment('pay-1', 'user-1'),
       ).rejects.toThrow(ForbiddenException);
+    });
 
-      process.env.NODE_ENV = origEnv;
+    it('should block when ENABLE_DEV_SHORTCUTS is missing', async () => {
+      delete process.env.ENABLE_DEV_SHORTCUTS;
+
+      await expect(
+        service.simulatePayment('pay-1', 'user-1'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should simulate successful payment', async () => {

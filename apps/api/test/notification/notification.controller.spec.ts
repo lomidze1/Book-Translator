@@ -111,7 +111,9 @@ describe('NotificationController', () => {
 
   describe('unsubscribePush', () => {
     it('should unsubscribe push endpoint', async () => {
-      const result = await controller.unsubscribePush(userId, 'https://push.example.com');
+      const result = await controller.unsubscribePush(userId, {
+        endpoint: 'https://push.example.com',
+      });
 
       expect(mockService.unsubscribePush).toHaveBeenCalledWith(userId, 'https://push.example.com');
       expect(result).toEqual({ success: true });
