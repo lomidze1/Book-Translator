@@ -1,7 +1,12 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
 .toggle {
   display: flex;
   align-items: center;
   justify-content: center;
+  // 34px works on desktop where pointer precision is high. Mobile users need
+  // ≥44px per WCAG 2.5.5; we bump up at the tablet breakpoint.
   width: 34px;
   height: 34px;
   background: none;
@@ -11,14 +16,29 @@
   cursor: pointer;
   transition: color 0.2s, background 0.2s, border-color 0.2s;
 
+  @include tablet {
+    width: 44px;
+    height: 44px;
+  }
+
   &:hover {
     color: var(--foreground);
     background: var(--surface-hover);
     border-color: var(--text-muted);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
   }
 }
 
 .placeholder {
   width: 34px;
   height: 34px;
+
+  @include tablet {
+    width: 44px;
+    height: 44px;
+  }
 }

@@ -56,8 +56,20 @@ export default function ReaderView({ translation, token }: Props) {
   const { highlights, addHighlight, updateColor, removeHighlight } = useHighlights(bookId, token);
   const { notes, addNote, removeNote } = useNotes(bookId, token);
 
-  // Local UI state
+  // Local UI state.
+  // Sidebar defaults open on desktop, closed on mobile (≤768px) where it
+  // otherwise slides in over the content on first render. Reading the
+  // viewport width on the initial render is safe under React 19 — the
+  // `useState` initializer only runs once on the client; SSR sees true,
+  // which is the desktop default, and hydration matches once the client
+  // re-evaluates the layout effect below.
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) {
+      setSidebarOpen(false);
+    }
+  }, []);
   const [activeChapter, setActiveChapter] = useState(1);
   const [percentage, setPercentage] = useState(0);
   const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; text: string; chapterNumber: number; start: number; end: number } | null>(null);
@@ -436,6 +448,7 @@ export default function ReaderView({ translation, token }: Props) {
             className={styles.pageNavBtn}
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage <= 0}
+            aria-label={t('previous_page')}
           >
             &#8592;
           </button>
@@ -446,6 +459,7 @@ export default function ReaderView({ translation, token }: Props) {
             className={styles.pageNavBtn}
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage >= totalPages - 1}
+            aria-label={t('next_page')}
           >
             &#8594;
           </button>

@@ -159,6 +159,7 @@ export default function SettingsPage() {
               onClick={() => updateNotifPref({ emailEnabled: !notifPrefs.emailEnabled })}
               role="switch"
               aria-checked={notifPrefs.emailEnabled}
+              aria-label={t('email_notifications')}
             />
           </div>
 
@@ -180,6 +181,7 @@ export default function SettingsPage() {
                 onClick={handlePushToggle}
                 role="switch"
                 aria-checked={isSubscribed}
+                aria-label={t('push_notifications')}
               />
             )}
           </div>
@@ -195,6 +197,7 @@ export default function SettingsPage() {
               onClick={() => updateNotifPref({ inAppEnabled: !notifPrefs.inAppEnabled })}
               role="switch"
               aria-checked={notifPrefs.inAppEnabled}
+              aria-label={t('in_app_notifications')}
             />
           </div>
         </div>
@@ -212,6 +215,7 @@ export default function SettingsPage() {
               onClick={() => updateNotifPref({ translationCompleted: !notifPrefs.translationCompleted })}
               role="switch"
               aria-checked={notifPrefs.translationCompleted}
+              aria-label={t('event_translation')}
             />
           </div>
 
@@ -224,6 +228,7 @@ export default function SettingsPage() {
               onClick={() => updateNotifPref({ ttsCompleted: !notifPrefs.ttsCompleted })}
               role="switch"
               aria-checked={notifPrefs.ttsCompleted}
+              aria-label={t('event_tts')}
             />
           </div>
 
@@ -236,6 +241,7 @@ export default function SettingsPage() {
               onClick={() => updateNotifPref({ paymentReceipt: !notifPrefs.paymentReceipt })}
               role="switch"
               aria-checked={notifPrefs.paymentReceipt}
+              aria-label={t('event_payment')}
             />
           </div>
         </div>
