@@ -127,7 +127,7 @@ export default function ProfilePage() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <h1>{profile.name || profile.email || 'User'}</h1>
+          <h1>{profile.name || profile.email || t('role_user')}</h1>
           <span className={styles.roleBadge}>{t(roleKey)}</span>
         </div>
 

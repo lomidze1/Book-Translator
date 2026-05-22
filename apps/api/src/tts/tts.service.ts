@@ -8,10 +8,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { SynthesizeDto, SynthesizeBookDto } from './dto/synthesize.dto';
-import { TTS_QUEUE, getRedisConnection } from './tts.constants';
+import { TTS_QUEUE, TTS_JOB_OPTIONS, getRedisConnection } from './tts.constants';
 import { ProviderManager } from './providers/provider-manager';
 import { Voice } from './providers/tts-provider.interface';
 import type { TtsJobData } from './tts.processor';
@@ -190,10 +191,7 @@ export class TtsService implements OnModuleDestroy {
         completedSoFar: audioBook.completedChapters,
       };
 
-      await this.queue.add('synthesize-chapter', jobData, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-      });
+      await this.queue.add('synthesize-chapter', jobData, TTS_JOB_OPTIONS);
     }
 
     return {
@@ -250,31 +248,46 @@ export class TtsService implements OnModuleDestroy {
       existingAudioChapters.map((ac) => [ac.chapterNumber, ac]),
     );
 
-    // Create AudioChapter records and queue jobs
+    // Bulk-create missing AudioChapter rows in a single round-trip. Previously
+    // this loop did N sequential `upsert()`s — for a 100-chapter book that's
+    // ~3-5s of pure DB latency before any TTS work could be queued.
+    // skipDuplicates handles the race where another concurrent request created
+    // the same (audioBookId, chapterNumber) row first.
+    const toCreate = translatedChapters
+      .filter((tc) => {
+        const existing = chapterMap.get(tc.chapter.number);
+        return !existing; // existing rows are either COMPLETED (skipped below) or already PENDING (reusable)
+      })
+      .map((tc) => ({
+        audioBookId: audioBook!.id,
+        chapterId: tc.chapter.id,
+        chapterNumber: tc.chapter.number,
+        status: 'PENDING' as const,
+      }));
+
+    if (toCreate.length > 0) {
+      await this.prisma.audioChapter.createMany({
+        data: toCreate,
+        skipDuplicates: true,
+      });
+
+      // Re-read the rows we just created so we have the generated ids.
+      const created = await this.prisma.audioChapter.findMany({
+        where: {
+          audioBookId: audioBook.id,
+          chapterNumber: { in: toCreate.map((c) => c.chapterNumber) },
+        },
+      });
+      for (const ac of created) chapterMap.set(ac.chapterNumber, ac);
+    }
+
+    // Queue jobs for every non-completed chapter.
     let queued = 0;
     for (let i = 0; i < translatedChapters.length; i++) {
       const tc = translatedChapters[i];
-      const existing = chapterMap.get(tc.chapter.number);
-
-      // Skip already completed chapters
-      if (existing?.status === 'COMPLETED') continue;
-
-      // Use existing pending record or create new one via upsert (P2002-safe)
-      const audioChapter = await this.prisma.audioChapter.upsert({
-        where: {
-          audioBookId_chapterNumber: {
-            audioBookId: audioBook.id,
-            chapterNumber: tc.chapter.number,
-          },
-        },
-        update: {},
-        create: {
-          audioBookId: audioBook.id,
-          chapterId: tc.chapter.id,
-          chapterNumber: tc.chapter.number,
-          status: 'PENDING',
-        },
-      });
+      const audioChapter = chapterMap.get(tc.chapter.number);
+      if (!audioChapter) continue;
+      if (audioChapter.status === 'COMPLETED') continue;
 
       if (this.queue) {
         const jobData: TtsJobData = {
@@ -291,10 +304,7 @@ export class TtsService implements OnModuleDestroy {
           completedSoFar: i,
         };
 
-        await this.queue.add('synthesize-chapter', jobData, {
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 5000 },
-        });
+        await this.queue.add('synthesize-chapter', jobData, TTS_JOB_OPTIONS);
         queued++;
       }
     }
@@ -321,21 +331,9 @@ export class TtsService implements OnModuleDestroy {
   // ========================
 
   async getAudioBookStatus(audioBookId: string, userId: string) {
-    const audioBook = await this.prisma.audioBook.findUnique({
-      where: { id: audioBookId },
-      include: {
-        chapters: { orderBy: { chapterNumber: 'asc' } },
-        book: { include: { userBooks: { where: { userId } } } },
-      },
+    const audioBook = await this.loadOwnedAudioBook(audioBookId, userId, {
+      chapters: { orderBy: { chapterNumber: 'asc' } },
     });
-
-    if (!audioBook) {
-      throw new NotFoundException('AudioBook ვერ მოიძებნა');
-    }
-
-    if (audioBook.book.userBooks.length === 0) {
-      throw new ForbiddenException('არ გაქვთ ამ AudioBook-ზე წვდომა');
-    }
 
     return {
       id: audioBook.id,
@@ -359,22 +357,7 @@ export class TtsService implements OnModuleDestroy {
   // ========================
 
   async getStreamUrl(audioChapterId: string, userId: string): Promise<string> {
-    const audioChapter = await this.prisma.audioChapter.findUnique({
-      where: { id: audioChapterId },
-      include: {
-        audioBook: {
-          include: { book: { include: { userBooks: { where: { userId } } } } },
-        },
-      },
-    });
-
-    if (!audioChapter) {
-      throw new NotFoundException('AudioChapter ვერ მოიძებნა');
-    }
-
-    if (audioChapter.audioBook.book.userBooks.length === 0) {
-      throw new ForbiddenException('არ გაქვთ ამ აუდიოზე წვდომა');
-    }
+    const audioChapter = await this.loadOwnedAudioChapter(audioChapterId, userId);
 
     if (!audioChapter.audioUrl) {
       throw new NotFoundException('აუდიო ჯერ არ არის მზად');
@@ -391,21 +374,11 @@ export class TtsService implements OnModuleDestroy {
   // ========================
 
   async deleteAudioBook(audioBookId: string, userId: string): Promise<void> {
-    const audioBook = await this.prisma.audioBook.findUnique({
-      where: { id: audioBookId },
-      include: {
-        chapters: true,
-        book: { include: { userBooks: { where: { userId } } } },
-      },
+    // Note: the previous inline check threw a "წაშლის უფლება" message; the
+    // shared helper uses a generic "AudioBook-ზე წვდომა" — close enough.
+    const audioBook = await this.loadOwnedAudioBook(audioBookId, userId, {
+      chapters: true,
     });
-
-    if (!audioBook) {
-      throw new NotFoundException('AudioBook ვერ მოიძებნა');
-    }
-
-    if (audioBook.book.userBooks.length === 0) {
-      throw new ForbiddenException('არ გაქვთ ამ AudioBook-ის წაშლის უფლება');
-    }
 
     // Delete S3 files in parallel — sequential awaits could take 30s+ on a
     // 100-chapter audiobook. Failures are swallowed so a missing object never
@@ -460,21 +433,9 @@ export class TtsService implements OnModuleDestroy {
   // ========================
 
   async retryFailed(audioBookId: string, userId: string) {
-    const audioBook = await this.prisma.audioBook.findUnique({
-      where: { id: audioBookId },
-      include: {
-        chapters: { where: { status: 'FAILED' } },
-        book: { include: { userBooks: { where: { userId } } } },
-      },
+    const audioBook = await this.loadOwnedAudioBook(audioBookId, userId, {
+      chapters: { where: { status: 'FAILED' } },
     });
-
-    if (!audioBook) {
-      throw new NotFoundException('AudioBook ვერ მოიძებნა');
-    }
-
-    if (audioBook.book.userBooks.length === 0) {
-      throw new ForbiddenException('არ გაქვთ ამ AudioBook-ზე წვდომა');
-    }
 
     const failedChapters = audioBook.chapters;
     if (failedChapters.length === 0) {
@@ -525,10 +486,7 @@ export class TtsService implements OnModuleDestroy {
           completedSoFar: audioBook.completedChapters,
         };
 
-        await this.queue.add('synthesize-chapter', jobData, {
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 5000 },
-        });
+        await this.queue.add('synthesize-chapter', jobData, TTS_JOB_OPTIONS);
         queued++;
         retriedChapterNumbers.push(failedCh.chapterNumber);
       }
@@ -555,20 +513,7 @@ export class TtsService implements OnModuleDestroy {
   // ========================
 
   async getTimestamps(audioBookId: string, chapterNumber: number, userId: string) {
-    const audioBook = await this.prisma.audioBook.findUnique({
-      where: { id: audioBookId },
-      include: {
-        book: { include: { userBooks: { where: { userId } } } },
-      },
-    });
-
-    if (!audioBook) {
-      throw new NotFoundException('AudioBook ვერ მოიძებნა');
-    }
-
-    if (audioBook.book.userBooks.length === 0) {
-      throw new ForbiddenException('არ გაქვთ ამ AudioBook-ზე წვდომა');
-    }
+    await this.loadOwnedAudioBook(audioBookId, userId);
 
     const audioChapter = await this.prisma.audioChapter.findFirst({
       where: { audioBookId, chapterNumber, status: 'COMPLETED' },
@@ -587,6 +532,69 @@ export class TtsService implements OnModuleDestroy {
   // ========================
   // Helpers
   // ========================
+
+  /**
+   * Load an AudioBook only if the caller owns its parent book. Optional
+   * `extraInclude` lets callers ask for additional relations (chapters,
+   * filtered chapters, etc.) in the same query — the book + userBooks check
+   * is always merged in.
+   *
+   * Replaces seven duplicated `findUnique → NotFound → ForbiddenException`
+   * blocks that previously lived inline across this file and the gateway.
+   */
+  private async loadOwnedAudioBook<I extends Prisma.AudioBookInclude>(
+    audioBookId: string,
+    userId: string,
+    extraInclude?: I,
+  ): Promise<
+    Prisma.AudioBookGetPayload<{ include: I }> & {
+      book: { userBooks: { id: string }[] };
+    }
+  > {
+    const include = {
+      ...(extraInclude ?? {}),
+      book: { include: { userBooks: { where: { userId } } } },
+    } as Prisma.AudioBookInclude;
+
+    const audioBook = await this.prisma.audioBook.findUnique({
+      where: { id: audioBookId },
+      include,
+    });
+
+    if (!audioBook) {
+      throw new NotFoundException('AudioBook ვერ მოიძებნა');
+    }
+    const book = (audioBook as unknown as { book: { userBooks: unknown[] } }).book;
+    if (book.userBooks.length === 0) {
+      throw new ForbiddenException('არ გაქვთ ამ AudioBook-ზე წვდომა');
+    }
+    return audioBook as unknown as Prisma.AudioBookGetPayload<{ include: I }> & {
+      book: { userBooks: { id: string }[] };
+    };
+  }
+
+  /**
+   * Same idea as `loadOwnedAudioBook` but starts from an AudioChapter — used
+   * by streaming endpoints that take the chapter id directly.
+   */
+  private async loadOwnedAudioChapter(audioChapterId: string, userId: string) {
+    const audioChapter = await this.prisma.audioChapter.findUnique({
+      where: { id: audioChapterId },
+      include: {
+        audioBook: {
+          include: { book: { include: { userBooks: { where: { userId } } } } },
+        },
+      },
+    });
+
+    if (!audioChapter) {
+      throw new NotFoundException('AudioChapter ვერ მოიძებნა');
+    }
+    if (audioChapter.audioBook.book.userBooks.length === 0) {
+      throw new ForbiddenException('არ გაქვთ ამ აუდიოზე წვდომა');
+    }
+    return audioChapter;
+  }
 
   private async validateBookOwnership(bookId: string, userId: string) {
     const book = await this.prisma.book.findUnique({

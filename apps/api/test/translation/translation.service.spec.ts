@@ -3,6 +3,7 @@ import { NotFoundException, BadRequestException, ForbiddenException } from '@nes
 import { TranslationService } from '../../src/translation/translation.service';
 
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+const ORIGINAL_DEV_SHORTCUTS = process.env.ENABLE_DEV_SHORTCUTS;
 
 // Mock BullMQ
 vi.mock('bullmq', () => ({
@@ -50,12 +51,19 @@ describe('TranslationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Dev shortcuts now require both env vars (see common/dev-shortcuts.ts).
     process.env.NODE_ENV = 'development';
+    process.env.ENABLE_DEV_SHORTCUTS = 'true';
     service = new (TranslationService as any)(mockPrisma, mockS3, mockParsing);
   });
 
   afterEach(() => {
     process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    if (ORIGINAL_DEV_SHORTCUTS === undefined) {
+      delete process.env.ENABLE_DEV_SHORTCUTS;
+    } else {
+      process.env.ENABLE_DEV_SHORTCUTS = ORIGINAL_DEV_SHORTCUTS;
+    }
   });
 
   describe('createTranslation', () => {

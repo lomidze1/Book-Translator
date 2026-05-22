@@ -30,6 +30,21 @@
   --remove-text: #dc2626;
   --input-border-error: #dc2626;
   --input-border-valid: #16a34a;
+
+  // ---------------------------------------------------------------------
+  // Legacy aliases. Several SCSS modules in profile/, reader/, and upload/
+  // reference token names that were never declared (--accent-color,
+  // --border-color, --text-primary, --text, --bg-hover, --error). Those
+  // resolved to `initial`, making buttons/borders invisible. Rather than
+  // hunt down every consumer, we alias the orphaned names to the canonical
+  // tokens. New code should use the canonical names directly.
+  --accent-color: var(--primary);
+  --accent-hover: var(--primary-hover);
+  --border-color: var(--card-border);
+  --text: var(--foreground);
+  --text-primary: var(--foreground);
+  --bg-hover: var(--surface-hover);
+  --error: var(--error-text);
   color-scheme: light;
 }
 

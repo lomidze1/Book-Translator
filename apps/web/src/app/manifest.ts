@@ -5,7 +5,10 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Book Translator — წიგნების AI თარგმანი',
     short_name: 'BookTranslator',
     description: 'ინგლისურენოვანი წიგნების ქართულ ენაზე AI თარგმანის პლატფორმა',
-    start_url: '/ka',
+    // Let next-intl middleware negotiate locale from Accept-Language on launch
+    // instead of hardcoding /ka — otherwise English-only PWA installs always
+    // open Georgian first, which surprises non-Georgian users.
+    start_url: '/',
     scope: '/',
     display: 'standalone',
     dir: 'ltr',

@@ -36,6 +36,20 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
         ttl: 900000, // 15 minutes
         limit: process.env.NODE_ENV === 'production' ? 5 : 10000,
       },
+      {
+        // Per-IP cap for login attempts. The auth service already throttles by
+        // email, but an attacker rotating the email field can bypass that —
+        // this catches IP-level brute-force / credential-stuffing.
+        name: 'auth-login',
+        ttl: 60000,
+        limit: process.env.NODE_ENV === 'production' ? 20 : 10000,
+      },
+      {
+        // Per-IP cap for OTP sends to limit SMS-cost amplification attacks.
+        name: 'auth-otp',
+        ttl: 60000,
+        limit: process.env.NODE_ENV === 'production' ? 5 : 10000,
+      },
     ]),
     PrismaModule,
     RedisModule,

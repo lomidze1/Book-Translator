@@ -1,8 +1,12 @@
 export const TTS_QUEUE = 'tts-audio';
 
-export function getRedisConnection() {
-  return {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-  };
-}
+// Re-exported for backwards compatibility with existing imports in this module.
+// New code should import directly from `common/redis-connection`.
+export { getRedisConnection } from '../common/redis-connection';
+
+// Shared BullMQ retry policy for TTS jobs. Previously inlined in four places
+// across tts.service.ts.
+export const TTS_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 5000 },
+};

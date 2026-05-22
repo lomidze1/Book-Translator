@@ -11,6 +11,7 @@ import {
   UseGuards,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response, CookieOptions } from 'express';
 import { AuthService } from './auth.service';
@@ -60,6 +61,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ 'auth-login': { ttl: 60000, limit: process.env.NODE_ENV === 'production' ? 20 : 10000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
@@ -108,6 +110,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ 'auth-otp': { ttl: 60000, limit: process.env.NODE_ENV === 'production' ? 5 : 10000 } })
   @Post('phone/send-otp')
   @HttpCode(HttpStatus.OK)
   async sendOtp(@Body() dto: SendOtpDto) {

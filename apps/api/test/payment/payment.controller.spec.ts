@@ -39,12 +39,13 @@ describe('PaymentController', () => {
         type: 'TRANSLATION' as const,
         provider: 'FLITT' as const,
         translationId: 'trans-1',
+        translationType: 'FAST' as const,
       };
 
       await controller.create(dto, 'user-1');
 
       expect(paymentService.createPayment).toHaveBeenCalledWith(
-        'user-1', 'book-1', 'TRANSLATION', 'FLITT', 'trans-1',
+        'user-1', 'book-1', 'TRANSLATION', 'FLITT', 'trans-1', 'FAST',
       );
     });
   });
@@ -67,13 +68,20 @@ describe('PaymentController', () => {
 
   describe('simulate', () => {
     const originalEnv = process.env.NODE_ENV;
+    const originalDevShortcuts = process.env.ENABLE_DEV_SHORTCUTS;
 
     afterEach(() => {
       process.env.NODE_ENV = originalEnv;
+      if (originalDevShortcuts === undefined) {
+        delete process.env.ENABLE_DEV_SHORTCUTS;
+      } else {
+        process.env.ENABLE_DEV_SHORTCUTS = originalDevShortcuts;
+      }
     });
 
-    it('should call simulatePayment in non-production', async () => {
+    it('should call simulatePayment when dev shortcuts are enabled', async () => {
       process.env.NODE_ENV = 'development';
+      process.env.ENABLE_DEV_SHORTCUTS = 'true';
       await controller.simulate('pay-1', 'user-1');
 
       expect(paymentService.simulatePayment).toHaveBeenCalledWith('pay-1', 'user-1');
@@ -81,6 +89,15 @@ describe('PaymentController', () => {
 
     it('should throw ForbiddenException in production', async () => {
       process.env.NODE_ENV = 'production';
+      process.env.ENABLE_DEV_SHORTCUTS = 'true'; // even with this set, prod must refuse
+
+      await expect(controller.simulate('pay-1', 'user-1')).rejects.toThrow(ForbiddenException);
+      expect(paymentService.simulatePayment).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException if ENABLE_DEV_SHORTCUTS is missing', async () => {
+      process.env.NODE_ENV = 'development';
+      delete process.env.ENABLE_DEV_SHORTCUTS;
 
       await expect(controller.simulate('pay-1', 'user-1')).rejects.toThrow(ForbiddenException);
       expect(paymentService.simulatePayment).not.toHaveBeenCalled();

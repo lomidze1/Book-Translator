@@ -9,7 +9,15 @@
  *   Concurrent 401s share the same refresh promise (no thundering herd).
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+/**
+ * Single source of truth for the backend URL. Components that need to call the
+ * API should prefer `apiFetch` / `apiJson`, which already wire in auth-refresh
+ * and credentials. When you genuinely need just the base URL (server-side
+ * sitemaps, OG images, redirects), import this instead of re-reading the env
+ * var — the previous pattern of redeclaring `const API_URL = process.env...`
+ * existed in ~20 files and risked drift if the env name ever changed.
+ */
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;

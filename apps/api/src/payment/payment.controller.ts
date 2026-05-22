@@ -18,6 +18,7 @@ import { CreatePaymentDto, FlittCallbackDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import { devShortcutsEnabled } from '../common/dev-shortcuts';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard)
@@ -35,6 +36,7 @@ export class PaymentController {
       dto.type,
       dto.provider,
       dto.translationId,
+      dto.translationType,
     );
   }
 
@@ -59,11 +61,12 @@ export class PaymentController {
     return this.paymentService.getPaymentById(id, userId);
   }
 
-  // Mock endpoint — simulate payment completion (dev only)
+  // Mock endpoint — simulate payment completion (dev only).
+  // Fail-secure: requires NODE_ENV=development AND ENABLE_DEV_SHORTCUTS=true.
   @Post(':id/simulate')
   async simulate(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    if (this.config.get<string>('NODE_ENV') === 'production') {
-      throw new ForbiddenException('Payment simulation is not available in production');
+    if (!devShortcutsEnabled()) {
+      throw new ForbiddenException('Payment simulation is not available in this environment');
     }
     return this.paymentService.simulatePayment(id, userId);
   }

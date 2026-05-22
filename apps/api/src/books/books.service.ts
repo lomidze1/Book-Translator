@@ -291,7 +291,25 @@ export class BooksService {
   async findOne(id: string) {
     const book = await this.prisma.book.findUnique({
       where: { id },
-      include: {
+      // Explicit projection: never leak originalFileUrl (S3 key) or fileHash on
+      // the public endpoint. Authenticated download requests should go through
+      // a separate route that returns a presigned URL after ownership checks.
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        description: true,
+        coverUrl: true,
+        isbn: true,
+        language: true,
+        pageCount: true,
+        originalFormat: true,
+        fileSize: true,
+        googleBooksId: true,
+        openLibraryId: true,
+        buyLinks: true,
+        createdAt: true,
+        updatedAt: true,
         translations: {
           select: {
             id: true,
@@ -327,13 +345,22 @@ export class BooksService {
   }
 
   async remove(id: string, userId: string) {
-    const book = await this.findOne(id); // throws if not found
     await this.verifyOwnership(id, userId);
 
+    // findOne intentionally projects away originalFileUrl (it's a private S3
+    // key — see the comment there). Fetch it directly for the S3 cleanup.
+    const stored = await this.prisma.book.findUnique({
+      where: { id },
+      select: { originalFileUrl: true },
+    });
+    if (!stored) {
+      throw new NotFoundException('Book not found');
+    }
+
     // Clean up S3 files before cascade delete
-    if (book.originalFileUrl) {
+    if (stored.originalFileUrl) {
       try {
-        await this.s3.delete(book.originalFileUrl);
+        await this.s3.delete(stored.originalFileUrl);
       } catch (err) {
         this.logger.warn(`Failed to delete S3 file for book ${id}: ${err}`);
       }

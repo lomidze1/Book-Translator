@@ -24,10 +24,26 @@
   color: var(--primary);
 }
 
-.links {
+// Desktop link cluster.
+.desktopLinks {
   display: flex;
   gap: $spacing-sm;
   align-items: center;
+
+  @include tablet {
+    display: none;
+  }
+}
+
+// Mobile compact bar (hamburger + bell).
+.mobileBar {
+  display: none;
+  align-items: center;
+  gap: $spacing-sm;
+
+  @include tablet {
+    display: flex;
+  }
 }
 
 .navLink {
@@ -40,6 +56,11 @@
   &:hover {
     color: var(--primary);
   }
+}
+
+.navLinkActive {
+  color: var(--primary);
+  background: var(--surface-hover);
 }
 
 .loginBtn {
@@ -94,4 +115,117 @@
     border-color: var(--error-text);
     color: var(--error-text);
   }
+}
+
+// =========================
+// Mobile hamburger + drawer
+// =========================
+
+.menuBtn {
+  // 44×44 touch target per WCAG 2.5.5.
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid var(--card-border);
+  border-radius: $radius-md;
+  cursor: pointer;
+  padding: 0;
+
+  &:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
+
+.menuBar {
+  width: 22px;
+  height: 2px;
+  background: var(--foreground);
+  border-radius: 2px;
+}
+
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 140;
+  // Only render on mobile breakpoints — the button that opens it is hidden
+  // above the tablet breakpoint so this is defense in depth.
+  @media (min-width: $breakpoint-md + 1) {
+    display: none;
+  }
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100dvh;
+  width: min(320px, 85vw);
+  background: var(--background);
+  border-left: 1px solid var(--card-border);
+  transform: translateX(100%);
+  transition: transform 0.25s ease-out;
+  z-index: 150;
+  overflow-y: auto;
+
+  @media (min-width: $breakpoint-md + 1) {
+    display: none;
+  }
+}
+
+.drawerOpen {
+  transform: translateX(0);
+}
+
+.drawerInner {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  padding: calc(#{$spacing-lg} + 56px) $spacing-lg $spacing-lg;
+  // The padding-top accounts for the sticky navbar height so the close button
+  // remains visible above the drawer content.
+}
+
+.drawerLink {
+  padding: $spacing-md;
+  border-radius: $radius-md;
+  font-weight: 500;
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--surface-hover);
+    color: var(--primary);
+  }
+}
+
+.drawerLinkActive {
+  color: var(--primary);
+  background: var(--surface-hover);
+}
+
+.drawerControls {
+  display: flex;
+  gap: $spacing-md;
+  padding: $spacing-sm 0;
+  border-top: 1px solid var(--card-border);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.drawerAuth {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.drawerUserBlock {
+  display: flex;
+  align-items: center;
 }

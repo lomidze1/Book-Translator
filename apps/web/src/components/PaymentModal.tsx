@@ -10,19 +10,21 @@ interface PaymentModalProps {
   bookTitle: string;
   type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
   translationId?: string;
+  // Required when type === 'TRANSLATION' — the server enforces this and uses it
+  // to pick the FAST vs STANDARD price tier.
+  translationType?: 'FAST' | 'STANDARD';
   amount: number;
   currency: string;
   onClose: () => void;
   onSuccess?: (paymentId: string) => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
 export default function PaymentModal({
   bookId,
   bookTitle,
   type,
   translationId,
+  translationType,
   amount,
   currency,
   onClose,
@@ -91,6 +93,7 @@ export default function PaymentModal({
           type,
           provider: 'FLITT',
           translationId,
+          translationType,
         }),
       });
 
@@ -113,7 +116,7 @@ export default function PaymentModal({
     } finally {
       setLoading(false);
     }
-  }, [bookId, type, translationId, onSuccess, t]);
+  }, [bookId, type, translationId, translationType, onSuccess, t]);
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();

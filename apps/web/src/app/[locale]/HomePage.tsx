@@ -1,11 +1,13 @@
-'use client';
-
-import { useTranslations } from 'next-intl';
+// Server Component — the landing page is all-static markup, so there is no
+// reason to ship a client bundle for it. Using getTranslations() async on the
+// server cuts JS payload on what is by far the most-trafficked entry point
+// and improves the LCP / TTI signals Google measures for ranking.
+import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import styles from '../page.module.scss';
 
-export default function HomePage() {
-  const t = useTranslations('home');
+export default async function HomePage({ locale }: { locale: string }) {
+  const t = await getTranslations({ locale, namespace: 'home' });
 
   return (
     <div className={styles.page}>

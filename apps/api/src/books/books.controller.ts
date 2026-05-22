@@ -16,12 +16,14 @@ import { Throttle } from '@nestjs/throttler';
 import { BooksService } from './books.service';
 import { CreateBookDto, UpdateBookDto, SearchBooksDto, PaginationDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FileValidationPipe } from './upload/file-validation.pipe';
 
 @Controller('books')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class BooksController {
   constructor(private readonly booksService: BooksService) {}
 
@@ -43,7 +45,11 @@ export class BooksController {
     return this.booksService.findOne(id);
   }
 
+  // Direct catalog insert is admin-only. End users add books via /books/upload
+  // (which also creates a UserBook ownership row), or via the search endpoints
+  // (which auto-import from Google Books / Open Library on demand).
   @Post()
+  @Roles('ADMIN')
   create(@Body() dto: CreateBookDto) {
     return this.booksService.create(dto);
   }

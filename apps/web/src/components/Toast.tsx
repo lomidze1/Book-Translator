@@ -1,10 +1,15 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/context/ToastContext';
 import styles from './Toast.module.scss';
 
 export default function ToastContainer() {
   const { toasts, removeToast } = useToast();
+  // Reuse the existing `payment.close` translation rather than introduce a
+  // new namespace — both languages already provide a localized "Close" string
+  // there.
+  const tPayment = useTranslations('payment');
 
   if (toasts.length === 0) return null;
 
@@ -20,7 +25,7 @@ export default function ToastContainer() {
           <button
             className={styles.close}
             onClick={() => removeToast(toast.id)}
-            aria-label="Close"
+            aria-label={tPayment('close')}
           >
             &times;
           </button>

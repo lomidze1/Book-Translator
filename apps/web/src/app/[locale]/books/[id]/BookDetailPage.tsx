@@ -216,13 +216,16 @@ export default function BookDetailsPage() {
         return;
       }
 
-      // Production: open payment modal
+      // Production: open payment modal. Pull the actual price for the selected tier
+      // from the pricing endpoint result instead of hardcoding 10 GEL.
       setTranslating(false);
+      const tierPrice = translationType === 'FAST' ? pricing?.fast : pricing?.slow;
       setPaymentModal({
         type: 'TRANSLATION',
-        amount: 10,
-        currency: 'GEL',
+        amount: tierPrice?.amount ?? 10,
+        currency: tierPrice?.currency ?? 'GEL',
         translationId: translation.id,
+        translationType,
       });
     } catch {
       setError(t('error_network'));
@@ -400,6 +403,7 @@ export default function BookDetailsPage() {
                 bookTitle={book.title}
                 type={paymentModal.type}
                 translationId={paymentModal.translationId}
+                translationType={paymentModal.translationType}
                 amount={paymentModal.amount}
                 currency={paymentModal.currency}
                 onClose={() => setPaymentModal(null)}

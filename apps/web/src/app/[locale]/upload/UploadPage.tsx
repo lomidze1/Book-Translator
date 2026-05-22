@@ -231,7 +231,12 @@ export default function UploadPage() {
                 <p className={styles.fileName}>{file.name}</p>
                 <p className={styles.fileSize}>{formatFileSize(file.size)}</p>
               </div>
-              <button className={styles.removeBtn} onClick={(e) => { e.stopPropagation(); removeFile(); }}>
+              <button
+                type="button"
+                className={styles.removeBtn}
+                onClick={(e) => { e.stopPropagation(); removeFile(); }}
+                aria-label={t('remove_file')}
+              >
                 ✕
               </button>
             </div>
