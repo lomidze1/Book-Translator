@@ -52,10 +52,10 @@ describe('TranslationController', () => {
       const expected = [{ id: 'tr-1' }, { id: 'tr-2' }];
       mockTranslationService.getMyTranslations.mockResolvedValue(expected);
 
-      const result = await controller.getMyTranslations('user-1');
+      const result = await controller.getMyTranslations('user-1', 1, 50);
 
       expect(result).toEqual(expected);
-      expect(mockTranslationService.getMyTranslations).toHaveBeenCalledWith('user-1');
+      expect(mockTranslationService.getMyTranslations).toHaveBeenCalledWith('user-1', 1, 50);
     });
   });
 
@@ -64,10 +64,10 @@ describe('TranslationController', () => {
       const expected = [{ id: 'tr-1' }];
       mockTranslationService.getTranslationsByBook.mockResolvedValue(expected);
 
-      const result = await controller.getByBook('book-1', 'user-1');
+      const result = await controller.getByBook('book-1', 'user-1', 1, 50);
 
       expect(result).toEqual(expected);
-      expect(mockTranslationService.getTranslationsByBook).toHaveBeenCalledWith('book-1', 'user-1');
+      expect(mockTranslationService.getTranslationsByBook).toHaveBeenCalledWith('book-1', 'user-1', 1, 50);
     });
   });
 });

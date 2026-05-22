@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { apiFetch, getAccessToken } from '@/lib/api-client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -26,13 +27,8 @@ export function useNotifications(onNewNotification?: (n: Notification) => void) 
 
   // Fetch initial data
   const fetchUnreadCount = useCallback(async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
     try {
-      const res = await fetch(`${API_URL}/api/notifications/unread-count`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch('/api/notifications/unread-count');
       if (res.ok) {
         const data = await res.json();
         setUnreadCount(data.count);
@@ -43,13 +39,8 @@ export function useNotifications(onNewNotification?: (n: Notification) => void) 
   }, []);
 
   const fetchNotifications = useCallback(async (page = 1) => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
     try {
-      const res = await fetch(`${API_URL}/api/notifications?page=${page}&limit=20`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/notifications?page=${page}&limit=20`);
       if (res.ok) {
         const data = await res.json();
         if (page === 1) {
@@ -65,14 +56,8 @@ export function useNotifications(onNewNotification?: (n: Notification) => void) 
   }, []);
 
   const markAsRead = useCallback(async (id: string) => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
     try {
-      await fetch(`${API_URL}/api/notifications/${id}/read`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiFetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
       setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, read: true, readAt: new Date().toISOString() } : n)
       );
@@ -83,14 +68,8 @@ export function useNotifications(onNewNotification?: (n: Notification) => void) 
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
     try {
-      await fetch(`${API_URL}/api/notifications/read-all`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiFetch('/api/notifications/read-all', { method: 'PATCH' });
       setNotifications(prev => prev.map(n => ({ ...n, read: true, readAt: new Date().toISOString() })));
       setUnreadCount(0);
     } catch {
@@ -98,9 +77,9 @@ export function useNotifications(onNewNotification?: (n: Notification) => void) 
     }
   }, []);
 
-  // WebSocket connection
+  // WebSocket connection — uses in-memory access token from the API client.
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken();
     if (!token) return;
 
     fetchUnreadCount();
@@ -123,6 +102,8 @@ export function useNotifications(onNewNotification?: (n: Notification) => void) 
     socketRef.current = socket;
 
     return () => {
+      socket.off('notification:new');
+      socket.off('notification:unread-count');
       socket.disconnect();
       socketRef.current = null;
     };

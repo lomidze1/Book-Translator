@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations, useLocale } from 'next-intl';
+import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -64,7 +65,13 @@ export default function DashboardPage() {
                     <li key={item.id} className={styles.activityItem}>
                       <Link href={`/books/${item.book.id}`} className={styles.activityLink}>
                         {item.book.coverUrl ? (
-                          <img src={item.book.coverUrl} alt={item.book.title} className={styles.activityCover} />
+                          <Image
+                            src={item.book.coverUrl}
+                            alt={item.book.title}
+                            width={48}
+                            height={72}
+                            className={styles.activityCover}
+                          />
                         ) : (
                           <div className={styles.activityCoverPlaceholder}>
                             {item.book.title?.[0] || '?'}

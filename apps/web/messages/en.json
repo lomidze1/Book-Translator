@@ -3,6 +3,15 @@
     "title": "Book Translator - AI Book Translation",
     "description": "AI-powered platform for translating English books into Georgian. Upload, translate, read."
   },
+  "errors": {
+    "not_found_title": "Page not found",
+    "not_found_description": "The page you are looking for does not exist or has been moved.",
+    "not_found_metadata_title": "Page not found — 404",
+    "back_home": "Back to home",
+    "error_title": "Something went wrong",
+    "error_description": "Please try again. If the problem persists, contact us.",
+    "try_again": "Try again"
+  },
   "navbar": {
     "search": "Search",
     "upload": "Upload",
@@ -250,9 +259,7 @@
   "payment": {
     "title": "Payment",
     "close": "Close",
-    "choose_provider": "Choose payment method:",
-    "provider_bog": "Bank of Georgia (BOG)",
-    "provider_tbc": "TBC Bank",
+    "provider_flitt_note": "Secure payment via Flitt (TBC Bank).",
     "pay_button": "Pay {amount}{currency}",
     "processing": "Processing...",
     "error_default": "Payment failed. Please try again.",

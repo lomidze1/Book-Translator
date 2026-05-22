@@ -7,6 +7,7 @@ import { usePathname } from '@/i18n/navigation';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import PaymentModal from '@/components/PaymentModal';
+import { apiFetch, getAccessToken } from '@/lib/api-client';
 import styles from '../../../books/[id]/page.module.scss';
 
 interface BookDetails {
@@ -113,12 +114,9 @@ export default function BookDetailsPage() {
 
     const pollOnce = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        if (!token) return;
+        if (!getAccessToken()) return;
 
-        const res = await fetch(`${API_URL}/api/translations/${translationId}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
+        const res = await apiFetch(`/api/translations/${translationId}`);
 
         // On rate limit, skip this cycle — don't spam
         if (res.status === 429) return;
@@ -169,8 +167,7 @@ export default function BookDetailsPage() {
 
   const handleTranslateClick = async (translationType: 'FAST' | 'STANDARD' = 'FAST') => {
     try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
+      if (!getAccessToken()) {
         setShowLoginPrompt(true);
         return;
       }
@@ -178,12 +175,9 @@ export default function BookDetailsPage() {
       setTranslating(true);
       setError('');
 
-      const res = await fetch(`${API_URL}/api/translations`, {
+      const res = await apiFetch('/api/translations', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookId: book!.id, translationType }),
       });
 
@@ -326,7 +320,7 @@ export default function BookDetailsPage() {
 
             {book.description && (
               <div className={styles.description}>
-                <h3>{t('description')}</h3>
+                <h2>{t('description')}</h2>
                 <p>{book.description}</p>
               </div>
             )}
@@ -414,7 +408,7 @@ export default function BookDetailsPage() {
 
             {book.chapters.length > 0 && (
               <div className={styles.chapters}>
-                <h3>{t('chapters', { count: book.chapters.length })}</h3>
+                <h2>{t('chapters', { count: book.chapters.length })}</h2>
                 <ul>
                   {book.chapters.map((ch) => (
                     <li key={ch.id}>

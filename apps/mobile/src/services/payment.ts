@@ -1,6 +1,6 @@
 import { apiRequest } from './api';
 
-export type PaymentProvider = 'BOG' | 'TBC';
+export type PaymentProvider = 'FLITT';
 export type PaymentType = 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
 
 interface CreatePaymentParams {

@@ -2,6 +2,7 @@ import './sentry';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -13,6 +14,9 @@ async function bootstrap() {
 
   // Compression
   app.use(compression());
+
+  // Cookie parsing (required to read the httpOnly refresh-token cookie)
+  app.use(cookieParser());
 
   // Security headers
   app.use(helmet());

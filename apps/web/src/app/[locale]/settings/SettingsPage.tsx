@@ -4,9 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { apiFetch, getAccessToken } from '@/lib/api-client';
 import styles from './settings.module.scss';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface ReaderDefaults {
   fontFamily: string;
@@ -52,12 +51,9 @@ export default function SettingsPage() {
 
   // Fetch notification preferences from API
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
+    if (!getAccessToken()) return;
 
-    fetch(`${API_URL}/api/notifications/preferences`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    apiFetch('/api/notifications/preferences')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) {
@@ -111,16 +107,12 @@ export default function SettingsPage() {
     setNotifPrefs(prev => ({ ...prev, ...update }));
     showSavedBadge();
 
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
+    if (!getAccessToken()) return;
 
     try {
-      await fetch(`${API_URL}/api/notifications/preferences`, {
+      await apiFetch('/api/notifications/preferences', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(update),
       });
     } catch {}

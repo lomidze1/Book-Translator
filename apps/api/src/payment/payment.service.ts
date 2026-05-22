@@ -7,28 +7,27 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { BogProvider } from './providers/bog.provider';
-import { TbcProvider } from './providers/tbc.provider';
+import { FlittProvider } from './providers/flitt.provider';
 import { PaymentProviderInterface, CallbackValidation } from './providers/payment-provider.interface';
 import { TranslationService } from '../translation/translation.service';
 import { NotificationService } from '../notification/notification.service';
 
+export type PaymentProviderName = 'FLITT';
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
-  private readonly providers: Record<string, PaymentProviderInterface>;
+  private readonly providers: Record<PaymentProviderName, PaymentProviderInterface>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly bogProvider: BogProvider,
-    private readonly tbcProvider: TbcProvider,
+    private readonly flittProvider: FlittProvider,
     private readonly translationService: TranslationService,
     private readonly notificationService: NotificationService,
   ) {
     this.providers = {
-      BOG: this.bogProvider,
-      TBC: this.tbcProvider,
+      FLITT: this.flittProvider,
     };
   }
 
@@ -116,7 +115,7 @@ export class PaymentService {
     userId: string,
     bookId: string,
     type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION',
-    providerName: 'BOG' | 'TBC',
+    providerName: PaymentProviderName,
     translationId?: string,
     translationType?: 'FAST' | 'STANDARD',
   ) {
@@ -176,7 +175,8 @@ export class PaymentService {
     });
 
     // Create order with provider
-    const callbackUrl = `${process.env.API_URL || 'http://localhost:4000'}/api/payments/${providerName.toLowerCase()}/callback`;
+    const apiUrl = this.config.get<string>('API_URL') || 'http://localhost:4000';
+    const callbackUrl = `${apiUrl}/api/payments/${providerName.toLowerCase()}/callback`;
 
     try {
       const result = await provider.createOrder(
@@ -215,7 +215,7 @@ export class PaymentService {
   }
 
   async handleCallback(
-    providerName: 'BOG' | 'TBC',
+    providerName: PaymentProviderName,
     payload: Record<string, unknown>,
     signature?: string,
   ) {
@@ -247,8 +247,8 @@ export class PaymentService {
       return { status: payment.status };
     }
 
-    // Verify amount matches what we expect
-    if (validation.amount > 0 && Number(payment.amount) !== validation.amount) {
+    // Verify amount matches what we expect — always (rejects zero-amount bypass).
+    if (Number(payment.amount) !== validation.amount) {
       this.logger.error(
         `Amount mismatch for payment ${payment.id}: expected ${payment.amount}, got ${validation.amount}`,
       );
@@ -338,7 +338,7 @@ export class PaymentService {
 
   // Mock: simulate successful payment (development only)
   async simulatePayment(paymentId: string, userId: string) {
-    if (process.env.NODE_ENV === 'production') {
+    if (this.config.get<string>('NODE_ENV') === 'production') {
       throw new ForbiddenException('Payment simulation is not available in production');
     }
 

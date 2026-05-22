@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Worker, Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
@@ -8,6 +9,8 @@ import { NotificationService } from '../notification/notification.service';
 import { chunkText } from './utils/text-chunker';
 import { concatenateAudioBuffers } from './utils/audio-concat';
 import { TTS_QUEUE, getRedisConnection } from './tts.constants';
+
+const PRESIGNED_URL_MAX_EXPIRY = 14400;
 
 export interface TtsJobData {
   audioBookId: string;
@@ -34,6 +37,7 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly gateway: TtsGateway,
     private readonly providerManager: ProviderManager,
     private readonly notificationService: NotificationService,
+    private readonly config: ConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -44,12 +48,12 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
       this.worker = new Worker(
         TTS_QUEUE,
         async (job: Job<TtsJobData>) => {
-          this.logger.log(`🔊 Processing TTS job ${job.id}: chapter ${job.data.chapterNumber}`);
+          this.logger.log(`Processing TTS job ${job.id}: chapter ${job.data.chapterNumber}`);
           await this.processChapter(job);
         },
         {
           connection: redisConn,
-          concurrency: parseInt(process.env.TTS_MAX_CONCURRENT_JOBS || '2'),
+          concurrency: parseInt(this.config.get<string>('TTS_MAX_CONCURRENT_JOBS') || '2', 10),
           stalledInterval: 300000,
           lockDuration: 900000,
         },
@@ -117,7 +121,7 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
           voiceId,
           speed,
           format: 'mp3',
-          sampleRate: parseInt(process.env.TTS_AUDIO_SAMPLE_RATE || '24000'),
+          sampleRate: parseInt(this.config.get<string>('TTS_AUDIO_SAMPLE_RATE') || '24000', 10),
         });
 
         audioBuffers.push(result.audioBuffer);
@@ -144,12 +148,12 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
       }
 
       // 3. Concatenate audio
-      const crossfadeMs = parseInt(process.env.TTS_CROSSFADE_MS || '50');
+      const crossfadeMs = parseInt(this.config.get<string>('TTS_CROSSFADE_MS') || '50', 10);
       const concatResult = await concatenateAudioBuffers(audioBuffers, {
         crossfadeMs: audioBuffers.length > 1 ? crossfadeMs : 0,
-        format: process.env.TTS_AUDIO_FORMAT || 'mp3',
-        bitrate: process.env.TTS_AUDIO_BITRATE || '128k',
-        sampleRate: parseInt(process.env.TTS_AUDIO_SAMPLE_RATE || '24000'),
+        format: this.config.get<string>('TTS_AUDIO_FORMAT') || 'mp3',
+        bitrate: this.config.get<string>('TTS_AUDIO_BITRATE') || '128k',
+        sampleRate: parseInt(this.config.get<string>('TTS_AUDIO_SAMPLE_RATE') || '24000', 10),
       });
 
       // 4. Upload to S3
@@ -199,7 +203,7 @@ export class TtsProcessor implements OnModuleInit, OnModuleDestroy {
       // 7. Emit events
       const presignedUrl = await this.s3.getPresignedUrl(
         s3Key,
-        parseInt(process.env.TTS_PRESIGNED_URL_EXPIRY || '14400'),
+        Math.min(parseInt(this.config.get<string>('TTS_PRESIGNED_URL_EXPIRY') || String(PRESIGNED_URL_MAX_EXPIRY), 10), PRESIGNED_URL_MAX_EXPIRY),
       );
 
       this.gateway.emitChapterDone(audioBookId, {

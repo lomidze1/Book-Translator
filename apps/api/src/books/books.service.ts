@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ParsingService } from '../parsing/parsing.service';
+import { fetchWithTimeout } from '../common/fetch';
 import { CreateBookDto, UpdateBookDto, SearchBooksDto, PaginationDto } from './dto';
 import * as crypto from 'crypto';
 
@@ -119,7 +120,7 @@ export class BooksService {
       const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
       const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${limit}&langRestrict=en${apiKey ? `&key=${apiKey}` : ''}`;
 
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url, {}, 8_000);
       if (!response.ok) return [];
 
       const data: any = await response.json();
@@ -159,7 +160,7 @@ export class BooksService {
     try {
       const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=${limit}&language=eng`;
 
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url, {}, 8_000);
       if (!response.ok) return [];
 
       const data: any = await response.json();

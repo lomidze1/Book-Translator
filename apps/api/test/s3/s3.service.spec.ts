@@ -37,7 +37,7 @@ describe('S3Service', () => {
     process.env.AWS_ACCESS_KEY_ID = 'test-key';
     process.env.AWS_SECRET_ACCESS_KEY = 'test-secret';
 
-    s3Service = new S3Service();
+    s3Service = new S3Service({ get: (k: string) => process.env[k] } as any);
     await s3Service.onModuleInit();
   });
 

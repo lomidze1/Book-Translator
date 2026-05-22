@@ -13,14 +13,15 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     description: t('register_description'),
     alternates: {
       canonical: `${BASE_URL}/${locale}/register`,
-      languages: { ka: `${BASE_URL}/ka/register`, en: `${BASE_URL}/en/register` },
+      languages: { ka: `${BASE_URL}/ka/register`, en: `${BASE_URL}/en/register`, 'x-default': `${BASE_URL}/ka/register` },
     },
     openGraph: {
       title: t('register_title'),
       description: t('register_description'),
       url: `${BASE_URL}/${locale}/register`,
-      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: 'Book Translator' }],
+      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: t('site_name') }],
     },
+    robots: { index: false, follow: true },
   };
 }
 

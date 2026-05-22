@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TtsProvider, TtsOptions, TtsSynthesisResult, Voice } from './tts-provider.interface';
 import { estimateMp3Duration, TtsRateLimitError } from '../utils/shared';
+import { fetchWithTimeout } from '../../common/fetch';
 
 @Injectable()
 export class ElevenLabsProvider implements TtsProvider {
@@ -27,14 +28,11 @@ export class ElevenLabsProvider implements TtsProvider {
   async isAvailable(): Promise<boolean> {
     if (!this.apiKey) return false;
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(`${this.baseUrl}/voices`, {
-        method: 'GET',
-        headers: { 'xi-api-key': this.apiKey },
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+      const res = await fetchWithTimeout(
+        `${this.baseUrl}/voices`,
+        { method: 'GET', headers: { 'xi-api-key': this.apiKey } },
+        5_000,
+      );
       return res.ok;
     } catch {
       return false;
@@ -46,11 +44,9 @@ export class ElevenLabsProvider implements TtsProvider {
     if (!voiceId) throw new Error('ElevenLabs: voiceId is required');
     if (!this.apiKey) throw new Error('ElevenLabs: API key not configured');
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-
-    try {
-      const res = await fetch(`${this.baseUrl}/text-to-speech/${voiceId}`, {
+    const res = await fetchWithTimeout(
+      `${this.baseUrl}/text-to-speech/${voiceId}`,
+      {
         method: 'POST',
         headers: {
           'xi-api-key': this.apiKey,
@@ -66,56 +62,49 @@ export class ElevenLabsProvider implements TtsProvider {
             speed: options.speed || 1.0,
           },
         }),
-        signal: controller.signal,
-      });
+      },
+      30_000,
+    );
 
-      clearTimeout(timeout);
-
-      if (res.status === 429) {
-        const retryAfter = res.headers.get('retry-after');
-        throw new TtsRateLimitError(
-          `ElevenLabs rate limit exceeded`,
-          retryAfter ? parseInt(retryAfter) : 60,
-          'elevenlabs',
-        );
-      }
-
-      if (res.status === 401) {
-        throw new Error('ElevenLabs: Invalid API key');
-      }
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`ElevenLabs API error ${res.status}: ${body}`);
-      }
-
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('audio')) {
-        throw new Error(`ElevenLabs: unexpected content-type: ${contentType}`);
-      }
-
-      const arrayBuffer = await res.arrayBuffer();
-      const audioBuffer = Buffer.from(arrayBuffer);
-
-      const durationMs = estimateMp3Duration(audioBuffer.length);
-
-      return { audioBuffer, durationMs };
-    } catch (error) {
-      clearTimeout(timeout);
-      if (error instanceof TtsRateLimitError) throw error;
-      if ((error as any)?.name === 'AbortError') {
-        throw new Error('ElevenLabs: request timeout (30s)');
-      }
-      throw error;
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('retry-after');
+      throw new TtsRateLimitError(
+        `ElevenLabs rate limit exceeded`,
+        retryAfter ? parseInt(retryAfter) : 60,
+        'elevenlabs',
+      );
     }
+
+    if (res.status === 401) {
+      throw new Error('ElevenLabs: Invalid API key');
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`ElevenLabs API error ${res.status}: ${body}`);
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('audio')) {
+      throw new Error(`ElevenLabs: unexpected content-type: ${contentType}`);
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    const audioBuffer = Buffer.from(arrayBuffer);
+
+    const durationMs = estimateMp3Duration(audioBuffer.length);
+
+    return { audioBuffer, durationMs };
   }
 
   async getVoices(language?: string): Promise<Voice[]> {
     if (!this.apiKey) return [];
 
-    const res = await fetch(`${this.baseUrl}/voices`, {
-      headers: { 'xi-api-key': this.apiKey },
-    });
+    const res = await fetchWithTimeout(
+      `${this.baseUrl}/voices`,
+      { headers: { 'xi-api-key': this.apiKey } },
+      10_000,
+    );
 
     if (!res.ok) return [];
 

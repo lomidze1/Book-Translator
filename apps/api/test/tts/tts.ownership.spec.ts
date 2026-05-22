@@ -26,7 +26,12 @@ describe('TTS Ownership & Authorization', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new (TtsService as any)(mockPrisma, mockS3, mockProviderManager);
+    service = new (TtsService as any)(
+      mockPrisma,
+      mockS3,
+      mockProviderManager,
+      { get: (k: string) => process.env[k] } as any,
+    );
   });
 
   it('user should not synthesize book they do not own', async () => {

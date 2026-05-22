@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, ValidationPipe } from '@nestjs/common';
 import { PaymentController } from '../../src/payment/payment.controller';
+import { FlittCallbackDto } from '../../src/payment/dto';
 
 describe('PaymentController', () => {
   let controller: PaymentController;
   let paymentService: any;
+  let config: any;
 
   beforeEach(() => {
     paymentService = {
@@ -26,7 +28,8 @@ describe('PaymentController', () => {
       handleCallback: vi.fn().mockResolvedValue({ status: 'COMPLETED' }),
     };
 
-    controller = new PaymentController(paymentService);
+    config = { get: (k: string) => process.env[k] };
+    controller = new PaymentController(paymentService, config as any);
   });
 
   describe('create', () => {
@@ -34,14 +37,14 @@ describe('PaymentController', () => {
       const dto = {
         bookId: 'book-1',
         type: 'TRANSLATION' as const,
-        provider: 'BOG' as const,
+        provider: 'FLITT' as const,
         translationId: 'trans-1',
       };
 
       await controller.create(dto, 'user-1');
 
       expect(paymentService.createPayment).toHaveBeenCalledWith(
-        'user-1', 'book-1', 'TRANSLATION', 'BOG', 'trans-1',
+        'user-1', 'book-1', 'TRANSLATION', 'FLITT', 'trans-1',
       );
     });
   });
@@ -84,23 +87,41 @@ describe('PaymentController', () => {
     });
   });
 
-  describe('bogCallback', () => {
-    it('should handle BOG callback', async () => {
-      const payload = { order_id: 'test', status: 'success' } as any;
+  describe('flittCallback', () => {
+    it('should handle Flitt callback', async () => {
+      const payload = { order_id: 'bt_1', order_status: 'approved', signature: 'sig-abc' } as any;
 
-      await controller.bogCallback(payload, 'sig-123');
+      await controller.flittCallback(payload);
 
-      expect(paymentService.handleCallback).toHaveBeenCalledWith('BOG', payload, 'sig-123');
+      expect(paymentService.handleCallback).toHaveBeenCalledWith('FLITT', payload);
     });
   });
 
-  describe('tbcCallback', () => {
-    it('should handle TBC callback', async () => {
-      const payload = { PaymentId: 'test', Status: 'Succeeded' } as any;
+  // Regression: the global ValidationPipe used to strip non-whitelisted fields,
+  // which broke signature verification on real webhooks. The webhook route must
+  // preserve the full payload so the SHA1 signature can be recomputed.
+  describe('webhook payload preservation', () => {
+    it('keeps extra Flitt fields after validation', async () => {
+      const pipe = new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true });
+      const input = {
+        order_id: 'bt_1',
+        order_status: 'approved',
+        signature: 'abc123',
+        amount: 1000,
+        currency: 'GEL',
+        payment_id: 'p-1',
+        masked_card: '4111****1111',
+      };
 
-      await controller.tbcCallback(payload, 'sig-456');
+      const result = await pipe.transform(input, { type: 'body', metatype: FlittCallbackDto });
 
-      expect(paymentService.handleCallback).toHaveBeenCalledWith('TBC', payload, 'sig-456');
+      expect(result.order_id).toBe('bt_1');
+      expect(result.order_status).toBe('approved');
+      expect(result.signature).toBe('abc123');
+      expect((result as any).amount).toBe(1000);
+      expect((result as any).currency).toBe('GEL');
+      expect((result as any).payment_id).toBe('p-1');
+      expect((result as any).masked_card).toBe('4111****1111');
     });
   });
 });

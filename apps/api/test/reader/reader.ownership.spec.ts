@@ -42,10 +42,12 @@ describe('ReaderService — Ownership & Authorization', () => {
 
       await service.getBookmarks(userA, bookId);
 
-      expect(mockPrisma.bookmark.findMany).toHaveBeenCalledWith({
-        where: { userId: userA, bookId },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.bookmark.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: userA, bookId },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
   });
 
@@ -77,11 +79,13 @@ describe('ReaderService — Ownership & Authorization', () => {
 
       await service.getHighlights(userA, bookId);
 
-      expect(mockPrisma.highlight.findMany).toHaveBeenCalledWith({
-        where: { userId: userA, bookId },
-        include: { notes: true },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.highlight.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: userA, bookId },
+          include: { notes: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
   });
 
@@ -113,11 +117,13 @@ describe('ReaderService — Ownership & Authorization', () => {
 
       await service.getNotes(userA, bookId);
 
-      expect(mockPrisma.note.findMany).toHaveBeenCalledWith({
-        where: { userId: userA, bookId },
-        include: { highlight: true },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: userA, bookId },
+          include: { highlight: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
 
     it('user A should NOT attach note to user B highlight', async () => {

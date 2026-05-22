@@ -1,6 +1,20 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from 'react';
+import {
+  apiFetch,
+  apiJson,
+  setAccessToken,
+  setAuthFailureHandler,
+} from '@/lib/api-client';
 
 interface User {
   id: string;
@@ -13,15 +27,18 @@ interface AuthContextType {
   user: User | null;
   isLoggedIn: boolean;
   isLoading: boolean;
-  login: (accessToken: string, refreshToken: string, user: User) => void;
-  logout: () => void;
+  /**
+   * Called after a successful login response. The refresh token lives in an
+   * httpOnly cookie set by the backend; we only stash the access token in
+   * memory + the user profile in localStorage (non-sensitive cache).
+   */
+  login: (accessToken: string, user: User) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-function getStoredUser(): User | null {
+function getCachedUser(): User | null {
   if (typeof window === 'undefined') return null;
   try {
     const stored = localStorage.getItem('cachedUser');
@@ -33,49 +50,89 @@ function getStoredUser(): User | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Track whether the cookie-based silent refresh has been attempted yet, so
+  // we don't show a "logged out" flicker on first paint.
+  const bootstrapped = useRef(false);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('cachedUser');
+  const clearLocalAuth = useCallback(() => {
+    setAccessToken(null);
+    try {
+      localStorage.removeItem('cachedUser');
+    } catch {}
     setUser(null);
   }, []);
 
-  const login = useCallback((accessToken: string, refreshToken: string, userData: User) => {
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('cachedUser', JSON.stringify(userData));
+  const logout = useCallback(async () => {
+    try {
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/logout`,
+        { method: 'POST', credentials: 'include' },
+      );
+    } catch {
+      // Network failure — clear local state anyway.
+    }
+    clearLocalAuth();
+  }, [clearLocalAuth]);
+
+  const login = useCallback((accessToken: string, userData: User) => {
+    setAccessToken(accessToken);
+    try {
+      localStorage.setItem('cachedUser', JSON.stringify(userData));
+    } catch {}
     setUser(userData);
   }, []);
 
   useEffect(() => {
-    // Restore cached user immediately (avoids flash of logged-out state)
-    const cached = getStoredUser();
+    // Wire the API client so refresh failures bounce the user.
+    setAuthFailureHandler(clearLocalAuth);
+    return () => setAuthFailureHandler(null);
+  }, [clearLocalAuth]);
+
+  useEffect(() => {
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+
+    // Restore cached user immediately to avoid flash-of-logged-out state.
+    const cached = getCachedUser();
     if (cached) setUser(cached);
 
-    const fetchProfile = async () => {
-      const token = localStorage.getItem('accessToken');
-      if (!token) return;
+    let cancelled = false;
 
+    (async () => {
       try {
-        const res = await fetch(`${API_URL}/api/users/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.status === 401) {
-          logout();
+        // Try a silent refresh — succeeds when the httpOnly refresh cookie is
+        // present and valid; fails cleanly for first-time visitors.
+        const refreshRes = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/refresh`,
+          { method: 'POST', credentials: 'include' },
+        );
+
+        if (!refreshRes.ok) {
+          if (!cancelled) clearLocalAuth();
           return;
         }
-        if (!res.ok) return;
-        const data = await res.json();
-        localStorage.setItem('cachedUser', JSON.stringify(data));
-        setUser(data);
-      } catch {
-        // Don't logout on network errors or non-401 failures
-      }
-    };
 
-    fetchProfile().finally(() => setIsLoading(false));
-  }, [logout]);
+        const { accessToken } = (await refreshRes.json()) as { accessToken: string };
+        setAccessToken(accessToken);
+
+        // Re-fetch the canonical profile so cached UI matches the server.
+        const profile = await apiJson<User>('/api/users/profile');
+        if (cancelled) return;
+        try {
+          localStorage.setItem('cachedUser', JSON.stringify(profile));
+        } catch {}
+        setUser(profile);
+      } catch {
+        // Don't blow away cached user on a transient network failure.
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clearLocalAuth]);
 
   return (
     <AuthContext.Provider value={{ user, isLoggedIn: !!user, isLoading, login, logout }}>
@@ -91,3 +148,7 @@ export function useAuth() {
   }
   return context;
 }
+
+// Re-exported so call sites can issue authenticated requests without importing
+// from two different modules.
+export { apiFetch, apiJson };

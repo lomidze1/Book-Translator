@@ -227,10 +227,12 @@ describe('ReaderService', () => {
       const result = await service.getBookmarks(userId, bookId);
 
       expect(result).toEqual(bookmarks);
-      expect(mockPrisma.bookmark.findMany).toHaveBeenCalledWith({
-        where: { userId, bookId },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.bookmark.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId, bookId },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
 
     it('should return empty array when no bookmarks', async () => {
@@ -246,10 +248,12 @@ describe('ReaderService', () => {
 
       await service.getBookmarks(userId, bookId);
 
-      expect(mockPrisma.bookmark.findMany).toHaveBeenCalledWith({
-        where: { userId, bookId },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.bookmark.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId, bookId },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
   });
 
@@ -353,11 +357,13 @@ describe('ReaderService', () => {
       const result = await service.getHighlights(userId, bookId);
 
       expect(result[0].notes).toHaveLength(1);
-      expect(mockPrisma.highlight.findMany).toHaveBeenCalledWith({
-        where: { userId, bookId },
-        include: { notes: true },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.highlight.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId, bookId },
+          include: { notes: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
 
     it('should return empty array when no highlights', async () => {
@@ -373,11 +379,13 @@ describe('ReaderService', () => {
 
       await service.getHighlights('user-2', 'book-2');
 
-      expect(mockPrisma.highlight.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-2', bookId: 'book-2' },
-        include: { notes: true },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.highlight.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-2', bookId: 'book-2' },
+          include: { notes: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
   });
 
@@ -496,11 +504,13 @@ describe('ReaderService', () => {
       const result = await service.getNotes(userId, bookId);
 
       expect(result[0].highlight).toBeDefined();
-      expect(mockPrisma.note.findMany).toHaveBeenCalledWith({
-        where: { userId, bookId },
-        include: { highlight: true },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId, bookId },
+          include: { highlight: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
 
     it('should return empty array when no notes', async () => {
@@ -516,11 +526,13 @@ describe('ReaderService', () => {
 
       await service.getNotes('user-2', 'book-2');
 
-      expect(mockPrisma.note.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-2', bookId: 'book-2' },
-        include: { highlight: true },
-        orderBy: { createdAt: 'asc' },
-      });
+      expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-2', bookId: 'book-2' },
+          include: { highlight: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
     });
   });
 

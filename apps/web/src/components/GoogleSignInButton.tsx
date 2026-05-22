@@ -37,6 +37,7 @@ export default function GoogleSignInButton({ onError, redirectTo = '/dashboard' 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
+        credentials: 'include', // Refresh token cookie set by backend.
       });
 
       const data = await response.json();
@@ -46,7 +47,7 @@ export default function GoogleSignInButton({ onError, redirectTo = '/dashboard' 
         return;
       }
 
-      login(data.accessToken, data.refreshToken, data.user);
+      login(data.accessToken, data.user);
       router.push(redirectTo);
     } catch {
       onError(t('error'));

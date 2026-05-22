@@ -13,13 +13,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     description: t('upload_description'),
     alternates: {
       canonical: `${BASE_URL}/${locale}/upload`,
-      languages: { ka: `${BASE_URL}/ka/upload`, en: `${BASE_URL}/en/upload` },
+      languages: { ka: `${BASE_URL}/ka/upload`, en: `${BASE_URL}/en/upload`, 'x-default': `${BASE_URL}/ka/upload` },
     },
     openGraph: {
       title: t('upload_title'),
       description: t('upload_description'),
       url: `${BASE_URL}/${locale}/upload`,
-      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: 'Book Translator' }],
+      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: t('site_name') }],
     },
     twitter: {
       card: 'summary_large_image',

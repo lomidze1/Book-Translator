@@ -148,7 +148,7 @@ describe('ReaderController', () => {
       const bookmarks = [{ id: 'bm-1' }, { id: 'bm-2' }];
       mockReaderService.getBookmarks.mockResolvedValue(bookmarks);
 
-      const result = await controller.getBookmarks(user, 'book-1');
+      const result = await controller.getBookmarks(user, 'book-1', 1, 100);
 
       expect(result).toHaveLength(2);
     });
@@ -156,7 +156,7 @@ describe('ReaderController', () => {
     it('should return empty array when no bookmarks', async () => {
       mockReaderService.getBookmarks.mockResolvedValue([]);
 
-      const result = await controller.getBookmarks(user, 'book-1');
+      const result = await controller.getBookmarks(user, 'book-1', 1, 100);
 
       expect(result).toEqual([]);
     });
@@ -164,9 +164,9 @@ describe('ReaderController', () => {
     it('should pass userId to service', async () => {
       mockReaderService.getBookmarks.mockResolvedValue([]);
 
-      await controller.getBookmarks(user, 'book-1');
+      await controller.getBookmarks(user, 'book-1', 1, 100);
 
-      expect(mockReaderService.getBookmarks).toHaveBeenCalledWith('user-1', 'book-1');
+      expect(mockReaderService.getBookmarks).toHaveBeenCalledWith('user-1', 'book-1', 1, 100);
     });
   });
 
@@ -254,7 +254,7 @@ describe('ReaderController', () => {
       const highlights = [{ id: 'hl-1', notes: [] }];
       mockReaderService.getHighlights.mockResolvedValue(highlights);
 
-      const result = await controller.getHighlights(user, 'book-1');
+      const result = await controller.getHighlights(user, 'book-1', 1, 100);
 
       expect(result).toHaveLength(1);
     });
@@ -262,7 +262,7 @@ describe('ReaderController', () => {
     it('should return empty array', async () => {
       mockReaderService.getHighlights.mockResolvedValue([]);
 
-      const result = await controller.getHighlights(user, 'book-1');
+      const result = await controller.getHighlights(user, 'book-1', 1, 100);
 
       expect(result).toEqual([]);
     });
@@ -371,7 +371,7 @@ describe('ReaderController', () => {
       const notes = [{ id: 'n-1', content: 'note', highlight: null }];
       mockReaderService.getNotes.mockResolvedValue(notes);
 
-      const result = await controller.getNotes(user, 'book-1');
+      const result = await controller.getNotes(user, 'book-1', 1, 100);
 
       expect(result).toHaveLength(1);
     });
@@ -379,7 +379,7 @@ describe('ReaderController', () => {
     it('should return empty array', async () => {
       mockReaderService.getNotes.mockResolvedValue([]);
 
-      const result = await controller.getNotes(user, 'book-1');
+      const result = await controller.getNotes(user, 'book-1', 1, 100);
 
       expect(result).toEqual([]);
     });
@@ -388,7 +388,7 @@ describe('ReaderController', () => {
       const notes = [{ id: 'n-1', highlight: { id: 'hl-1', selectedText: 'text' } }];
       mockReaderService.getNotes.mockResolvedValue(notes);
 
-      const result = await controller.getNotes(user, 'book-1');
+      const result = await controller.getNotes(user, 'book-1', 1, 100);
 
       expect(result[0].highlight).toBeDefined();
     });

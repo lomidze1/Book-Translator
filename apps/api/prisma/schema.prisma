@@ -256,8 +256,7 @@ enum PaymentStatus {
 }
 
 enum PaymentProvider {
-  BOG
-  TBC
+  FLITT
 }
 
 enum PaymentType {

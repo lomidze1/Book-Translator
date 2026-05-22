@@ -5,14 +5,16 @@ import {
   Param,
   Body,
   Query,
-  Headers,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
   ParseIntPipe,
   DefaultValuePipe,
   ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PaymentService } from './payment.service';
-import { CreatePaymentDto, BogCallbackDto, TbcCallbackDto } from './dto';
+import { CreatePaymentDto, FlittCallbackDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -20,7 +22,10 @@ import { Public } from '../auth/decorators/public.decorator';
 @Controller('payments')
 @UseGuards(JwtAuthGuard)
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Post()
   async create(@Body() dto: CreatePaymentDto, @CurrentUser('id') userId: string) {
@@ -57,28 +62,19 @@ export class PaymentController {
   // Mock endpoint — simulate payment completion (dev only)
   @Post(':id/simulate')
   async simulate(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    if (process.env.NODE_ENV === 'production') {
+    if (this.config.get<string>('NODE_ENV') === 'production') {
       throw new ForbiddenException('Payment simulation is not available in production');
     }
     return this.paymentService.simulatePayment(id, userId);
   }
 
-  // Webhook callbacks — no auth (called by payment providers)
+  // Flitt webhook callback — no auth (called by Flitt servers).
+  // The SHA1 signature is computed over the full payload, so we must NOT
+  // strip extra fields. Override the global ValidationPipe to keep them.
   @Public()
-  @Post('bog/callback')
-  async bogCallback(
-    @Body() payload: BogCallbackDto,
-    @Headers('x-bog-signature') signature?: string,
-  ) {
-    return this.paymentService.handleCallback('BOG', payload, signature);
-  }
-
-  @Public()
-  @Post('tbc/callback')
-  async tbcCallback(
-    @Body() payload: TbcCallbackDto,
-    @Headers('x-tbc-signature') signature?: string,
-  ) {
-    return this.paymentService.handleCallback('TBC', payload, signature);
+  @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
+  @Post('flitt/callback')
+  async flittCallback(@Body() payload: FlittCallbackDto) {
+    return this.paymentService.handleCallback('FLITT', payload);
   }
 }

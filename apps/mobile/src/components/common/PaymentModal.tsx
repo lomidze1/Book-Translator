@@ -7,7 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/theme/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
-import { createPayment, type PaymentProvider, type PaymentType } from '@/services/payment';
+import { createPayment, type PaymentType } from '@/services/payment';
 
 interface PaymentModalProps {
   visible: boolean;
@@ -27,7 +27,6 @@ export default function PaymentModal({
   const { t } = useTranslation();
   const { showToast } = useToast();
   const { height: screenHeight } = useWindowDimensions();
-  const [provider, setProvider] = useState<PaymentProvider>('BOG');
   const [loading, setLoading] = useState(false);
 
   const handlePay = async () => {
@@ -36,7 +35,7 @@ export default function PaymentModal({
       const result = await createPayment({
         bookId,
         type,
-        provider,
+        provider: 'FLITT',
         translationId,
       });
 
@@ -48,7 +47,6 @@ export default function PaymentModal({
 
       // When browser closes, assume user completed or cancelled
       if (browserResult.type === 'cancel' || browserResult.type === 'dismiss') {
-        // User may have completed payment — let parent refresh status
         onSuccess();
       }
     } catch (err: any) {
@@ -63,11 +61,6 @@ export default function PaymentModal({
     if (currency === 'GEL') return `${amount.toFixed(2)} ₾`;
     return `${amount.toFixed(2)} ${currency}`;
   };
-
-  const providers: { key: PaymentProvider; label: string }[] = [
-    { key: 'BOG', label: t('payment.provider_bog') },
-    { key: 'TBC', label: t('payment.provider_tbc') },
-  ];
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -89,28 +82,10 @@ export default function PaymentModal({
             </View>
           )}
 
-          {/* Provider Selection */}
-          <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>{t('payment.choose_provider')}</Text>
-          <View style={s.providerRow}>
-            {providers.map((p) => (
-              <TouchableOpacity
-                key={p.key}
-                style={[
-                  s.providerCard,
-                  { borderColor: provider === p.key ? theme.primary : theme.border },
-                  provider === p.key && { backgroundColor: theme.primary + '10' },
-                ]}
-                onPress={() => setProvider(p.key)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: provider === p.key }}
-              >
-                <View style={[s.radio, { borderColor: provider === p.key ? theme.primary : theme.border }]}>
-                  {provider === p.key && <View style={[s.radioInner, { backgroundColor: theme.primary }]} />}
-                </View>
-                <Text style={[s.providerLabel, { color: theme.text }]}>{p.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {/* Provider note */}
+          <Text style={[s.providerNote, { color: theme.textSecondary }]}>
+            {t('payment.provider_flitt_note')}
+          </Text>
 
           {/* Pay Button */}
           <TouchableOpacity
@@ -146,15 +121,7 @@ const s = StyleSheet.create({
   },
   amountLabel: { fontSize: 13, marginBottom: 4 },
   amountValue: { fontSize: 28, fontWeight: '700' },
-  sectionLabel: { fontSize: 14, marginBottom: 10 },
-  providerRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  providerCard: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderWidth: 2, borderRadius: 10, padding: 14,
-  },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  radioInner: { width: 10, height: 10, borderRadius: 5 },
-  providerLabel: { fontSize: 16, fontWeight: '600' },
+  providerNote: { fontSize: 14, marginBottom: 24, textAlign: 'center' },
   payBtn: { height: 52, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   payBtnDisabled: { opacity: 0.6 },
   payBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },

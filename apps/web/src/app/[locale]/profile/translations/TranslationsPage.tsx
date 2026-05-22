@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, Link } from '@/i18n/navigation';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -92,7 +93,12 @@ export default function TranslationsPage() {
               <div key={item.id} className={styles.translationItem}>
                 <div className={styles.translationCover}>
                   {item.book.coverUrl ? (
-                    <img src={item.book.coverUrl} alt={item.book.title} />
+                    <Image
+                      src={item.book.coverUrl}
+                      alt={item.book.title}
+                      width={48}
+                      height={72}
+                    />
                   ) : (
                     <div className={styles.coverPlaceholder}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

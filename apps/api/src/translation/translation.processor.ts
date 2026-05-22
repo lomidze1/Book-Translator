@@ -68,25 +68,24 @@ export class TranslationProcessor implements OnModuleInit {
     const { translationId, bookId } = job.data;
     this.logger.log(`🔄 Starting translation: translationId=${translationId}, bookId=${bookId}`);
 
-    // Get chapter count and metadata (without loading content)
-    const chapterMeta = await this.prisma.chapter.findMany({
-      where: { bookId },
-      orderBy: { number: 'asc' },
-      select: { id: true, number: true },
-    });
-
-    this.logger.log(`Found ${chapterMeta.length} chapters for book ${bookId}`);
-
-    if (chapterMeta.length === 0) {
-      await this.translationService.updateProgress(translationId, 0, 'FAILED');
-      throw new Error('No chapters found for book');
-    }
-
-    // Get book info and translation glossary in parallel
-    const [book, translation] = await Promise.all([
+    // Single query: fetch all chapters with content + book + translation in parallel.
+    // Previously this was an N+1: one findMany for metadata, then findUnique per chapter.
+    const [chapters, book, translation] = await Promise.all([
+      this.prisma.chapter.findMany({
+        where: { bookId },
+        orderBy: { number: 'asc' },
+        select: { id: true, number: true, originalContent: true },
+      }),
       this.prisma.book.findUnique({ where: { id: bookId } }),
       this.prisma.translation.findUnique({ where: { id: translationId } }),
     ]);
+
+    this.logger.log(`Found ${chapters.length} chapters for book ${bookId}`);
+
+    if (chapters.length === 0) {
+      await this.translationService.updateProgress(translationId, 0, 'FAILED');
+      throw new Error('No chapters found for book');
+    }
 
     if (!book) {
       await this.translationService.updateProgress(translationId, 0, 'FAILED');
@@ -99,16 +98,14 @@ export class TranslationProcessor implements OnModuleInit {
     await this.translationService.updateProgress(translationId, 0, 'IN_PROGRESS');
 
     // Pre-scan all chapters to estimate total chunks for granular progress
-    const chapterContents: { meta: (typeof chapterMeta)[0]; chapter: { id: string; number: number; originalContent: string } }[] = [];
-    let totalChunks = 0;
-
-    for (const meta of chapterMeta) {
-      const chapter = await this.prisma.chapter.findUnique({ where: { id: meta.id } });
-      if (!chapter) continue;
-      const chunkCount = this.claude.estimateChunkCount(chapter.originalContent.length);
-      totalChunks += chunkCount;
-      chapterContents.push({ meta, chapter });
-    }
+    const chapterContents = chapters.map((chapter) => ({
+      meta: { id: chapter.id, number: chapter.number },
+      chapter,
+    }));
+    const totalChunks = chapters.reduce(
+      (sum, c) => sum + this.claude.estimateChunkCount(c.originalContent.length),
+      0,
+    );
 
     this.logger.log(`Total estimated chunks across all chapters: ${totalChunks}`);
 

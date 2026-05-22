@@ -14,14 +14,20 @@ describe('AuthController — Edge Cases & Error Handling', () => {
     verifyOtp: vi.fn(),
   };
 
+  const mockConfig = { get: vi.fn().mockReturnValue('test') };
+
+  function createMockRes() {
+    return { cookie: vi.fn(), clearCookie: vi.fn() } as any;
+  }
+  function createMockReq(cookies: Record<string, string> = {}) {
+    return { cookies } as any;
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
-    controller = new (AuthController as any)(mockAuthService);
+    controller = new (AuthController as any)(mockAuthService, mockConfig);
   });
 
-  // ============================================================
-  // POST /auth/register — Edge Cases
-  // ============================================================
   describe('POST /auth/register — edge cases', () => {
     it('should propagate ConflictException from service', async () => {
       mockAuthService.register.mockRejectedValue(
@@ -67,9 +73,6 @@ describe('AuthController — Edge Cases & Error Handling', () => {
     });
   });
 
-  // ============================================================
-  // POST /auth/login — Edge Cases
-  // ============================================================
   describe('POST /auth/login — edge cases', () => {
     it('should propagate UnauthorizedException for wrong password', async () => {
       mockAuthService.login.mockRejectedValue(
@@ -77,12 +80,12 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.login({ email: 'test@example.com', password: 'wrongpassword' }),
+        controller.login({ email: 'test@example.com', password: 'wrongpassword' }, createMockRes()),
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return full auth response structure', async () => {
-      const expectedResponse = {
+    it('should return access token and user (refresh token goes to cookie)', async () => {
+      mockAuthService.login.mockResolvedValue({
         accessToken: 'eyJhbGciOiJIUzI1NiJ9.test',
         refreshToken: 'eyJhbGciOiJIUzI1NiJ9.refresh',
         user: {
@@ -91,21 +94,18 @@ describe('AuthController — Edge Cases & Error Handling', () => {
           name: 'ნიკა',
           avatar: null,
         },
-      };
-      mockAuthService.login.mockResolvedValue(expectedResponse);
-
-      const result = await controller.login({
-        email: 'test@example.com',
-        password: 'password123',
       });
+      const res = createMockRes();
+
+      const result = await controller.login(
+        { email: 'test@example.com', password: 'password123' },
+        res,
+      );
 
       expect(result).toHaveProperty('accessToken');
-      expect(result).toHaveProperty('refreshToken');
       expect(result).toHaveProperty('user');
-      expect(result.user).toHaveProperty('id');
-      expect(result.user).toHaveProperty('email');
-      expect(result.user).toHaveProperty('name');
-      expect(result.user).toHaveProperty('avatar');
+      expect((result as any).refreshToken).toBeUndefined();
+      expect(res.cookie).toHaveBeenCalled();
     });
 
     it('should not include passwordHash in login response', async () => {
@@ -115,19 +115,16 @@ describe('AuthController — Edge Cases & Error Handling', () => {
         user: { id: '1', email: 'a@b.com', name: null, avatar: null },
       });
 
-      const result = await controller.login({
-        email: 'a@b.com',
-        password: 'password123',
-      });
+      const result = await controller.login(
+        { email: 'a@b.com', password: 'password123' },
+        createMockRes(),
+      );
 
       expect((result as any).passwordHash).toBeUndefined();
       expect((result.user as any).passwordHash).toBeUndefined();
     });
   });
 
-  // ============================================================
-  // POST /auth/refresh — Edge Cases
-  // ============================================================
   describe('POST /auth/refresh — edge cases', () => {
     it('should propagate UnauthorizedException for invalid token', async () => {
       mockAuthService.refreshTokens.mockRejectedValue(
@@ -135,7 +132,7 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.refresh({ refreshToken: 'invalid-token' }),
+        controller.refresh(createMockReq({ refresh_token: 'invalid-token' }), createMockRes()),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -145,39 +142,43 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.refresh({ refreshToken: 'expired-token' }),
+        controller.refresh(createMockReq({ refresh_token: 'expired-token' }), createMockRes()),
       ).rejects.toThrow('Invalid refresh token');
     });
 
-    it('should correctly pass refreshToken string to service', async () => {
+    it('should correctly pass refresh cookie value to service', async () => {
       const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEifQ.signature';
       mockAuthService.refreshTokens.mockResolvedValue({
         accessToken: 'new-access',
         refreshToken: 'new-refresh',
       });
 
-      await controller.refresh({ refreshToken: token });
+      await controller.refresh(createMockReq({ refresh_token: token }), createMockRes());
 
       expect(mockAuthService.refreshTokens).toHaveBeenCalledWith(token);
     });
 
-    it('should return only accessToken and refreshToken', async () => {
+    it('should return access token only (refresh stays in cookie)', async () => {
       mockAuthService.refreshTokens.mockResolvedValue({
         accessToken: 'new-access',
         refreshToken: 'new-refresh',
       });
 
-      const result = await controller.refresh({ refreshToken: 'old-token' });
-
-      expect(Object.keys(result)).toEqual(
-        expect.arrayContaining(['accessToken', 'refreshToken']),
+      const result = await controller.refresh(
+        createMockReq({ refresh_token: 'old-token' }),
+        createMockRes(),
       );
+
+      expect(result).toEqual({ accessToken: 'new-access' });
+    });
+
+    it('rejects when cookie is missing', async () => {
+      await expect(
+        controller.refresh(createMockReq({}), createMockRes()),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
-  // ============================================================
-  // POST /auth/google — Edge Cases
-  // ============================================================
   describe('POST /auth/google — edge cases', () => {
     it('should propagate UnauthorizedException for invalid Google token', async () => {
       mockAuthService.googleAuth.mockRejectedValue(
@@ -185,7 +186,7 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.googleAuth({ idToken: 'invalid-google-token' }),
+        controller.googleAuth({ idToken: 'invalid-google-token' }, createMockRes()),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -195,14 +196,11 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.googleAuth({ idToken: 'any-token' }),
+        controller.googleAuth({ idToken: 'any-token' }, createMockRes()),
       ).rejects.toThrow('Google token verification not implemented');
     });
   });
 
-  // ============================================================
-  // POST /auth/phone/send-otp — Edge Cases
-  // ============================================================
   describe('POST /auth/phone/send-otp — edge cases', () => {
     it('should handle multiple sequential OTP requests', async () => {
       mockAuthService.sendOtp.mockResolvedValue({ message: 'OTP sent successfully' });
@@ -223,9 +221,6 @@ describe('AuthController — Edge Cases & Error Handling', () => {
     });
   });
 
-  // ============================================================
-  // POST /auth/phone/verify-otp — Edge Cases
-  // ============================================================
   describe('POST /auth/phone/verify-otp — edge cases', () => {
     it('should propagate BadRequestException for invalid OTP', async () => {
       mockAuthService.verifyOtp.mockRejectedValue(
@@ -233,24 +228,29 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.verifyOtp({ phone: '+995599123456', code: '000000' }),
+        controller.verifyOtp({ phone: '+995599123456', code: '000000' }, createMockRes()),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should return full auth response on successful OTP verification', async () => {
-      const authResponse = {
+    it('should return access token + user (refresh token goes to cookie)', async () => {
+      mockAuthService.verifyOtp.mockResolvedValue({
         accessToken: 'access',
         refreshToken: 'refresh',
         user: { id: 'user-1', email: null, name: null, avatar: null },
-      };
-      mockAuthService.verifyOtp.mockResolvedValue(authResponse);
-
-      const result = await controller.verifyOtp({
-        phone: '+995599123456',
-        code: '123456',
       });
+      const res = createMockRes();
 
-      expect(result).toEqual(authResponse);
+      const result = await controller.verifyOtp(
+        { phone: '+995599123456', code: '123456' },
+        res,
+      );
+
+      expect(result).toEqual({
+        accessToken: 'access',
+        user: { id: 'user-1', email: null, name: null, avatar: null },
+      });
+      expect((result as any).refreshToken).toBeUndefined();
+      expect(res.cookie).toHaveBeenCalled();
     });
   });
 });

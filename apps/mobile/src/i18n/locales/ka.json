@@ -227,9 +227,7 @@
   },
   "payment": {
     "title": "გადახდა",
-    "choose_provider": "აირჩიეთ გადახდის მეთოდი",
-    "provider_bog": "BOG",
-    "provider_tbc": "TBC",
+    "provider_flitt_note": "უსაფრთხო გადახდა Flitt-ით (თიბისი ბანკი).",
     "amount_label": "თანხა",
     "pay_button": "გადახდა",
     "processing": "მუშავდება...",

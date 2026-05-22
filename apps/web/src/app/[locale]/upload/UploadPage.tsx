@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, DragEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
+import { getAccessToken } from '@/lib/api-client';
 import styles from '../../upload/page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -138,8 +139,12 @@ export default function UploadPage() {
         xhr.addEventListener('error', () => reject(new Error(t('error_network'))));
         xhr.addEventListener('abort', () => reject(new Error(t('error_aborted'))));
 
-        const token = localStorage.getItem('accessToken');
+        // XHR is used here for upload progress events. The in-memory access
+        // token is sufficient — a stale token will simply 401, and the user
+        // can retry after the silent refresh on the next request.
+        const token = getAccessToken();
         xhr.open('POST', `${API_URL}/api/books/upload`);
+        xhr.withCredentials = true;
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.send(formData);
       });

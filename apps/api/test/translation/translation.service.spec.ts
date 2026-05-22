@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { TranslationService } from '../../src/translation/translation.service';
+
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 
 // Mock BullMQ
 vi.mock('bullmq', () => ({
@@ -48,7 +50,12 @@ describe('TranslationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.NODE_ENV = 'development';
     service = new (TranslationService as any)(mockPrisma, mockS3, mockParsing);
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
   });
 
   describe('createTranslation', () => {

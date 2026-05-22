@@ -2,6 +2,7 @@ import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import type { Metadata, Viewport } from 'next';
+import { Noto_Sans_Georgian, Noto_Serif_Georgian } from 'next/font/google';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
 import GoogleOAuthWrapper from '@/components/GoogleOAuthWrapper';
@@ -12,6 +13,22 @@ import ToastContainer from '@/components/Toast';
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://booktranslator.ge';
+
+// Georgian-aware self-hosted fonts. Geist (the previous sans) has no Georgian
+// glyphs, so it silently fell back to Arial for the entire app. Noto Sans
+// Georgian is the de-facto choice for Georgian UI; the serif variant powers
+// the reader view.
+const notoSans = Noto_Sans_Georgian({
+  subsets: ['georgian', 'latin'],
+  display: 'swap',
+  variable: '--font-sans',
+});
+
+const notoSerif = Noto_Serif_Georgian({
+  subsets: ['georgian', 'latin'],
+  display: 'swap',
+  variable: '--font-serif',
+});
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -77,21 +94,36 @@ export default async function LocaleLayout({
   }
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang={locale} className={`${notoSans.variable} ${notoSerif.variable}`} suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
-              '@type': 'WebSite',
-              name: 'Book Translator',
-              url: BASE_URL,
-              potentialAction: {
-                '@type': 'SearchAction',
-                target: `${BASE_URL}/${locale}/search?q={search_term_string}`,
-                'query-input': 'required name=search_term_string',
-              },
+              '@graph': [
+                {
+                  '@type': 'WebSite',
+                  '@id': `${BASE_URL}/#website`,
+                  name: 'Book Translator',
+                  url: BASE_URL,
+                  potentialAction: {
+                    '@type': 'SearchAction',
+                    target: `${BASE_URL}/${locale}/search?q={search_term_string}`,
+                    'query-input': 'required name=search_term_string',
+                  },
+                },
+                {
+                  '@type': 'Organization',
+                  '@id': `${BASE_URL}/#organization`,
+                  name: 'Book Translator',
+                  url: BASE_URL,
+                  logo: {
+                    '@type': 'ImageObject',
+                    url: `${BASE_URL}/og-image.png`,
+                  },
+                },
+              ],
             }).replace(/</g, '\\u003c'),
           }}
         />

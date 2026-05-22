@@ -8,76 +8,74 @@ import {
   Body,
   Query,
   UseGuards,
-  Request,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { NotificationService } from './notification.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { SubscribePushDto } from './dto/subscribe-push.dto';
 
 @Controller('notifications')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Get()
   async getNotifications(
-    @Request() req: any,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @CurrentUser('id') userId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
-    return this.notificationService.getNotifications(
-      req.user.id,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
-    );
+    return this.notificationService.getNotifications(userId, page, limit);
   }
 
   @Get('unread-count')
-  async getUnreadCount(@Request() req: any) {
-    const count = await this.notificationService.getUnreadCount(req.user.id);
+  async getUnreadCount(@CurrentUser('id') userId: string) {
+    const count = await this.notificationService.getUnreadCount(userId);
     return { count };
   }
 
   @Patch(':id/read')
-  async markAsRead(@Request() req: any, @Param('id') id: string) {
-    await this.notificationService.markAsRead(req.user.id, id);
+  async markAsRead(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    await this.notificationService.markAsRead(userId, id);
     return { success: true };
   }
 
   @Patch('read-all')
-  async markAllAsRead(@Request() req: any) {
-    await this.notificationService.markAllAsRead(req.user.id);
+  async markAllAsRead(@CurrentUser('id') userId: string) {
+    await this.notificationService.markAllAsRead(userId);
     return { success: true };
   }
 
   @Get('preferences')
-  async getPreferences(@Request() req: any) {
-    return this.notificationService.getOrCreatePreferences(req.user.id);
+  async getPreferences(@CurrentUser('id') userId: string) {
+    return this.notificationService.getOrCreatePreferences(userId);
   }
 
   @Patch('preferences')
   async updatePreferences(
-    @Request() req: any,
+    @CurrentUser('id') userId: string,
     @Body() dto: UpdatePreferencesDto,
   ) {
-    return this.notificationService.updatePreferences(req.user.id, dto);
+    return this.notificationService.updatePreferences(userId, dto);
   }
 
   @Post('push/subscribe')
   async subscribePush(
-    @Request() req: any,
+    @CurrentUser('id') userId: string,
     @Body() dto: SubscribePushDto,
   ) {
-    return this.notificationService.subscribePush(req.user.id, dto);
+    return this.notificationService.subscribePush(userId, dto);
   }
 
   @Delete('push/unsubscribe')
   async unsubscribePush(
-    @Request() req: any,
+    @CurrentUser('id') userId: string,
     @Body('endpoint') endpoint: string,
   ) {
-    await this.notificationService.unsubscribePush(req.user.id, endpoint);
+    await this.notificationService.unsubscribePush(userId, endpoint);
     return { success: true };
   }
 }

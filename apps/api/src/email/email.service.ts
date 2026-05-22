@@ -1,72 +1,133 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+
+function maskEmail(email: string): string {
+  const [user, domain] = email.split('@');
+  if (!user || !domain) return '***';
+  const visible = user.length <= 2 ? user[0] : user.slice(0, 2);
+  return `${visible}***@${domain}`;
+}
 
 @Injectable()
 export class EmailService {
-  private resend: Resend | null;
+  private readonly logger = new Logger(EmailService.name);
+  private readonly resend: Resend | null;
+  private readonly from: string;
+  private readonly frontendUrl: string;
 
-  constructor() {
-    const apiKey = process.env.RESEND_API_KEY;
+  constructor(private readonly config: ConfigService) {
+    const apiKey = this.config.get<string>('RESEND_API_KEY');
+    this.from = this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev';
+    this.frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+
     if (apiKey) {
       this.resend = new Resend(apiKey);
     } else {
-      console.warn('⚠️  RESEND_API_KEY not set — email sending disabled');
+      this.logger.warn('RESEND_API_KEY not set — email sending disabled');
       this.resend = null;
     }
   }
 
-  async sendPasswordResetEmail(to: string, token: string, name?: string): Promise<void> {
+  private async send(label: string, to: string, subject: string, html: string): Promise<void> {
     if (!this.resend) {
-      console.warn(`⚠️  Email skipped (no API key): password reset for ${to}`);
+      this.logger.warn(`Email skipped (no API key): ${label} for ${maskEmail(to)}`);
       return;
     }
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-    const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+    await this.resend.emails.send({ from: this.from, to, subject, html });
+    this.logger.log(`Email sent: ${label} → ${maskEmail(to)}`);
+  }
 
-    console.log(`📧 Sending password reset email: from=${from}, to=${to}`);
-
-    const result = await this.resend.emails.send({
-      from,
+  async sendPasswordResetEmail(to: string, token: string, name?: string): Promise<void> {
+    const resetUrl = `${this.frontendUrl}/reset-password?token=${token}`;
+    await this.send(
+      'password-reset',
       to,
-      subject: 'პაროლის აღდგენა — Book Translator',
-      html: this.getPasswordResetTemplate(resetUrl, name),
-    });
-
-    console.log(`📧 Resend response:`, JSON.stringify(result));
+      'პაროლის აღდგენა — Book Translator',
+      this.getPasswordResetTemplate(resetUrl, name),
+    );
   }
 
   async sendPasswordChangeConfirmation(to: string, token: string, name?: string): Promise<void> {
-    if (!this.resend) {
-      console.warn(`⚠️  Email skipped (no API key): password change confirmation for ${to}`);
-      return;
-    }
-
-    const confirmUrl = `${process.env.FRONTEND_URL}/confirm-password-change?token=${token}`;
-    const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
-
-    await this.resend.emails.send({
-      from,
+    const confirmUrl = `${this.frontendUrl}/confirm-password-change?token=${token}`;
+    await this.send(
+      'password-change-confirmation',
       to,
-      subject: 'პაროლის შეცვლის დადასტურება — Book Translator',
-      html: this.getPasswordChangeConfirmationTemplate(confirmUrl, name),
-    });
+      'პაროლის შეცვლის დადასტურება — Book Translator',
+      this.getPasswordChangeConfirmationTemplate(confirmUrl, name),
+    );
   }
 
   async sendEmailVerification(to: string, token: string, name?: string): Promise<void> {
-    if (!this.resend) {
-      console.warn(`⚠️  Email skipped (no API key): verification for ${to}`);
-      return;
-    }
-
-    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
-
-    await this.resend.emails.send({
-      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+    const verifyUrl = `${this.frontendUrl}/verify-email?token=${token}`;
+    await this.send(
+      'email-verification',
       to,
-      subject: 'ემაილის დადასტურება — Book Translator',
-      html: this.getEmailVerificationTemplate(verifyUrl, name),
-    });
+      'ემაილის დადასტურება — Book Translator',
+      this.getEmailVerificationTemplate(verifyUrl, name),
+    );
+  }
+
+  async sendTranslationCompletedEmail(
+    to: string,
+    locale: string,
+    data: { bookTitle: string; bookId: string; userName?: string },
+  ): Promise<void> {
+    const isKa = locale !== 'en';
+    const subject = isKa
+      ? 'თარგმანი დასრულდა — Book Translator'
+      : 'Translation Completed — Book Translator';
+    const readUrl = `${this.frontendUrl}/${locale}/books/${data.bookId}/read`;
+    await this.send(
+      'translation-completed',
+      to,
+      subject,
+      this.getTranslationCompletedTemplate(readUrl, data.bookTitle, data.userName, isKa),
+    );
+  }
+
+  async sendPaymentReceiptEmail(
+    to: string,
+    locale: string,
+    data: {
+      amount: number;
+      currency: string;
+      bookTitle: string;
+      paymentId: string;
+      paidAt: Date;
+      userName?: string;
+    },
+  ): Promise<void> {
+    const isKa = locale !== 'en';
+    const subject = isKa
+      ? 'გადახდის ქვითარი — Book Translator'
+      : 'Payment Receipt — Book Translator';
+    await this.send('payment-receipt', to, subject, this.getPaymentReceiptTemplate(data, isKa));
+  }
+
+  async sendTtsCompletedEmail(
+    to: string,
+    locale: string,
+    data: {
+      bookTitle: string;
+      bookId: string;
+      audioBookId: string;
+      totalDuration: number;
+      userName?: string;
+    },
+  ): Promise<void> {
+    const isKa = locale !== 'en';
+    const subject = isKa
+      ? 'აუდიო მზადაა — Book Translator'
+      : 'Audio Book Ready — Book Translator';
+    const listenUrl = `${this.frontendUrl}/${locale}/books/${data.bookId}/read`;
+    await this.send(
+      'tts-completed',
+      to,
+      subject,
+      this.getTtsCompletedTemplate(listenUrl, data, isKa),
+    );
   }
 
   private getPasswordResetTemplate(resetUrl: string, name?: string): string {
@@ -86,92 +147,6 @@ export class EmailService {
       </body>
       </html>
     `;
-  }
-
-  // === Phase 9: Notification Emails ===
-
-  async sendTranslationCompletedEmail(
-    to: string,
-    locale: string,
-    data: { bookTitle: string; bookId: string; userName?: string },
-  ): Promise<void> {
-    if (!this.resend) {
-      console.warn(`⚠️  Email skipped (no API key): translation completed for ${to}`);
-      return;
-    }
-
-    const isKa = locale !== 'en';
-    const subject = isKa
-      ? 'თარგმანი დასრულდა — Book Translator'
-      : 'Translation Completed — Book Translator';
-    const readUrl = `${process.env.FRONTEND_URL}/${locale}/books/${data.bookId}/read`;
-
-    await this.resend.emails.send({
-      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-      to,
-      subject,
-      html: this.getTranslationCompletedTemplate(readUrl, data.bookTitle, data.userName, isKa),
-    });
-  }
-
-  async sendPaymentReceiptEmail(
-    to: string,
-    locale: string,
-    data: {
-      amount: number;
-      currency: string;
-      bookTitle: string;
-      paymentId: string;
-      paidAt: Date;
-      userName?: string;
-    },
-  ): Promise<void> {
-    if (!this.resend) {
-      console.warn(`⚠️  Email skipped (no API key): payment receipt for ${to}`);
-      return;
-    }
-
-    const isKa = locale !== 'en';
-    const subject = isKa
-      ? 'გადახდის ქვითარი — Book Translator'
-      : 'Payment Receipt — Book Translator';
-
-    await this.resend.emails.send({
-      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-      to,
-      subject,
-      html: this.getPaymentReceiptTemplate(data, isKa),
-    });
-  }
-
-  async sendTtsCompletedEmail(
-    to: string,
-    locale: string,
-    data: {
-      bookTitle: string;
-      bookId: string;
-      audioBookId: string;
-      totalDuration: number;
-      userName?: string;
-    },
-  ): Promise<void> {
-    if (!this.resend) {
-      console.warn(`⚠️  Email skipped (no API key): TTS completed for ${to}`);
-      return;
-    }
-
-    const isKa = locale !== 'en';
-    const subject = isKa
-      ? 'აუდიო მზადაა — Book Translator'
-      : 'Audio Book Ready — Book Translator';
-    const listenUrl = `${process.env.FRONTEND_URL}/${locale}/books/${data.bookId}/read`;
-
-    await this.resend.emails.send({
-      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-      to,
-      subject,
-      html: this.getTtsCompletedTemplate(listenUrl, data, isKa),
-    });
   }
 
   private getTranslationCompletedTemplate(readUrl: string, bookTitle: string, name?: string, isKa = true): string {

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TtsProvider, TtsOptions, TtsSynthesisResult, Voice } from './tts-provider.interface';
 import { escapeXml, estimateMp3Duration } from '../utils/shared';
+import { fetchWithTimeout } from '../../common/fetch';
 
 @Injectable()
 export class AzureProvider implements TtsProvider {
@@ -38,49 +39,27 @@ export class AzureProvider implements TtsProvider {
 
     const token = await this.getAccessToken();
     const ssml = this.buildSsml(text, options.voiceId, options.speed);
+    const ttsUrl = `https://${this.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
+    const ttsHeaders = (bearerToken: string) => ({
+      Authorization: `Bearer ${bearerToken}`,
+      'Content-Type': 'application/ssml+xml',
+      'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+    });
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-
-    let res: Response;
-    try {
-      res = await fetch(
-        `https://${this.region}.tts.speech.microsoft.com/cognitiveservices/v1`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/ssml+xml',
-            'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
-          },
-          body: ssml,
-          signal: controller.signal,
-        },
-      );
-    } catch (error) {
-      clearTimeout(timeout);
-      if ((error as any)?.name === 'AbortError') {
-        throw new Error('Azure TTS: request timeout (30s)');
-      }
-      throw error;
-    }
-    clearTimeout(timeout);
+    const res = await fetchWithTimeout(
+      ttsUrl,
+      { method: 'POST', headers: ttsHeaders(token), body: ssml },
+      30_000,
+    );
 
     if (res.status === 401) {
       // Token expired, refresh and retry once
       this.accessToken = null;
       const newToken = await this.getAccessToken();
-      const retryRes = await fetch(
-        `https://${this.region}.tts.speech.microsoft.com/cognitiveservices/v1`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${newToken}`,
-            'Content-Type': 'application/ssml+xml',
-            'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
-          },
-          body: ssml,
-        },
+      const retryRes = await fetchWithTimeout(
+        ttsUrl,
+        { method: 'POST', headers: ttsHeaders(newToken), body: ssml },
+        30_000,
       );
       if (!retryRes.ok) throw new Error(`Azure TTS error ${retryRes.status}`);
       const arrayBuffer = await retryRes.arrayBuffer();
@@ -108,11 +87,10 @@ export class AzureProvider implements TtsProvider {
     if (!this.speechKey) return [];
 
     const token = await this.getAccessToken();
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://${this.region}.tts.speech.microsoft.com/cognitiveservices/voices/list`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
+      { headers: { Authorization: `Bearer ${token}` } },
+      10_000,
     );
 
     if (!res.ok) return [];
@@ -141,7 +119,7 @@ export class AzureProvider implements TtsProvider {
       return this.accessToken;
     }
 
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://${this.region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
       {
         method: 'POST',
@@ -150,6 +128,7 @@ export class AzureProvider implements TtsProvider {
           'Content-Length': '0',
         },
       },
+      8_000,
     );
 
     if (!res.ok) {

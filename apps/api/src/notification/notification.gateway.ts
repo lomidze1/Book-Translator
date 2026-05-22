@@ -7,6 +7,7 @@ import {
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
+import { PrismaService } from '../prisma/prisma.service';
 
 @WebSocketGateway({
   namespace: 'notifications',
@@ -21,9 +22,12 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  handleConnection(client: Socket): void {
+  async handleConnection(client: Socket): Promise<void> {
     try {
       const token =
         (client.handshake.auth as any)?.token ||
@@ -37,6 +41,24 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
       const payload = this.jwtService.verify(token);
       const userId = payload.sub;
+
+      // Match JwtStrategy: verify the token wasn't revoked by a password change
+      // or logout-all (tokenVersion bump).
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { tokenVersion: true },
+      });
+      if (!user) {
+        this.logger.warn(`Notification client rejected (user not found): ${client.id}`);
+        client.disconnect();
+        return;
+      }
+      if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+        this.logger.warn(`Notification client rejected (token revoked): ${client.id}`);
+        client.disconnect();
+        return;
+      }
+
       (client as any).userId = userId;
 
       // Auto-join user's room

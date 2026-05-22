@@ -36,7 +36,12 @@ describe('TtsService — retry', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new (TtsService as any)(mockPrisma, mockS3, mockProviderManager);
+    service = new (TtsService as any)(
+      mockPrisma,
+      mockS3,
+      mockProviderManager,
+      { get: (k: string) => process.env[k] } as any,
+    );
   });
 
   it('should re-queue FAILED chapters only', async () => {

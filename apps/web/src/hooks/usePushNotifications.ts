@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch, getAccessToken } from '@/lib/api-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -53,15 +53,11 @@ export function usePushNotifications() {
       });
 
       const json = subscription.toJSON();
-      const token = localStorage.getItem('accessToken');
-      if (!token) return false;
+      if (!getAccessToken()) return false;
 
-      await fetch(`${API_URL}/api/notifications/push/subscribe`, {
+      await apiFetch('/api/notifications/push/subscribe', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           endpoint: json.endpoint,
           p256dh: json.keys?.p256dh,
@@ -86,14 +82,10 @@ export function usePushNotifications() {
       const endpoint = subscription.endpoint;
       await subscription.unsubscribe();
 
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        await fetch(`${API_URL}/api/notifications/push/unsubscribe`, {
+      if (getAccessToken()) {
+        await apiFetch('/api/notifications/push/unsubscribe', {
           method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ endpoint }),
         });
       }
