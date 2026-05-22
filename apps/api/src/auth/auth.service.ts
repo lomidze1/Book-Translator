@@ -65,6 +65,32 @@ export class AuthService {
     this.googleClient = new OAuth2Client(this.googleClientId);
   }
 
+  /**
+   * Build the canonical `{ accessToken, refreshToken, user }` response from a
+   * loaded user row. Centralises what was previously a near-identical 10-line
+   * block at the bottom of register/login/googleAuth/verifyOtp/resetPassword —
+   * if we ever need to add a field to the user envelope (locale, role, etc.)
+   * it now changes in one place.
+   */
+  private async buildAuthResponse(user: {
+    id: string;
+    email: string | null;
+    name: string | null;
+    avatar: string | null;
+    tokenVersion: number;
+  }): Promise<AuthResponse> {
+    const tokens = await this.generateTokens(user.id, user.email, user.tokenVersion);
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatar: user.avatar,
+      },
+    };
+  }
+
   // ========================
   // Email + Password Auth
   // ========================
@@ -149,17 +175,7 @@ export class AuthService {
     // Reset attempts on successful login
     await this.redis.del(rateLimitKey);
 
-    const tokens = await this.generateTokens(user.id, user.email!, user.tokenVersion);
-
-    return {
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatar: user.avatar,
-      },
-    };
+    return this.buildAuthResponse(user);
   }
 
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
@@ -248,17 +264,7 @@ export class AuthService {
       }
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.tokenVersion);
-
-    return {
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatar: user.avatar,
-      },
-    };
+    return this.buildAuthResponse(user);
   }
 
   // ========================
@@ -322,17 +328,7 @@ export class AuthService {
       });
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.tokenVersion);
-
-    return {
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatar: user.avatar,
-      },
-    };
+    return this.buildAuthResponse(user);
   }
 
   // ========================

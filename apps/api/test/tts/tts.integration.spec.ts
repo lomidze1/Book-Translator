@@ -35,6 +35,7 @@ describe('TTS Integration Flow', () => {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
+      createMany: vi.fn(),
       upsert: vi.fn(),
       update: vi.fn(),
       count: vi.fn(),
@@ -91,12 +92,16 @@ describe('TTS Integration Flow', () => {
         id: audioBookId, totalChapters: 3, completedChapters: 0,
       });
 
-      // No existing AudioChapters
-      mockPrisma.audioChapter.findMany.mockResolvedValue([]);
-      mockPrisma.audioChapter.upsert
-        .mockResolvedValueOnce({ id: 'ac-1' })
-        .mockResolvedValueOnce({ id: 'ac-2' })
-        .mockResolvedValueOnce({ id: 'ac-3' });
+      // No existing AudioChapters on the initial scan; after createMany the
+      // service re-reads the rows by chapterNumber to learn the generated ids.
+      mockPrisma.audioChapter.findMany
+        .mockResolvedValueOnce([]) // first scan
+        .mockResolvedValueOnce([
+          { id: 'ac-1', chapterNumber: 1, status: 'PENDING' },
+          { id: 'ac-2', chapterNumber: 2, status: 'PENDING' },
+          { id: 'ac-3', chapterNumber: 3, status: 'PENDING' },
+        ]);
+      mockPrisma.audioChapter.createMany.mockResolvedValue({ count: 3 });
 
       const result = await service.synthesizeBook(userId, { bookId });
 
@@ -116,8 +121,11 @@ describe('TTS Integration Flow', () => {
         }),
       );
 
-      // Verify 3 AudioChapter upserts
-      expect(mockPrisma.audioChapter.upsert).toHaveBeenCalledTimes(3);
+      // After refactor: rows are created in a single batched call.
+      expect(mockPrisma.audioChapter.createMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.audioChapter.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skipDuplicates: true }),
+      );
     });
 
     it('synthesize-book → skips already completed chapters', async () => {
@@ -130,12 +138,11 @@ describe('TTS Integration Flow', () => {
         id: audioBookId, totalChapters: 2, completedChapters: 1,
       });
 
-      // Chapter 1 already completed
-      mockPrisma.audioChapter.findMany.mockResolvedValue([
-        { chapterNumber: 1, status: 'COMPLETED' },
-      ]);
-
-      mockPrisma.audioChapter.upsert.mockResolvedValue({ id: 'ac-2' });
+      // Chapter 1 already completed; chapter 2 created in the batch.
+      mockPrisma.audioChapter.findMany
+        .mockResolvedValueOnce([{ chapterNumber: 1, status: 'COMPLETED' }])
+        .mockResolvedValueOnce([{ id: 'ac-2', chapterNumber: 2, status: 'PENDING' }]);
+      mockPrisma.audioChapter.createMany.mockResolvedValue({ count: 1 });
 
       const result = await service.synthesizeBook(userId, { bookId });
 

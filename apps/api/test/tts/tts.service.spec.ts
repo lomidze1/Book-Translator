@@ -16,7 +16,7 @@ describe('TtsService', () => {
     translation: { findFirst: vi.fn() },
     translatedChapter: { findFirst: vi.fn(), findMany: vi.fn() },
     audioBook: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), update: vi.fn() },
-    audioChapter: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), upsert: vi.fn(), findMany: vi.fn() },
+    audioChapter: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), createMany: vi.fn(), upsert: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   };
 
   const mockS3 = {
@@ -186,8 +186,13 @@ describe('TtsService', () => {
         { translatedContent: 'text1', chapter: { id: 'ch-1', number: 1 } },
         { translatedContent: 'text2', chapter: { id: 'ch-2', number: 2 } },
       ]);
-      mockPrisma.audioChapter.findMany.mockResolvedValue([]);
-      mockPrisma.audioChapter.upsert.mockResolvedValue({ id: 'ac-1' });
+      mockPrisma.audioChapter.findMany
+        .mockResolvedValueOnce([]) // initial scan
+        .mockResolvedValueOnce([
+          { id: 'ac-1', chapterNumber: 1, status: 'PENDING' },
+          { id: 'ac-2', chapterNumber: 2, status: 'PENDING' },
+        ]);
+      mockPrisma.audioChapter.createMany.mockResolvedValue({ count: 2 });
 
       const result = await service.synthesizeBook(userId, dto);
       expect(result.totalChapters).toBe(2);

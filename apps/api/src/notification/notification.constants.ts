@@ -1,8 +1,5 @@
 export const NOTIFICATION_QUEUE = 'notification';
 
-export function getRedisConnection() {
-  return {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-  };
-}
+// Re-exported for backwards compatibility with existing imports in this module.
+// New code should import directly from `common/redis-connection`.
+export { getRedisConnection } from '../common/redis-connection';
