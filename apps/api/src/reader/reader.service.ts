@@ -94,18 +94,12 @@ export class ReaderService {
   }
 
   async deleteBookmark(userId: string, id: string) {
-    const bookmark = await this.prisma.bookmark.findUnique({
-      where: { id },
-    });
-
-    if (!bookmark) {
-      throw new NotFoundException('Bookmark ვერ მოიძებნა');
-    }
-
-    if (bookmark.userId !== userId) {
-      throw new ForbiddenException('არ გაქვთ ამ bookmark-ის წაშლის უფლება');
-    }
-
+    await this.assertOwnership(
+      () => this.prisma.bookmark.findUnique({ where: { id } }),
+      userId,
+      'Bookmark ვერ მოიძებნა',
+      'არ გაქვთ ამ bookmark-ის წაშლის უფლება',
+    );
     return this.prisma.bookmark.delete({ where: { id } });
   }
 
@@ -145,18 +139,12 @@ export class ReaderService {
   }
 
   async updateHighlight(userId: string, id: string, dto: UpdateHighlightDto) {
-    const highlight = await this.prisma.highlight.findUnique({
-      where: { id },
-    });
-
-    if (!highlight) {
-      throw new NotFoundException('Highlight ვერ მოიძებნა');
-    }
-
-    if (highlight.userId !== userId) {
-      throw new ForbiddenException('არ გაქვთ ამ highlight-ის რედაქტირების უფლება');
-    }
-
+    await this.assertOwnership(
+      () => this.prisma.highlight.findUnique({ where: { id } }),
+      userId,
+      'Highlight ვერ მოიძებნა',
+      'არ გაქვთ ამ highlight-ის რედაქტირების უფლება',
+    );
     return this.prisma.highlight.update({
       where: { id },
       data: { color: dto.color },
@@ -164,18 +152,12 @@ export class ReaderService {
   }
 
   async deleteHighlight(userId: string, id: string) {
-    const highlight = await this.prisma.highlight.findUnique({
-      where: { id },
-    });
-
-    if (!highlight) {
-      throw new NotFoundException('Highlight ვერ მოიძებნა');
-    }
-
-    if (highlight.userId !== userId) {
-      throw new ForbiddenException('არ გაქვთ ამ highlight-ის წაშლის უფლება');
-    }
-
+    await this.assertOwnership(
+      () => this.prisma.highlight.findUnique({ where: { id } }),
+      userId,
+      'Highlight ვერ მოიძებნა',
+      'არ გაქვთ ამ highlight-ის წაშლის უფლება',
+    );
     return this.prisma.highlight.delete({ where: { id } });
   }
 
@@ -187,17 +169,12 @@ export class ReaderService {
     await this.validateBookExists(dto.bookId);
 
     if (dto.highlightId) {
-      const highlight = await this.prisma.highlight.findUnique({
-        where: { id: dto.highlightId },
-      });
-
-      if (!highlight) {
-        throw new NotFoundException('Highlight ვერ მოიძებნა');
-      }
-
-      if (highlight.userId !== userId) {
-        throw new ForbiddenException('არ გაქვთ ამ highlight-ზე შენიშვნის დამატების უფლება');
-      }
+      await this.assertOwnership(
+        () => this.prisma.highlight.findUnique({ where: { id: dto.highlightId } }),
+        userId,
+        'Highlight ვერ მოიძებნა',
+        'არ გაქვთ ამ highlight-ზე შენიშვნის დამატების უფლება',
+      );
     }
 
     return this.prisma.note.create({
@@ -223,18 +200,12 @@ export class ReaderService {
   }
 
   async updateNote(userId: string, id: string, dto: UpdateNoteDto) {
-    const note = await this.prisma.note.findUnique({
-      where: { id },
-    });
-
-    if (!note) {
-      throw new NotFoundException('შენიშვნა ვერ მოიძებნა');
-    }
-
-    if (note.userId !== userId) {
-      throw new ForbiddenException('არ გაქვთ ამ შენიშვნის რედაქტირების უფლება');
-    }
-
+    await this.assertOwnership(
+      () => this.prisma.note.findUnique({ where: { id } }),
+      userId,
+      'შენიშვნა ვერ მოიძებნა',
+      'არ გაქვთ ამ შენიშვნის რედაქტირების უფლება',
+    );
     return this.prisma.note.update({
       where: { id },
       data: { content: dto.content },
@@ -242,24 +213,35 @@ export class ReaderService {
   }
 
   async deleteNote(userId: string, id: string) {
-    const note = await this.prisma.note.findUnique({
-      where: { id },
-    });
-
-    if (!note) {
-      throw new NotFoundException('შენიშვნა ვერ მოიძებნა');
-    }
-
-    if (note.userId !== userId) {
-      throw new ForbiddenException('არ გაქვთ ამ შენიშვნის წაშლის უფლება');
-    }
-
+    await this.assertOwnership(
+      () => this.prisma.note.findUnique({ where: { id } }),
+      userId,
+      'შენიშვნა ვერ მოიძებნა',
+      'არ გაქვთ ამ შენიშვნის წაშლის უფლება',
+    );
     return this.prisma.note.delete({ where: { id } });
   }
 
   // ========================
   // Helpers
   // ========================
+
+  /**
+   * Load an owned entity or throw. Centralizes the repetitive
+   *   findUnique → NotFound → ForbiddenIfNotOwner
+   * pattern used by every mutation on bookmarks/highlights/notes.
+   */
+  private async assertOwnership<T extends { userId: string }>(
+    finder: () => Promise<T | null>,
+    userId: string,
+    notFoundMessage: string,
+    forbiddenMessage: string,
+  ): Promise<T> {
+    const entity = await finder();
+    if (!entity) throw new NotFoundException(notFoundMessage);
+    if (entity.userId !== userId) throw new ForbiddenException(forbiddenMessage);
+    return entity;
+  }
 
   private async validateBookExists(bookId: string) {
     const book = await this.prisma.book.findUnique({

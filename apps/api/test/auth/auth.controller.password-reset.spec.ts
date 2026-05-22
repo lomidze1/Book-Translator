@@ -18,9 +18,11 @@ describe('AuthController — Password Reset & Email Verification', () => {
     resendVerificationEmail: vi.fn(),
   };
 
+  const mockConfig = { get: vi.fn().mockReturnValue('test') };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    controller = new (AuthController as any)(mockAuthService);
+    controller = new (AuthController as any)(mockAuthService, mockConfig);
   });
 
   // ============================================================

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { UnauthorizedException } from '@nestjs/common';
 import { AuthController } from '../../src/auth/auth.controller';
 
 describe('AuthController', () => {
@@ -13,14 +14,34 @@ describe('AuthController', () => {
     verifyOtp: vi.fn(),
   };
 
+  // ConfigService stub — `production` to keep cookieOptions test-stable.
+  const mockConfig = { get: vi.fn().mockReturnValue('test') };
+
+  // Builds a minimal Response stand-in capturing cookie operations.
+  function createMockRes() {
+    const cookies: Record<string, { value: string; opts?: unknown }> = {};
+    const cleared: string[] = [];
+    return {
+      cookies,
+      cleared,
+      cookie: vi.fn((name: string, value: string, opts?: unknown) => {
+        cookies[name] = { value, opts };
+      }),
+      clearCookie: vi.fn((name: string) => {
+        cleared.push(name);
+      }),
+    } as any;
+  }
+
+  function createMockReq(cookies: Record<string, string> = {}) {
+    return { cookies } as any;
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
-    controller = new (AuthController as any)(mockAuthService);
+    controller = new (AuthController as any)(mockAuthService, mockConfig);
   });
 
-  // ============================================================
-  // POST /auth/register
-  // ============================================================
   describe('POST /auth/register', () => {
     it('should call authService.register with the DTO', async () => {
       const dto = { email: 'test@example.com', password: 'password123', name: 'გიორგი' };
@@ -45,75 +66,106 @@ describe('AuthController', () => {
     });
   });
 
-  // ============================================================
-  // POST /auth/login
-  // ============================================================
   describe('POST /auth/login', () => {
-    it('should call authService.login and return tokens + user', async () => {
+    it('sets refresh cookie and returns access token + user (no refresh in body)', async () => {
       const dto = { email: 'test@example.com', password: 'password123' };
-      const expectedResult = {
+      mockAuthService.login.mockResolvedValue({
         accessToken: 'access-123',
         refreshToken: 'refresh-123',
         user: { id: 'user-1', email: dto.email, name: 'გიორგი', avatar: null },
-      };
-      mockAuthService.login.mockResolvedValue(expectedResult);
+      });
+      const res = createMockRes();
 
-      const result = await controller.login(dto);
+      const result = await controller.login(dto, res);
 
-      expect(result).toEqual(expectedResult);
-      expect(mockAuthService.login).toHaveBeenCalledWith(dto);
+      expect(result).toEqual({
+        accessToken: 'access-123',
+        user: { id: 'user-1', email: dto.email, name: 'გიორგი', avatar: null },
+      });
+      // Refresh token must not leak through the response body
+      expect((result as any).refreshToken).toBeUndefined();
+      expect(res.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh-123',
+        expect.objectContaining({ httpOnly: true, path: '/api/auth' }),
+      );
     });
 
     it('should propagate UnauthorizedException from service', async () => {
       const dto = { email: 'test@example.com', password: 'wrong' };
       mockAuthService.login.mockRejectedValue(new Error('Invalid email or password'));
+      const res = createMockRes();
 
-      await expect(controller.login(dto)).rejects.toThrow('Invalid email or password');
+      await expect(controller.login(dto, res)).rejects.toThrow('Invalid email or password');
+      expect(res.cookie).not.toHaveBeenCalled();
     });
   });
 
-  // ============================================================
-  // POST /auth/refresh
-  // ============================================================
   describe('POST /auth/refresh', () => {
-    it('should call authService.refreshTokens with the refresh token', async () => {
-      const dto = { refreshToken: 'old-refresh-token' };
-      const expectedResult = {
+    it('reads refresh token from cookie and sets a new cookie', async () => {
+      mockAuthService.refreshTokens.mockResolvedValue({
         accessToken: 'new-access',
         refreshToken: 'new-refresh',
-      };
-      mockAuthService.refreshTokens.mockResolvedValue(expectedResult);
+      });
+      const req = createMockReq({ refresh_token: 'old-refresh' });
+      const res = createMockRes();
 
-      const result = await controller.refresh(dto);
+      const result = await controller.refresh(req, res);
 
-      expect(result).toEqual(expectedResult);
-      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith(dto.refreshToken);
+      expect(result).toEqual({ accessToken: 'new-access' });
+      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith('old-refresh');
+      expect(res.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'new-refresh',
+        expect.objectContaining({ httpOnly: true }),
+      );
+    });
+
+    it('throws when refresh cookie is missing', async () => {
+      const req = createMockReq({});
+      const res = createMockRes();
+
+      await expect(controller.refresh(req, res)).rejects.toThrow(UnauthorizedException);
+      expect(mockAuthService.refreshTokens).not.toHaveBeenCalled();
     });
   });
 
-  // ============================================================
-  // POST /auth/google
-  // ============================================================
+  describe('POST /auth/logout', () => {
+    it('clears the refresh cookie', async () => {
+      const res = createMockRes();
+
+      const result = await controller.logout(res);
+
+      expect(result).toEqual({ success: true });
+      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', expect.any(Object));
+    });
+  });
+
   describe('POST /auth/google', () => {
-    it('should call authService.googleAuth with the Google ID token', async () => {
+    it('sets refresh cookie and strips refresh token from body', async () => {
       const dto = { idToken: 'google-token-123' };
-      const expectedResult = {
+      mockAuthService.googleAuth.mockResolvedValue({
         accessToken: 'access',
         refreshToken: 'refresh',
         user: { id: 'user-1', email: 'user@gmail.com', name: 'User', avatar: null },
-      };
-      mockAuthService.googleAuth.mockResolvedValue(expectedResult);
+      });
+      const res = createMockRes();
 
-      const result = await controller.googleAuth(dto);
+      const result = await controller.googleAuth(dto, res);
 
-      expect(result).toEqual(expectedResult);
-      expect(mockAuthService.googleAuth).toHaveBeenCalledWith(dto);
+      expect(result).toEqual({
+        accessToken: 'access',
+        user: { id: 'user-1', email: 'user@gmail.com', name: 'User', avatar: null },
+      });
+      expect((result as any).refreshToken).toBeUndefined();
+      expect(res.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh',
+        expect.objectContaining({ httpOnly: true }),
+      );
     });
   });
 
-  // ============================================================
-  // POST /auth/phone/send-otp
-  // ============================================================
   describe('POST /auth/phone/send-otp', () => {
     it('should call authService.sendOtp with phone number', async () => {
       const dto = { phone: '+995599123456' };
@@ -126,23 +178,28 @@ describe('AuthController', () => {
     });
   });
 
-  // ============================================================
-  // POST /auth/phone/verify-otp
-  // ============================================================
   describe('POST /auth/phone/verify-otp', () => {
-    it('should call authService.verifyOtp with phone and code', async () => {
+    it('sets refresh cookie and strips refresh token from body', async () => {
       const dto = { phone: '+995599123456', code: '123456' };
-      const expectedResult = {
+      mockAuthService.verifyOtp.mockResolvedValue({
         accessToken: 'access',
         refreshToken: 'refresh',
         user: { id: 'user-1', email: null, name: null, avatar: null },
-      };
-      mockAuthService.verifyOtp.mockResolvedValue(expectedResult);
+      });
+      const res = createMockRes();
 
-      const result = await controller.verifyOtp(dto);
+      const result = await controller.verifyOtp(dto, res);
 
-      expect(result).toEqual(expectedResult);
-      expect(mockAuthService.verifyOtp).toHaveBeenCalledWith(dto);
+      expect(result).toEqual({
+        accessToken: 'access',
+        user: { id: 'user-1', email: null, name: null, avatar: null },
+      });
+      expect((result as any).refreshToken).toBeUndefined();
+      expect(res.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh',
+        expect.any(Object),
+      );
     });
   });
 });

@@ -407,12 +407,14 @@ export class TtsService implements OnModuleDestroy {
       throw new ForbiddenException('არ გაქვთ ამ AudioBook-ის წაშლის უფლება');
     }
 
-    // Delete S3 files
-    for (const chapter of audioBook.chapters) {
-      if (chapter.audioUrl) {
-        await this.s3.delete(chapter.audioUrl).catch(() => {});
-      }
-    }
+    // Delete S3 files in parallel — sequential awaits could take 30s+ on a
+    // 100-chapter audiobook. Failures are swallowed so a missing object never
+    // blocks the DB cascade.
+    await Promise.all(
+      audioBook.chapters
+        .filter((c) => c.audioUrl)
+        .map((c) => this.s3.delete(c.audioUrl!).catch(() => undefined)),
+    );
 
     // Delete records (cascade will handle AudioChapters)
     await this.prisma.audioBook.delete({ where: { id: audioBookId } });

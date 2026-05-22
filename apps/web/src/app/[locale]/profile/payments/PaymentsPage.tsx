@@ -4,9 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, Link } from '@/i18n/navigation';
+import { apiFetch, getAccessToken } from '@/lib/api-client';
 import styles from '../subpage.module.scss';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface PaymentItem {
   id: string;
@@ -42,25 +41,16 @@ export default function PaymentsPage() {
   const fetchPayments = useCallback(async (pageNum: number) => {
     setLoading(true);
     setError(null);
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
+    if (!getAccessToken()) {
       setLoading(false);
       return;
     }
 
     try {
-      const res = await fetch(
-        `${API_URL}/api/payments/history?page=${pageNum}&limit=${limit}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const res = await apiFetch(`/api/payments/history?page=${pageNum}&limit=${limit}`);
 
-      if (res.status === 401) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('cachedUser');
-        throw new Error('Unauthorized');
-      }
-
+      // 401 here means the refresh attempt also failed — AuthContext clears state.
+      if (res.status === 401) throw new Error('Unauthorized');
       if (!res.ok) throw new Error('Failed to fetch');
 
       const data: PaymentsResponse = await res.json();

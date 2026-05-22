@@ -4,9 +4,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, Link } from '@/i18n/navigation';
+import { apiFetch } from '@/lib/api-client';
 import styles from '../subpage.module.scss';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 function EyeIcon() {
   return (
@@ -85,15 +84,11 @@ export default function ChangePasswordPage() {
     }
 
     setSaving(true);
-    const token = localStorage.getItem('accessToken');
 
     try {
-      const res = await fetch(`${API_URL}/api/auth/change-password`, {
+      const res = await apiFetch('/api/auth/change-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newPassword }),
       });
 

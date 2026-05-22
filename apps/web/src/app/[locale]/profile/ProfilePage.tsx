@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, Link } from '@/i18n/navigation';
+import { apiFetch, getAccessToken } from '@/lib/api-client';
 import styles from './profile.module.scss';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface UserProfile {
   id: string;
@@ -39,13 +38,9 @@ export default function ProfilePage() {
     }
 
     if (!isLoggedIn) return;
+    if (!getAccessToken()) return;
 
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
-    fetch(`${API_URL}/api/users/profile`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    apiFetch('/api/users/profile')
       .then((res) => {
         if (!res.ok) throw new Error('Failed');
         return res.json();
@@ -79,15 +74,11 @@ export default function ProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     setMessage('');
-    const token = localStorage.getItem('accessToken');
 
     try {
-      const res = await fetch(`${API_URL}/api/users/profile`, {
+      const res = await apiFetch('/api/users/profile', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       });
 

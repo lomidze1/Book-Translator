@@ -78,6 +78,7 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include', // Refresh token cookie set by backend.
       });
 
       const data = await res.json();
@@ -97,7 +98,7 @@ export default function LoginPage() {
         return;
       }
 
-      login(data.accessToken, data.refreshToken, data.user);
+      login(data.accessToken, data.user);
 
       // Redirect to returnUrl if present and safe (relative path only)
       const returnUrl = searchParams.get('returnUrl');

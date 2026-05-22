@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { setApiUrl } from '@book-translator/reader';
+import { apiFetch, getAccessToken } from '@/lib/api-client';
 import ReaderView from './ReaderView';
 import styles from './reader.module.scss';
 
@@ -35,7 +36,7 @@ export default function ReaderPage() {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const accessToken = localStorage.getItem('accessToken');
+    const accessToken = getAccessToken();
     if (!accessToken) {
       setError(t('login_required'));
       setLoading(false);
@@ -45,9 +46,7 @@ export default function ReaderPage() {
 
     async function fetchTranslation(attempt = 0) {
       try {
-        const res = await fetch(`${API_URL}/api/translations/book/${params.id}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const res = await apiFetch(`/api/translations/book/${params.id}`);
 
         if (!res.ok) {
           setError(t('not_found'));
@@ -78,9 +77,7 @@ export default function ReaderPage() {
           return;
         }
 
-        const fullRes = await fetch(`${API_URL}/api/translations/${completed.id}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const fullRes = await apiFetch(`/api/translations/${completed.id}`);
 
         if (!fullRes.ok) {
           setError(t('not_found'));

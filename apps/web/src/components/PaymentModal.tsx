@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { apiFetch } from '@/lib/api-client';
 import styles from './PaymentModal.module.scss';
 
 interface PaymentModalProps {
@@ -82,13 +83,9 @@ export default function PaymentModal({
     setError('');
 
     try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(`${API_URL}/api/payments`, {
+      const res = await apiFetch('/api/payments', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookId,
           type,

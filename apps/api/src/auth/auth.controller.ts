@@ -1,7 +1,21 @@
-import { Controller, Post, Body, Get, Query, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Query,
+  Req,
+  Res,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Request, Response, CookieOptions } from 'express';
 import { AuthService } from './auth.service';
 import {
-  RegisterDto, LoginDto, RefreshTokenDto, GoogleAuthDto,
+  RegisterDto, LoginDto, GoogleAuthDto,
   SendOtpDto, VerifyOtpDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto,
   RequestPasswordChangeDto, ConfirmPasswordChangeDto,
 } from './dto';
@@ -9,9 +23,35 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 
+const REFRESH_COOKIE = 'refresh_token';
+const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days, matches JWT TTL
+
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private readonly cookieOptions: CookieOptions;
+
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    this.cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      // Limit the cookie to the /auth path so it isn't sent on every request.
+      path: '/api/auth',
+      maxAge: REFRESH_TOKEN_MAX_AGE_MS,
+    };
+  }
+
+  private setRefreshCookie(res: Response, refreshToken: string): void {
+    res.cookie(REFRESH_COOKIE, refreshToken, this.cookieOptions);
+  }
+
+  private clearRefreshCookie(res: Response): void {
+    res.clearCookie(REFRESH_COOKIE, { ...this.cookieOptions, maxAge: undefined });
+  }
 
   @Public()
   @Post('register')
@@ -22,22 +62,49 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { refreshToken, ...rest } = await this.authService.login(dto);
+    this.setRefreshCookie(res, refreshToken);
+    return rest;
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refreshTokens(dto.refreshToken);
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = req.cookies?.[REFRESH_COOKIE];
+    if (!token) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
+    const { accessToken, refreshToken } = await this.authService.refreshTokens(token);
+    this.setRefreshCookie(res, refreshToken);
+    return { accessToken };
+  }
+
+  @Post('logout')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async logout(@Res({ passthrough: true }) res: Response) {
+    this.clearRefreshCookie(res);
+    return { success: true };
   }
 
   @Public()
   @Post('google')
   @HttpCode(HttpStatus.OK)
-  async googleAuth(@Body() dto: GoogleAuthDto) {
-    return this.authService.googleAuth(dto);
+  async googleAuth(
+    @Body() dto: GoogleAuthDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { refreshToken, ...rest } = await this.authService.googleAuth(dto);
+    this.setRefreshCookie(res, refreshToken);
+    return rest;
   }
 
   @Public()
@@ -50,8 +117,13 @@ export class AuthController {
   @Public()
   @Post('phone/verify-otp')
   @HttpCode(HttpStatus.OK)
-  async verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.authService.verifyOtp(dto);
+  async verifyOtp(
+    @Body() dto: VerifyOtpDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { refreshToken, ...rest } = await this.authService.verifyOtp(dto);
+    this.setRefreshCookie(res, refreshToken);
+    return rest;
   }
 
   @Public()
@@ -94,7 +166,12 @@ export class AuthController {
   @Post('confirm-password-change')
   @Public()
   @HttpCode(HttpStatus.OK)
-  async confirmPasswordChange(@Body() dto: ConfirmPasswordChangeDto) {
+  async confirmPasswordChange(
+    @Body() dto: ConfirmPasswordChangeDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Confirming a password change rotates tokenVersion → invalidate cookie too.
+    this.clearRefreshCookie(res);
     return this.authService.confirmPasswordChange(dto.token);
   }
 }

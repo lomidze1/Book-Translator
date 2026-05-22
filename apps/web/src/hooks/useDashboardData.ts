@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { apiFetch, getAccessToken } from '@/lib/api-client';
 
 interface TranslationItem {
   id: string;
@@ -46,23 +45,18 @@ export function useDashboardData(): DashboardData {
 
   useEffect(() => {
     const controller = new AbortController();
-    const token = localStorage.getItem('accessToken');
-    if (!token) { setLoading(false); return; }
+    // Bail out early if there's no session — apiFetch would otherwise probe
+    // /refresh on every dashboard mount even for logged-out visitors.
+    if (!getAccessToken()) { setLoading(false); return; }
 
     async function fetchWithRetry(attempts = 3, delay = 1000) {
       for (let i = 0; i < attempts; i++) {
         try {
-          const res = await fetch(`${API_URL}/api/translations/my`, {
-            headers: { Authorization: `Bearer ${token}` },
-            signal: controller.signal,
-          });
+          const res = await apiFetch('/api/translations/my', { signal: controller.signal });
 
-          if (res.status === 401) {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('cachedUser');
-            throw new Error('Unauthorized');
-          }
+          // 401 here means the refresh attempt also failed — AuthContext will
+          // clear local state. Just surface the error to the caller.
+          if (res.status === 401) throw new Error('Unauthorized');
           if (!res.ok) throw new Error('Failed to fetch');
 
           const data = await res.json();
