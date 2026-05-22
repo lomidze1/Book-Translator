@@ -88,6 +88,9 @@ export class FlittProvider implements PaymentProviderInterface {
     // payment.service already strips \n\r from book titles, but a malicious
     // upload could still slip in other ASCII control chars (\x00..\x1f, \x7f)
     // that could confuse Flitt's request parser or downstream invoicing.
+    // The control chars in the regex are intentional — that's the whole point
+    // of the rule we're trying to match.
+    // eslint-disable-next-line no-control-regex
     const sanitizedDesc = description.replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 1024);
 
     const requestParams: Record<string, unknown> = {
