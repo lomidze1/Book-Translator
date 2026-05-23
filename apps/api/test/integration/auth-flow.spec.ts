@@ -66,6 +66,28 @@ describe('Integration — Auth Flow Scenarios', () => {
     isConnected: true,
   };
 
+  // AuthService now takes (prisma, jwt, redis, emailService, config). The
+  // earlier 3-arg shape predates the email + config dependencies — this
+  // mock list keeps the integration tests faithful to the real constructor.
+  const mockEmailService = {
+    sendEmailVerification: vi.fn().mockResolvedValue(undefined),
+    sendPasswordReset: vi.fn().mockResolvedValue(undefined),
+    sendPasswordChangeConfirmation: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const mockConfig = {
+    get: vi.fn((key: string) => {
+      // Map the env vars AuthService reads in its constructor to defaults the
+      // tests can rely on.
+      const map: Record<string, string | undefined> = {
+        GOOGLE_CLIENT_ID: 'test-google-client-id',
+        JWT_ACCESS_SECRET: 'test-access-secret',
+        JWT_REFRESH_SECRET: 'test-refresh-secret',
+      };
+      return map[key] ?? process.env[key];
+    }),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.JWT_ACCESS_SECRET = 'test-access-secret';
@@ -73,7 +95,13 @@ describe('Integration — Auth Flow Scenarios', () => {
     mockRedisService.get.mockResolvedValue(null);
     mockRedisService.incr.mockResolvedValue(1);
 
-    authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedisService);
+    authService = new (AuthService as any)(
+      mockPrisma,
+      mockJwt,
+      mockRedisService,
+      mockEmailService,
+      mockConfig,
+    );
     jwtStrategy = new (JwtStrategy as any)(mockPrisma);
     (jwtStrategy as any).prisma = mockPrisma;
   });

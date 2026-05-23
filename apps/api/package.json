@@ -48,11 +48,11 @@
     "multer": "^2.1.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
-    "pdf-parse": "1.1.1",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.9.4",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",
+    "unpdf": "^1.6.2",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
@@ -66,7 +66,6 @@
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^22.0.0",
     "@types/passport-jwt": "^4.0.1",
-    "@types/pdf-parse": "^1.1.5",
     "@types/supertest": "^7.2.0",
     "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^3.0.0",
