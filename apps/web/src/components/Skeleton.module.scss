@@ -1,0 +1,89 @@
+@use '../styles/variables' as *;
+
+// Base loading placeholder. Variants below override sizing.
+// The shimmer uses a moving linear gradient so we avoid layout thrash.
+.skeleton {
+  display: inline-block;
+  background: var(--progress-bg);
+  border-radius: $radius-sm;
+  position: relative;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.animate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--surface-hover) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+// Respect users who opt out of motion — keep the placeholder visible but
+// stop animating it.
+@media (prefers-reduced-motion: reduce) {
+  .animate::after {
+    animation: none;
+  }
+}
+
+// =========================
+// Variants
+// =========================
+
+// Single line of body text — default height matches body line.
+.text {
+  width: 100%;
+  height: 0.9em;
+  border-radius: $radius-sm;
+}
+
+// Heading. Bigger height to roughly match an <h2>.
+.title {
+  width: 60%;
+  height: 1.5em;
+  border-radius: $radius-sm;
+}
+
+// Circle. Width controls diameter; height inherits.
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+}
+
+// Rectangular image / cover. Caller usually sets width + height.
+.image {
+  width: 100%;
+  height: 200px;
+  border-radius: $radius-md;
+}
+
+// Block — generic rectangle for card-like containers.
+.block {
+  width: 100%;
+  height: 100px;
+  border-radius: $radius-md;
+}
+
+// Composite card skeleton — image + 2 lines.
+.card {
+  display: block;
+  width: 100%;
+  height: 280px;
+  border-radius: $radius-lg;
+}

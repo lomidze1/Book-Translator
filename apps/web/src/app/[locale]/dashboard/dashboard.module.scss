@@ -189,6 +189,28 @@
   padding: $spacing-xl;
   color: var(--text-secondary);
   font-size: 0.95rem;
+
+  p {
+    margin: 0 0 $spacing-xs;
+
+    &:first-child {
+      color: var(--foreground);
+      font-weight: 500;
+      font-size: 1.05rem;
+    }
+  }
+}
+
+.emptyHint {
+  font-size: 0.85rem;
+  margin-bottom: $spacing-md;
+}
+
+.emptyActions {
+  display: flex;
+  gap: $spacing-sm;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .retryBtn {

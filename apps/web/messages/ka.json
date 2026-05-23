@@ -115,7 +115,15 @@
     "error_confirm_required": "პაროლის დადასტურება აუცილებელია",
     "show_password": "პაროლის ჩვენება",
     "hide_password": "პაროლის დამალვა",
-    "or_divider": "ან"
+    "or_divider": "ან",
+    "strength_weak": "სუსტი პაროლი",
+    "strength_fair": "საშუალო პაროლი",
+    "strength_good": "კარგი პაროლი",
+    "strength_strong": "ძლიერი პაროლი",
+    "requirement_length": "მინიმუმ 8 სიმბოლო",
+    "requirement_uppercase": "1 დიდი ასო",
+    "requirement_lowercase": "1 პატარა ასო",
+    "requirement_digit": "1 ციფრი"
   },
   "google_auth": {
     "error": "Google-ით შესვლა ვერ მოხერხდა. სცადეთ თავიდან."
@@ -265,6 +273,8 @@
     "provider_flitt_note": "უსაფრთხო გადახდა Flitt-ით (თიბისი ბანკი).",
     "pay_button": "გადაიხადე {amount}{currency}",
     "processing": "მუშავდება...",
+    "redirecting": "გადამისამართება...",
+    "redirecting_to_bank": "გადახდის გვერდზე გადამისამართება...",
     "error_default": "გადახდა ვერ მოხერხდა. სცადეთ თავიდან.",
     "success_title": "გადახდა წარმატებულია!",
     "success_message": "გადახდა დამუშავდა. თარგმანი მალე დაიწყება.",
@@ -278,6 +288,7 @@
     "mock_pay_fail": "წარუმატებლობის სიმულაცია"
   },
   "profile": {
+    "profile": "პროფილი",
     "loading": "იტვირთება...",
     "load_error": "პროფილის ჩატვირთვა ვერ მოხერხდა",
     "email": "ელ-ფოსტა",
@@ -431,6 +442,7 @@
     "stats_completed": "დასრულებული",
     "recent_activity": "ბოლო აქტივობა",
     "no_activity": "აქტივობა ჯერ არ გაქვთ",
+    "no_activity_hint": "მოძებნეთ წიგნი ან ატვირთეთ თქვენი ფაილი — AI თარგმანი დაიწყება მაშინვე.",
     "quick_actions": "სწრაფი მოქმედებები",
     "search_books": "წიგნის ძებნა",
     "upload_book": "წიგნის ატვირთვა",
@@ -450,6 +462,8 @@
     "search_placeholder": "ძებნა ბიბლიოთეკაში...",
     "no_books": "ბიბლიოთეკა ცარიელია",
     "no_books_hint": "მოძებნეთ წიგნი და დაიწყეთ თარგმნა",
+    "no_matches": "შესაბამისი წიგნი ვერ მოიძებნა",
+    "no_matches_hint": "შეცვალეთ ფილტრი ან გაასუფთავეთ ძებნა.",
     "start_search": "წიგნის ძებნა",
     "continue_reading": "კითხვის გაგრძელება",
     "read": "წაკითხვა",

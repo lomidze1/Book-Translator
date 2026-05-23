@@ -226,6 +226,42 @@
   to { transform: rotate(360deg); }
 }
 
+// Surfaced after 3 consecutive poll failures so the user knows we noticed.
+// Sits inside .progressBox as a full-row item; the `flex-basis: 100%` forces
+// it onto its own line below the spinner+text+bar row.
+.pollWarning {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 400 !important;
+  white-space: normal !important;
+  margin: $spacing-xs 0 0;
+
+  &::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: pulse 1.4s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pollWarning::before {
+    animation: none;
+  }
+}
+
 .progressBar {
   flex: 1;
   height: 8px;

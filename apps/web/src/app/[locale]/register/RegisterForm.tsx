@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
+import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 import styles from '../../register/page.module.scss';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -352,6 +353,7 @@ export default function RegisterPage() {
             {touched.password && fieldErrors.password && (
               <span className={styles.fieldError}>{fieldErrors.password}</span>
             )}
+            <PasswordStrengthMeter password={password} />
           </label>
 
           <label className={styles.label}>

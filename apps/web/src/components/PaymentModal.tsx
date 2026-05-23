@@ -32,6 +32,11 @@ export default function PaymentModal({
 }: PaymentModalProps) {
   const t = useTranslations('payment');
   const [loading, setLoading] = useState(false);
+  // Tracks the moment between "server returned a payment URL" and
+  // "browser actually starts navigating to the bank". On slow networks the
+  // visible state would otherwise sit on "processing…" with no signal that
+  // the redirect is imminent.
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -105,7 +110,14 @@ export default function PaymentModal({
       const data = await res.json();
 
       if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
+        // Tell the user we're handing them off to the provider before the
+        // browser jumps. A short delay lets the message paint and gives the
+        // user a chance to read it — set assign() async so React commits
+        // the state update first.
+        setRedirecting(true);
+        setTimeout(() => {
+          window.location.href = data.paymentUrl;
+        }, 50);
       }
 
       if (onSuccess) {
@@ -113,9 +125,11 @@ export default function PaymentModal({
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('error_default'));
-    } finally {
       setLoading(false);
+      return;
     }
+    // Note: do NOT clear `loading` in the success path — the page is about
+    // to navigate away and we want the button to stay disabled until then.
   }, [bookId, type, translationId, translationType, onSuccess, t]);
 
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -149,13 +163,24 @@ export default function PaymentModal({
 
         {error && <div className={styles.error} role="alert">{error}</div>}
 
+        {redirecting && (
+          <div className={styles.redirecting} role="status" aria-live="polite">
+            <span className={styles.redirectingSpinner} aria-hidden="true" />
+            {t('redirecting_to_bank')}
+          </div>
+        )}
+
         <button
           className={styles.payBtn}
           onClick={handlePay}
-          disabled={loading}
-          aria-busy={loading}
+          disabled={loading || redirecting}
+          aria-busy={loading || redirecting}
         >
-          {loading ? t('processing') : t('pay_button', { amount, currency: currency === 'GEL' ? '₾' : '$' })}
+          {redirecting
+            ? t('redirecting')
+            : loading
+              ? t('processing')
+              : t('pay_button', { amount, currency: currency === 'GEL' ? '₾' : '$' })}
         </button>
       </div>
     </div>
