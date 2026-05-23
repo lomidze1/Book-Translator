@@ -1,5 +1,4 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import pdfParseModule from 'pdf-parse';
 import * as mammoth from 'mammoth';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -42,14 +41,20 @@ export class ParsingService {
   }
 
   private async parsePdf(buffer: Buffer): Promise<ParsedBook> {
-    const data = await pdfParseModule(buffer);
-    const text = data.text.trim();
+    // Switched from pdf-parse@1.1.1 (which bundled pdfjs v1.9.426–v2.0.550
+    // from 2018) to unpdf, which wraps the maintained Mozilla pdfjs and
+    // ships ESM-first. Dynamic import keeps Nest's CJS build happy.
+    const { extractText, getDocumentProxy } = await import('unpdf');
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { text } = await extractText(pdf, { mergePages: true });
 
-    if (!text) {
+    const trimmed = (Array.isArray(text) ? text.join('\n') : text).trim();
+
+    if (!trimmed) {
       throw new BadRequestException('PDF file contains no extractable text');
     }
 
-    return this.splitIntoChapters(text);
+    return this.splitIntoChapters(trimmed);
   }
 
   private async parseEpub(buffer: Buffer): Promise<ParsedBook> {

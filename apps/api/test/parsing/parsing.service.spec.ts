@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { ParsingService } from '../../src/parsing/parsing.service';
 
-// Mock pdf-parse
-vi.mock('pdf-parse', () => ({
-  default: vi.fn(),
+// Mock unpdf (replaces the legacy pdf-parse import). The service calls
+// getDocumentProxy(buffer) then extractText(pdf, { mergePages: true }).
+vi.mock('unpdf', () => ({
+  getDocumentProxy: vi.fn().mockResolvedValue({}),
+  extractText: vi.fn(),
 }));
 
 // Mock mammoth
@@ -61,8 +63,8 @@ describe('ParsingService', () => {
 
   describe('parse', () => {
     it('should route PDF format to parsePdf', async () => {
-      const pdfParse = (await import('pdf-parse')).default as any;
-      pdfParse.mockResolvedValue({ text: 'Chapter 1\nSome content here.\nChapter 2\nMore content.' });
+      const { extractText } = (await import('unpdf')) as unknown as { extractText: ReturnType<typeof vi.fn> };
+      extractText.mockResolvedValue({ text: 'Chapter 1\nSome content here.\nChapter 2\nMore content.', totalPages: 2 });
 
       const result = await service.parse(Buffer.from('fake-pdf'), 'PDF');
       expect(result.chapters.length).toBeGreaterThan(0);
@@ -101,16 +103,17 @@ describe('ParsingService', () => {
 
   describe('parsePdf', () => {
     it('should throw if PDF has no extractable text', async () => {
-      const pdfParse = (await import('pdf-parse')).default as any;
-      pdfParse.mockResolvedValue({ text: '' });
+      const { extractText } = (await import('unpdf')) as unknown as { extractText: ReturnType<typeof vi.fn> };
+      extractText.mockResolvedValue({ text: '', totalPages: 0 });
 
       await expect(service.parse(Buffer.from('empty-pdf'), 'PDF')).rejects.toThrow('no extractable text');
     });
 
     it('should extract text and split into chapters', async () => {
-      const pdfParse = (await import('pdf-parse')).default as any;
-      pdfParse.mockResolvedValue({
+      const { extractText } = (await import('unpdf')) as unknown as { extractText: ReturnType<typeof vi.fn> };
+      extractText.mockResolvedValue({
         text: 'Chapter 1: Introduction\nThis is the first chapter with content.\nChapter 2: The Journey\nSecond chapter has more text.',
+        totalPages: 2,
       });
 
       const result = await service.parse(Buffer.from('pdf-data'), 'PDF');
@@ -119,11 +122,24 @@ describe('ParsingService', () => {
       expect(result.chapters[1].number).toBe(2);
     });
 
-    it('should throw if pdf-parse throws (corrupt PDF)', async () => {
-      const pdfParse = (await import('pdf-parse')).default as any;
-      pdfParse.mockRejectedValue(new Error('Invalid PDF structure'));
+    it('should throw if unpdf throws (corrupt PDF)', async () => {
+      const { extractText } = (await import('unpdf')) as unknown as { extractText: ReturnType<typeof vi.fn> };
+      extractText.mockRejectedValue(new Error('Invalid PDF structure'));
 
       await expect(service.parse(Buffer.from('corrupt'), 'PDF')).rejects.toThrow('Invalid PDF structure');
+    });
+
+    it('should accept page-array text from unpdf (mergePages safety net)', async () => {
+      // unpdf can return text as string (mergePages: true) or string[] (false).
+      // We always pass mergePages: true, but defend against an array result too.
+      const { extractText } = (await import('unpdf')) as unknown as { extractText: ReturnType<typeof vi.fn> };
+      extractText.mockResolvedValue({
+        text: ['Chapter 1\nPage one content.', 'Chapter 2\nPage two content.'],
+        totalPages: 2,
+      });
+
+      const result = await service.parse(Buffer.from('pdf-data'), 'PDF');
+      expect(result.chapters.length).toBeGreaterThan(0);
     });
   });
 
