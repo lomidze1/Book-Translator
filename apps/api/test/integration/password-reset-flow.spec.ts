@@ -54,6 +54,20 @@ describe('Integration — Password Reset & Email Verification Flows', () => {
   const mockEmailService = {
     sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
     sendEmailVerification: vi.fn().mockResolvedValue(undefined),
+    sendPasswordChangeConfirmation: vi.fn().mockResolvedValue(undefined),
+  };
+
+  // AuthService now also takes ConfigService — the constructor reads
+  // GOOGLE_CLIENT_ID, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET from it.
+  const mockConfig = {
+    get: vi.fn((key: string) => {
+      const map: Record<string, string | undefined> = {
+        GOOGLE_CLIENT_ID: 'test-google-client-id',
+        JWT_ACCESS_SECRET: 'test-access-secret',
+        JWT_REFRESH_SECRET: 'test-refresh-secret',
+      };
+      return map[key] ?? process.env[key];
+    }),
   };
 
   beforeEach(() => {
@@ -64,7 +78,13 @@ describe('Integration — Password Reset & Email Verification Flows', () => {
     mockRedis.incr.mockResolvedValue(1);
     mockRedis.secureIncr.mockResolvedValue(1);
     dbUsers = {};
-    authService = new (AuthService as any)(mockPrisma, mockJwt, mockRedis, mockEmailService);
+    authService = new (AuthService as any)(
+      mockPrisma,
+      mockJwt,
+      mockRedis,
+      mockEmailService,
+      mockConfig,
+    );
   });
 
   // ============================================================
