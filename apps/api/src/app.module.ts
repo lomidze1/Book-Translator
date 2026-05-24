@@ -14,6 +14,7 @@ import { PaymentModule } from './payment/payment.module';
 import { ReaderModule } from './reader/reader.module';
 import { TtsModule } from './tts/tts.module';
 import { NotificationModule } from './notification/notification.module';
+import { AdminModule } from './admin/admin.module';
 import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
@@ -62,6 +63,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     ReaderModule,
     TtsModule,
     NotificationModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [

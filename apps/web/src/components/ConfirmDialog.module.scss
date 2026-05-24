@@ -1,0 +1,95 @@
+@use '../styles/variables' as *;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  animation: cdFadeIn 0.15s ease;
+}
+
+@keyframes cdFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dialog {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--card-border, #{$color-border});
+  border-radius: $radius-lg;
+  padding: $spacing-xl;
+  max-width: 440px;
+  width: 90%;
+  animation: cdSlideUp 0.2s ease;
+}
+
+@keyframes cdSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0 0 $spacing-sm;
+}
+
+.message {
+  font-size: 0.95rem;
+  color: var(--text-secondary, #{$color-secondary});
+  margin: 0 0 $spacing-lg;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: $spacing-sm;
+  justify-content: flex-end;
+}
+
+.cancelBtn,
+.confirmBtn {
+  padding: $spacing-sm $spacing-lg;
+  border-radius: $radius-md;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.cancelBtn {
+  background: transparent;
+  border: 1px solid $color-border;
+  color: $color-foreground;
+
+  &:hover:not(:disabled) {
+    background: #f1f5f9;
+  }
+}
+
+.confirmBtn {
+  background: $color-primary;
+  border: 1px solid $color-primary;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: $color-primary-dark;
+  }
+}
+
+.confirmBtnDanger {
+  background: #dc2626;
+  border-color: #dc2626;
+
+  &:hover:not(:disabled) {
+    background: #b91c1c;
+  }
+}

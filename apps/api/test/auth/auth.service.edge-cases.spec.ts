@@ -243,12 +243,15 @@ describe('AuthService — Edge Cases & Security', () => {
         password: 'password123',
       });
 
-      // Should NOT include passwordHash, phone, or role in response user
+      // Should NOT include passwordHash or phone in response user. Role IS
+      // exposed so the frontend can render admin-only UI without a second
+      // /users/profile round-trip.
       expect(result.user).toEqual({
         id: 'user-1',
         email: 'test@example.com',
         name: 'გიორგი',
         avatar: 'https://example.com/avatar.jpg',
+        role: 'USER',
       });
       expect((result.user as any).passwordHash).toBeUndefined();
       expect((result.user as any).phone).toBeUndefined();

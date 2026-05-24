@@ -76,6 +76,7 @@ export default function Navbar() {
                 <UserDropdown
                   userName={user?.name || null}
                   userEmail={user?.email || null}
+                  userRole={user?.role}
                   onLogout={handleLogout}
                 />
               </>
@@ -148,6 +149,7 @@ export default function Navbar() {
                 <UserDropdown
                   userName={user?.name || null}
                   userEmail={user?.email || null}
+                  userRole={user?.role}
                   onLogout={handleLogout}
                 />
               </div>

@@ -5,6 +5,28 @@ import { useTranslations } from 'next-intl';
 import { apiFetch } from '@/lib/api-client';
 import styles from './PaymentModal.module.scss';
 
+// Maps backend error messages (English, raw from NestJS exceptions) to
+// translation keys. The backend doesn't return error codes, so we pattern-
+// match the message. New backend messages must be added here as well.
+function mapPaymentError(
+  status: number,
+  message: string | undefined,
+  t: (key: string) => string,
+): string {
+  if (status === 429) return t('error_rate_limit');
+  const msg = (message ?? '').toLowerCase();
+  if (msg.includes('book not found')) return t('error_book_not_found');
+  if (msg.includes('do not have access')) return t('error_no_access');
+  if (msg.includes('already have a pending payment')) return t('error_already_pending');
+  if (msg.includes('is not supported') || msg.includes('unknown provider')) {
+    return t('error_provider_unsupported');
+  }
+  if (msg.includes('amount mismatch')) return t('error_amount_mismatch');
+  if (msg.includes('payment creation failed')) return t('error_creation_failed');
+  if (msg.includes('translationtype')) return t('error_translation_type_required');
+  return t('error_default');
+}
+
 interface PaymentModalProps {
   bookId: string;
   bookTitle: string;
@@ -104,7 +126,7 @@ export default function PaymentModal({
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || t('error_default'));
+        throw new Error(mapPaymentError(res.status, data.message, t));
       }
 
       const data = await res.json();
@@ -124,7 +146,12 @@ export default function PaymentModal({
         onSuccess(data.paymentId);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('error_default'));
+      if (err instanceof TypeError) {
+        // Network error (fetch failed before getting a response).
+        setError(t('error_server'));
+      } else {
+        setError(err instanceof Error ? err.message : t('error_default'));
+      }
       setLoading(false);
       return;
     }

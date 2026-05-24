@@ -5,7 +5,7 @@ import { S3Service } from '../s3/s3.service';
 import { ParsingService } from '../parsing/parsing.service';
 import { fetchWithTimeout } from '../common/fetch';
 import { clampPagination } from '../common/pagination';
-import { TRANSLATION_QUEUE, TRANSLATION_JOB_OPTIONS, getRedisConnection } from './translation.constants';
+import { TRANSLATION_QUEUE, TRANSLATION_JOB_OPTIONS, getRedisConnection, translationJobId } from './translation.constants';
 import { devShortcutsEnabled } from '../common/dev-shortcuts';
 
 @Injectable()
@@ -127,13 +127,15 @@ export class TranslationService {
       return translation;
     }
 
-    // Add to queue
+    // Add to queue. Deterministic jobId — BullMQ silently rejects a second
+    // add() with the same id while the prior job is still in the queue, so
+    // double-clicks and webhook replays can't stack workers on one row.
     if (this.queue) {
       this.logger.log(`Adding translation ${translationId} to queue...`);
       await this.queue.add(
         'translate-book',
         { translationId: translation.id, bookId: translation.bookId },
-        TRANSLATION_JOB_OPTIONS,
+        { ...TRANSLATION_JOB_OPTIONS, jobId: translationJobId(translation.id) },
       );
       this.logger.log(`Translation ${translationId} added to queue`);
     } else {
@@ -141,6 +143,26 @@ export class TranslationService {
     }
 
     return translation;
+  }
+
+  /**
+   * Drop any queued/failed BullMQ job for this translation so a retry can be
+   * re-added cleanly. Refuses to remove an actively-running job — that's the
+   * caller's signal that retry is unsafe and they should wait it out. Returns
+   * true if a job was removed, false if none existed.
+   */
+  async clearQueuedJob(translationId: string): Promise<boolean> {
+    if (!this.queue) return false;
+    const existing = await this.queue.getJob(translationJobId(translationId));
+    if (!existing) return false;
+    const state = await existing.getState();
+    if (state === 'active') {
+      throw new BadRequestException(
+        'Translation is actively being processed — wait for it to finish or fail.',
+      );
+    }
+    await existing.remove();
+    return true;
   }
 
   async getTranslation(translationId: string, userId: string) {

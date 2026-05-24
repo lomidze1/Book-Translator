@@ -8,6 +8,7 @@ import GoogleSignInButton from '@/components/GoogleSignInButton';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 import styles from './page.module.scss';
 import { API_URL } from '@/lib/api-client';
+import { getWebmailUrl } from '@/lib/email-provider';
 
 
 function EyeIcon() {
@@ -256,7 +257,7 @@ export default function RegisterPage() {
             <p className={styles.verifySubtitle}>{t('success_verify')}</p>
 
             <a
-              href="https://mail.google.com"
+              href={getWebmailUrl(email)}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.submitBtn}

@@ -28,6 +28,30 @@ async function fetchBook(id: string): Promise<BookDto | null> {
   }
 }
 
+const PREVIEW_MAX_LENGTH = 160;
+
+// Builds the og:description / meta description for a book page. Strips HTML
+// tags and collapses whitespace from book.description (sources like Google
+// Books and OpenLibrary often return inline markup), then trims to the last
+// word boundary so the preview doesn't end mid-word. Falls back to a
+// localized "Title by Author" line when the book has no description.
+function buildBookDescription(
+  book: { title: string; author?: string | null; description?: string | null },
+  seo: (key: string, values?: Record<string, string>) => string,
+): string {
+  const raw = book.description?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (raw) {
+    if (raw.length <= PREVIEW_MAX_LENGTH) return raw;
+    const cut = raw.slice(0, PREVIEW_MAX_LENGTH + 1);
+    const lastSpace = cut.lastIndexOf(' ');
+    const trimmed = (lastSpace > 80 ? cut.slice(0, lastSpace) : cut.slice(0, PREVIEW_MAX_LENGTH)).trimEnd();
+    return `${trimmed}…`;
+  }
+  return book.author
+    ? seo('book_description_fallback', { title: book.title, author: book.author })
+    : seo('book_description_fallback_no_author', { title: book.title });
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -46,9 +70,13 @@ export async function generateMetadata({
     };
   }
 
-  const description =
-    book.description?.substring(0, 160) || `${book.title} by ${book.author ?? ''}`.trim();
-  const ogImage = book.coverUrl || `${BASE_URL}/og-image.png`;
+  const description = buildBookDescription(book, seo);
+  // When a cover exists, use it (recognizable to readers). Otherwise let the
+  // file convention at books/[id]/opengraph-image.tsx render a dynamic image
+  // with the book's title/author — better than the generic site fallback.
+  const customImage = book.coverUrl
+    ? [{ url: book.coverUrl, width: 1200, height: 630, alt: book.title }]
+    : undefined;
 
   return {
     title: `${book.title} — ${book.author ?? ''}`.trim(),
@@ -64,7 +92,7 @@ export async function generateMetadata({
     openGraph: {
       title: book.title,
       description,
-      images: [{ url: ogImage, width: 1200, height: 630, alt: book.title }],
+      ...(customImage ? { images: customImage } : {}),
       type: 'book' as const,
       url: `${BASE_URL}/${locale}/books/${id}`,
     },
@@ -72,7 +100,7 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title: book.title,
       description,
-      images: [ogImage],
+      ...(book.coverUrl ? { images: [book.coverUrl] } : {}),
     },
   };
 }

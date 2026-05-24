@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import styles from './NotificationCenter.module.scss';
 
 interface Notification {
@@ -20,9 +20,13 @@ interface Props {
   onClose: () => void;
 }
 
-function timeAgo(dateStr: string, t: (key: string, params?: Record<string, string | number | Date>) => string): string {
-  const now = Date.now();
-  const diff = now - new Date(dateStr).getTime();
+function timeAgo(
+  dateStr: string,
+  t: (key: string, params?: Record<string, string | number | Date>) => string,
+  locale: string,
+): string {
+  const date = new Date(dateStr);
+  const diff = Date.now() - date.getTime();
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
@@ -30,7 +34,14 @@ function timeAgo(dateStr: string, t: (key: string, params?: Record<string, strin
   if (minutes < 1) return t('just_now');
   if (minutes < 60) return t('minutes_ago', { count: minutes });
   if (hours < 24) return t('hours_ago', { count: hours });
-  return t('days_ago', { count: days });
+  if (days <= 7) return t('days_ago', { count: days });
+
+  const formatted = new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+  }).format(date);
+  return t('on_date', { date: formatted });
 }
 
 export default function NotificationCenter({
@@ -41,6 +52,7 @@ export default function NotificationCenter({
   onClose,
 }: Props) {
   const t = useTranslations('notifications');
+  const locale = useLocale();
 
   return (
     <div className={styles.center}>
@@ -69,7 +81,7 @@ export default function NotificationCenter({
               <div className={styles.itemContent}>
                 <span className={styles.itemTitle}>{n.title}</span>
                 <span className={styles.itemBody}>{n.body}</span>
-                <span className={styles.itemTime}>{timeAgo(n.createdAt, t)}</span>
+                <span className={styles.itemTime}>{timeAgo(n.createdAt, t, locale)}</span>
               </div>
               {!n.read && <span className={styles.dot} />}
             </button>
