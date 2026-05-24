@@ -22,6 +22,7 @@ export interface AuthResponse {
     email: string | null;
     name: string | null;
     avatar: string | null;
+    role: 'USER' | 'ADMIN';
   };
 }
 
@@ -77,6 +78,7 @@ export class AuthService {
     email: string | null;
     name: string | null;
     avatar: string | null;
+    role: 'USER' | 'ADMIN';
     tokenVersion: number;
   }): Promise<AuthResponse> {
     const tokens = await this.generateTokens(user.id, user.email, user.tokenVersion);
@@ -87,6 +89,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         avatar: user.avatar,
+        role: user.role,
       },
     };
   }

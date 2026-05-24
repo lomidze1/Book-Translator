@@ -8,10 +8,11 @@ import styles from './UserDropdown.module.scss';
 interface Props {
   userName: string | null;
   userEmail: string | null;
+  userRole?: 'USER' | 'ADMIN';
   onLogout: () => void;
 }
 
-export default function UserDropdown({ userName, userEmail, onLogout }: Props) {
+export default function UserDropdown({ userName, userEmail, userRole, onLogout }: Props) {
   const t = useTranslations('navbar');
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -80,6 +81,14 @@ export default function UserDropdown({ userName, userEmail, onLogout }: Props) {
               {t('settings')}
             </Link>
           </div>
+
+          {userRole === 'ADMIN' && (
+            <div className={styles.section}>
+              <Link href="/admin" className={styles.item} onClick={close} role="menuitem">
+                {t('admin_panel')}
+              </Link>
+            </div>
+          )}
 
           <div className={styles.section}>
             <button

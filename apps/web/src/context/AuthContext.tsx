@@ -21,6 +21,7 @@ interface User {
   email: string | null;
   name: string | null;
   avatar: string | null;
+  role: 'USER' | 'ADMIN';
 }
 
 interface AuthContextType {
