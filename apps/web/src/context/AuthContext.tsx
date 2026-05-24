@@ -43,9 +43,20 @@ function getCachedUser(): User | null {
   if (typeof window === 'undefined') return null;
   try {
     const stored = localStorage.getItem('cachedUser');
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return null;
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as Partial<User>;
+    // Reject caches saved before `role` joined the user envelope. The silent
+    // refresh + /users/profile fetch will repopulate with a fresh, complete
+    // user; rendering the stale shape would briefly say "not admin" for an
+    // actual admin and flicker the admin-panel link.
+    if (typeof parsed.id !== 'string' || (parsed.role !== 'USER' && parsed.role !== 'ADMIN')) {
+      localStorage.removeItem('cachedUser');
+      return null;
+    }
+    return parsed as User;
+  } catch {
+    return null;
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
