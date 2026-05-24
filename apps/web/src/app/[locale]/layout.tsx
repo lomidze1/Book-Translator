@@ -13,6 +13,7 @@ import ToastContainer from '@/components/Toast';
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://booktranslator.ge';
+const TWITTER_HANDLE = process.env.NEXT_PUBLIC_TWITTER_HANDLE;
 
 // Georgian-aware self-hosted fonts. Geist (the previous sans) has no Georgian
 // glyphs, so it silently fell back to Arial for the entire app. Noto Sans
@@ -65,13 +66,15 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       alternateLocale: locale === 'ka' ? 'en_US' : 'ka_GE',
       type: 'website',
       url: `${BASE_URL}/${locale}`,
-      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: seo('site_name') }],
+      // og:image is populated by app/[locale]/opengraph-image.tsx (dynamic,
+      // high-quality 1200×630 render). Don't duplicate it here or the file
+      // convention's auto-injected tag gets overridden.
     },
     twitter: {
       card: 'summary_large_image',
       title: t('title'),
       description: t('description'),
-      images: [`${BASE_URL}/og-image.png`],
+      ...(TWITTER_HANDLE ? { site: TWITTER_HANDLE, creator: TWITTER_HANDLE } : {}),
     },
     robots: {
       index: true,

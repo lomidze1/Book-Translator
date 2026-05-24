@@ -543,6 +543,8 @@
     "payment_success_title": "Payment Successful",
     "payment_failure_title": "Payment Failed",
     "book_not_found": "Book Not Found",
-    "site_name": "Book Translator"
+    "site_name": "Book Translator",
+    "book_description_fallback": "{title} by {author}",
+    "book_description_fallback_no_author": "{title}"
   }
 }

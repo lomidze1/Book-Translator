@@ -543,6 +543,8 @@
     "payment_success_title": "გადახდა წარმატებულია",
     "payment_failure_title": "გადახდა ვერ მოხერხდა",
     "book_not_found": "წიგნი ვერ მოიძებნა",
-    "site_name": "Book Translator \u2014 წიგნების მთარგმნელი"
+    "site_name": "Book Translator — წიგნების მთარგმნელი",
+    "book_description_fallback": "{title} — {author}",
+    "book_description_fallback_no_author": "{title}"
   }
 }

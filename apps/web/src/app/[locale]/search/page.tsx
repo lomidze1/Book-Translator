@@ -19,7 +19,6 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       title: t('search_title'),
       description: t('search_description'),
       url: `${BASE_URL}/${locale}/search`,
-      images: [{ url: `${BASE_URL}/og-image.png`, width: 1200, height: 630, alt: t('site_name') }],
     },
   };
 }

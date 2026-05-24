@@ -25,9 +25,10 @@ async function fetchBook(id: string) {
 export default async function OgImage({
   params,
 }: {
-  params: { locale: string; id: string };
+  params: Promise<{ locale: string; id: string }>;
 }) {
-  const book = await fetchBook(params.id);
+  const { locale, id } = await params;
+  const book = await fetchBook(id);
   const title = book?.title ?? 'Book Translator';
   const author = book?.author ?? '';
 
@@ -77,7 +78,7 @@ export default async function OgImage({
             justifyContent: 'space-between',
           }}
         >
-          <span>{params.locale === 'ka' ? 'წაიკითხეთ ქართულად' : 'Read in your language'}</span>
+          <span>{locale === 'ka' ? 'წაიკითხეთ ქართულად' : 'Read in your language'}</span>
           <span>booktranslator.ge</span>
         </div>
       </div>
