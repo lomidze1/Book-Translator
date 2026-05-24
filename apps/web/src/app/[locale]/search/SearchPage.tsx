@@ -5,7 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import Image from 'next/image';
-import styles from '../../search/page.module.scss';
+import Skeleton from '@/components/Skeleton';
+import styles from './page.module.scss';
+import { API_URL } from '@/lib/api-client';
 
 interface ExternalBook {
   source: 'google' | 'openlibrary';
@@ -37,7 +39,6 @@ interface SearchResult {
   total: number;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function SearchPage() {
   const t = useTranslations('search');
@@ -106,6 +107,29 @@ export default function SearchPage() {
               {loading ? t('searching') : t('button')}
             </button>
           </div>
+
+          {loading && !results && (
+            // Initial search — show a skeleton grid until results arrive.
+            // For subsequent searches the previous results stay visible
+            // (handled by the existing button "searching..." state).
+            <section className={styles.section} aria-busy="true" aria-live="polite">
+              <span className="sr-only">{t('searching')}</span>
+              <h2 className={styles.sectionTitle}>
+                <Skeleton variant="title" width={180} />
+              </h2>
+              <div className={styles.grid}>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className={styles.card}>
+                    <Skeleton variant="image" height={192} />
+                    <div className={styles.cardInfo}>
+                      <Skeleton variant="text" width="85%" />
+                      <Skeleton variant="text" width="55%" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {results?.database && results.database.length > 0 && (
             <section className={styles.section}>

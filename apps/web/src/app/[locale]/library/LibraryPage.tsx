@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import Skeleton from '@/components/Skeleton';
 import styles from './library.module.scss';
 
 type Filter = 'all' | 'in_progress' | 'completed';
@@ -63,16 +64,40 @@ export default function LibraryPage() {
         </div>
 
         {loading ? (
-          <div className={styles.loadingState}>{t('loading')}</div>
+          // Skeleton grid that mirrors the real card layout so the page
+          // doesn't reflow when data arrives.
+          <div className={styles.grid} aria-busy="true" aria-live="polite">
+            <span className="sr-only">{t('loading')}</span>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className={styles.bookCard}>
+                <Skeleton variant="image" height={200} />
+                <div className={styles.bookInfo}>
+                  <Skeleton variant="text" width="90%" />
+                  <Skeleton variant="text" width="60%" />
+                  <Skeleton variant="text" width={64} height={18} />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <div className={styles.emptyState}><p>{t('error')}</p></div>
         ) : filtered.length === 0 ? (
           <div className={styles.emptyState}>
-            <p>{translations.length === 0 ? t('no_books') : t('no_books_hint')}</p>
-            {translations.length === 0 && (
-              <Link href="/search" className={styles.emptyBtn}>
-                {t('start_search')}
-              </Link>
+            {translations.length === 0 ? (
+              <>
+                <p>{t('no_books')}</p>
+                <p className={styles.emptyHint}>{t('no_books_hint')}</p>
+                <Link href="/search" className={styles.emptyBtn}>
+                  {t('start_search')}
+                </Link>
+              </>
+            ) : (
+              // User has books but the current filter / search hides them all.
+              // Tell them how to recover rather than repeating the empty copy.
+              <>
+                <p>{t('no_matches')}</p>
+                <p className={styles.emptyHint}>{t('no_matches_hint')}</p>
+              </>
             )}
           </div>
         ) : (

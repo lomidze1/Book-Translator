@@ -6,6 +6,7 @@ import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import Skeleton from '@/components/Skeleton';
 import styles from './dashboard.module.scss';
 
 export default function DashboardPage() {
@@ -30,7 +31,33 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className={styles.loadingState}>{t('loading')}</div>
+          // Skeleton for the 3 stat tiles + a few activity rows. Mirrors the
+          // real layout so the page doesn't shift when data arrives.
+          <div aria-busy="true" aria-live="polite">
+            <span className="sr-only">{t('loading')}</span>
+            <div className={styles.statsGrid}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className={styles.statCard}>
+                  <Skeleton variant="title" width="40%" height={32} />
+                  <Skeleton variant="text" width="60%" />
+                </div>
+              ))}
+            </div>
+            <div className={styles.section}>
+              <Skeleton variant="title" width={180} />
+              <ul className={styles.activityList}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <li key={i} className={styles.activityItem}>
+                    <Skeleton variant="image" width={48} height={72} />
+                    <div style={{ flex: 1 }}>
+                      <Skeleton variant="text" width="70%" />
+                      <Skeleton variant="text" width="40%" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         ) : error ? (
           <div className={styles.emptyState}>
             <p>{t('error')}</p>
@@ -58,7 +85,18 @@ export default function DashboardPage() {
             <div className={styles.section}>
               <h2>{t('recent_activity')}</h2>
               {recentActivity.length === 0 ? (
-                <div className={styles.emptyState}>{t('no_activity')}</div>
+                <div className={styles.emptyState}>
+                  <p>{t('no_activity')}</p>
+                  <p className={styles.emptyHint}>{t('no_activity_hint')}</p>
+                  <div className={styles.emptyActions}>
+                    <Link href="/search" className={styles.actionBtn}>
+                      {t('search_books')}
+                    </Link>
+                    <Link href="/upload" className={styles.actionBtn}>
+                      {t('upload_book')}
+                    </Link>
+                  </div>
+                </div>
               ) : (
                 <ul className={styles.activityList}>
                   {recentActivity.map((item) => (

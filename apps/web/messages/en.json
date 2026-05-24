@@ -115,7 +115,15 @@
     "error_confirm_required": "Password confirmation is required",
     "show_password": "Show password",
     "hide_password": "Hide password",
-    "or_divider": "or"
+    "or_divider": "or",
+    "strength_weak": "Weak password",
+    "strength_fair": "Fair password",
+    "strength_good": "Good password",
+    "strength_strong": "Strong password",
+    "requirement_length": "At least 8 characters",
+    "requirement_uppercase": "1 uppercase letter",
+    "requirement_lowercase": "1 lowercase letter",
+    "requirement_digit": "1 number"
   },
   "google_auth": {
     "error": "Google sign-in failed. Please try again."
@@ -265,6 +273,8 @@
     "provider_flitt_note": "Secure payment via Flitt (TBC Bank).",
     "pay_button": "Pay {amount}{currency}",
     "processing": "Processing...",
+    "redirecting": "Redirecting...",
+    "redirecting_to_bank": "Redirecting to payment page...",
     "error_default": "Payment failed. Please try again.",
     "success_title": "Payment Successful!",
     "success_message": "Your payment has been processed. Translation will begin shortly.",
@@ -278,6 +288,7 @@
     "mock_pay_fail": "Simulate Failure"
   },
   "profile": {
+    "profile": "Profile",
     "loading": "Loading...",
     "load_error": "Failed to load profile",
     "email": "Email",
@@ -431,6 +442,7 @@
     "stats_completed": "Completed",
     "recent_activity": "Recent Activity",
     "no_activity": "No activity yet",
+    "no_activity_hint": "Search for a book or upload your own file — AI translation starts right away.",
     "quick_actions": "Quick Actions",
     "search_books": "Search Books",
     "upload_book": "Upload Book",
@@ -450,6 +462,8 @@
     "search_placeholder": "Search library...",
     "no_books": "Library is empty",
     "no_books_hint": "Search for a book and start translating",
+    "no_matches": "No matching books found",
+    "no_matches_hint": "Try changing the filter or clearing your search.",
     "start_search": "Search Books",
     "continue_reading": "Continue Reading",
     "read": "Read",

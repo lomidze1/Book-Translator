@@ -153,3 +153,39 @@
   text-align: center;
   margin-bottom: $spacing-sm;
 }
+
+// Shown right before window.location.href fires. Visible reassurance that
+// the form actually went through and we're switching contexts to the bank.
+.redirecting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm;
+  margin-bottom: $spacing-sm;
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  border-radius: $radius-md;
+  font-size: 0.9rem;
+  color: var(--foreground);
+}
+
+.redirectingSpinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--progress-bg);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: redirectSpin 0.8s linear infinite;
+}
+
+@keyframes redirectSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .redirectingSpinner {
+    animation: none;
+  }
+}

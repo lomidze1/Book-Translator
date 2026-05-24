@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import styles from '../../forgot-password/page.module.scss';
+import styles from './page.module.scss';
+import { API_URL } from '@/lib/api-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('forgot_password');

@@ -7,8 +7,9 @@ import { usePathname } from '@/i18n/navigation';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import PaymentModal from '@/components/PaymentModal';
-import { apiFetch, getAccessToken } from '@/lib/api-client';
-import styles from '../../../books/[id]/page.module.scss';
+import Breadcrumbs from '@/components/Breadcrumbs';
+import { API_URL, apiFetch, getAccessToken } from '@/lib/api-client';
+import styles from './page.module.scss';
 
 interface BookDetails {
   id: string;
@@ -37,10 +38,10 @@ interface BookDetails {
   _count: { userBooks: number };
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function BookDetailsPage() {
   const t = useTranslations('book');
+  const tNav = useTranslations('navbar');
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -267,6 +268,12 @@ export default function BookDetailsPage() {
   return (
     <div className={styles.main}>
       <div className={styles.container}>
+        <Breadcrumbs
+          items={[
+            { label: tNav('search'), href: '/search' },
+            { label: book.title },
+          ]}
+        />
         <button onClick={() => router.back()} className={styles.backLink}>{t('back_to_search')}</button>
 
         {showLoginPrompt && (

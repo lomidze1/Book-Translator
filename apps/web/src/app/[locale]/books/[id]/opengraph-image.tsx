@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { API_URL } from '@/lib/api-client';
 
 // Dynamic OG image for book detail pages. Crawlers (LinkedIn, Twitter,
 // Facebook, Telegram, iMessage, etc.) request this URL when a /books/:id link
@@ -10,7 +11,6 @@ export const alt = 'Book Translator';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 async function fetchBook(id: string) {
   try {
