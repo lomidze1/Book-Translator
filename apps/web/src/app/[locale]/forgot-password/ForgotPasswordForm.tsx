@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import styles from './page.module.scss';
 import { API_URL } from '@/lib/api-client';
+import { getWebmailUrl } from '@/lib/email-provider';
 
 
 export default function ForgotPasswordPage() {
@@ -55,7 +56,7 @@ export default function ForgotPasswordPage() {
           <div className={styles.successBox}>
             <p>{t('success')}</p>
             <a
-              href="https://mail.google.com"
+              href={getWebmailUrl(email)}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.emailBtn}

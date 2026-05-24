@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, Link } from '@/i18n/navigation';
 import { apiFetch } from '@/lib/api-client';
+import { getWebmailUrl } from '@/lib/email-provider';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import styles from '../subpage.module.scss';
 
@@ -41,7 +42,7 @@ type Step = 'form' | 'emailSent';
 
 export default function ChangePasswordPage() {
   const t = useTranslations('profile');
-  const { isLoggedIn, isLoading } = useAuth();
+  const { user, isLoggedIn, isLoading } = useAuth();
   const router = useRouter();
 
   const [newPassword, setNewPassword] = useState('');
@@ -118,7 +119,7 @@ export default function ChangePasswordPage() {
             <p className={styles.emailSentDescription}>{t('email_sent_description')}</p>
 
             <a
-              href="https://mail.google.com"
+              href={getWebmailUrl(user?.email)}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.emailBtn}
