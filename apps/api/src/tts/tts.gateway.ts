@@ -6,9 +6,9 @@ import {
   SubscribeMessage,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
+import { SocketAuthService } from '../auth/socket-auth.service';
 
 @WebSocketGateway({
   namespace: 'tts',
@@ -24,47 +24,15 @@ export class TtsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   constructor(
-    private readonly jwtService: JwtService,
+    private readonly socketAuth: SocketAuthService,
     private readonly prisma: PrismaService,
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
-    try {
-      const token =
-        (client.handshake.auth as any)?.token ||
-        (client.handshake.query?.token as string);
-
-      if (!token) {
-        this.logger.warn(`TTS client rejected (no token): ${client.id}`);
-        client.disconnect();
-        return;
-      }
-
-      const payload = this.jwtService.verify(token);
-
-      // Match JwtStrategy: verify the token wasn't revoked by a password change
-      // or logout-all (tokenVersion bump).
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: { tokenVersion: true },
-      });
-      if (!user) {
-        this.logger.warn(`TTS client rejected (user not found): ${client.id}`);
-        client.disconnect();
-        return;
-      }
-      if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
-        this.logger.warn(`TTS client rejected (token revoked): ${client.id}`);
-        client.disconnect();
-        return;
-      }
-
-      (client as any).userId = payload.sub;
-      this.logger.log(`TTS client connected: ${client.id} (user: ${payload.sub})`);
-    } catch {
-      this.logger.warn(`TTS client rejected (invalid token): ${client.id}`);
-      client.disconnect();
-    }
+    // SocketAuthService handles token extraction, JWT verify, tokenVersion
+    // revocation check, and disconnects on failure. Returns null when the
+    // client was rejected (already disconnected).
+    await this.socketAuth.authenticate(client, 'TTS');
   }
 
   handleDisconnect(client: Socket): void {
@@ -73,7 +41,7 @@ export class TtsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('tts:subscribe')
   async handleSubscribe(client: Socket, audioBookId: string): Promise<void> {
-    const userId = (client as any).userId;
+    const userId = client.userId;
     if (!userId) {
       client.disconnect();
       return;

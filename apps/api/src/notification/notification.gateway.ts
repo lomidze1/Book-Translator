@@ -5,9 +5,8 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
-import { PrismaService } from '../prisma/prisma.service';
+import { SocketAuthService } from '../auth/socket-auth.service';
 
 @WebSocketGateway({
   namespace: 'notifications',
@@ -22,59 +21,21 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   @WebSocketServer()
   server: Server;
 
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly socketAuth: SocketAuthService) {}
 
   async handleConnection(client: Socket): Promise<void> {
-    try {
-      const token =
-        (client.handshake.auth as any)?.token ||
-        (client.handshake.query?.token as string);
+    const userId = await this.socketAuth.authenticate(client, 'Notification');
+    if (!userId) return;
 
-      if (!token) {
-        this.logger.warn(`Notification client rejected (no token): ${client.id}`);
-        client.disconnect();
-        return;
-      }
-
-      const payload = this.jwtService.verify(token);
-      const userId = payload.sub;
-
-      // Match JwtStrategy: verify the token wasn't revoked by a password change
-      // or logout-all (tokenVersion bump).
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { tokenVersion: true },
-      });
-      if (!user) {
-        this.logger.warn(`Notification client rejected (user not found): ${client.id}`);
-        client.disconnect();
-        return;
-      }
-      if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
-        this.logger.warn(`Notification client rejected (token revoked): ${client.id}`);
-        client.disconnect();
-        return;
-      }
-
-      (client as any).userId = userId;
-
-      // Auto-join user's room
-      client.join(`user:${userId}`);
-      this.logger.log(`Notification client connected: ${client.id} (user: ${userId})`);
-    } catch {
-      this.logger.warn(`Notification client rejected (invalid token): ${client.id}`);
-      client.disconnect();
-    }
+    // Auto-join the user's personal room so emitNotification can target them.
+    client.join(`user:${userId}`);
   }
 
   handleDisconnect(client: Socket): void {
     this.logger.log(`Notification client disconnected: ${client.id}`);
   }
 
-  emitNotification(userId: string, notification: any): void {
+  emitNotification(userId: string, notification: unknown): void {
     this.server?.to(`user:${userId}`).emit('notification:new', notification);
   }
 

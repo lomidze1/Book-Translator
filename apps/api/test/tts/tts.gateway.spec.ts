@@ -4,15 +4,15 @@ import { TtsGateway } from '../../src/tts/tts.gateway';
 describe('TtsGateway', () => {
   let gateway: TtsGateway;
 
-  const mockJwtService = {
-    verify: vi.fn(),
+  // The auth handshake now lives in SocketAuthService — the gateway just
+  // delegates. We test that delegation here and trust the dedicated
+  // socket-auth.service.spec for the verify/tokenVersion logic itself.
+  const mockSocketAuth = {
+    authenticate: vi.fn(),
   };
 
   const mockPrisma = {
     audioBook: {
-      findUnique: vi.fn(),
-    },
-    user: {
       findUnique: vi.fn(),
     },
   };
@@ -28,6 +28,7 @@ describe('TtsGateway', () => {
     emit: vi.fn(),
     disconnect: vi.fn(),
     data: {} as any,
+    userId: undefined as string | undefined,
   });
 
   const mockRoom = {
@@ -36,61 +37,29 @@ describe('TtsGateway', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gateway = new (TtsGateway as any)(mockJwtService, mockPrisma);
+    gateway = new (TtsGateway as any)(mockSocketAuth, mockPrisma);
     (gateway as any).server = {
       to: vi.fn().mockReturnValue(mockRoom),
     };
   });
 
   describe('handleConnection', () => {
-    it('should authenticate client with valid JWT and matching tokenVersion', async () => {
-      mockJwtService.verify.mockReturnValue({ sub: 'user-1', tokenVersion: 0 });
-      mockPrisma.user.findUnique.mockResolvedValue({ tokenVersion: 0 });
+    it('should delegate authentication to SocketAuthService', async () => {
+      mockSocketAuth.authenticate.mockResolvedValue('user-1');
       const client = createMockClient('valid-token');
 
       await gateway.handleConnection(client as any);
 
-      expect(mockJwtService.verify).toHaveBeenCalledWith('valid-token');
-      expect(client.disconnect).not.toHaveBeenCalled();
-      expect((client as any).userId).toBe('user-1');
+      expect(mockSocketAuth.authenticate).toHaveBeenCalledWith(client, 'TTS');
     });
 
-    it('should disconnect client with no token', async () => {
+    it('should not block when authenticate rejects (service already disconnected)', async () => {
+      // Returning null is the documented "rejected and disconnected" signal.
+      mockSocketAuth.authenticate.mockResolvedValue(null);
       const client = createMockClient(undefined);
 
-      await gateway.handleConnection(client as any);
-
-      expect(client.disconnect).toHaveBeenCalled();
-    });
-
-    it('should disconnect client with invalid token', async () => {
-      mockJwtService.verify.mockImplementation(() => { throw new Error('invalid'); });
-      const client = createMockClient('bad-token');
-
-      await gateway.handleConnection(client as any);
-
-      expect(client.disconnect).toHaveBeenCalled();
-    });
-
-    it('should disconnect client when tokenVersion does not match (revoked token)', async () => {
-      mockJwtService.verify.mockReturnValue({ sub: 'user-1', tokenVersion: 0 });
-      mockPrisma.user.findUnique.mockResolvedValue({ tokenVersion: 1 });
-      const client = createMockClient('stale-token');
-
-      await gateway.handleConnection(client as any);
-
-      expect(client.disconnect).toHaveBeenCalled();
-      expect((client as any).userId).toBeUndefined();
-    });
-
-    it('should disconnect client when user no longer exists', async () => {
-      mockJwtService.verify.mockReturnValue({ sub: 'user-1', tokenVersion: 0 });
-      mockPrisma.user.findUnique.mockResolvedValue(null);
-      const client = createMockClient('valid-token');
-
-      await gateway.handleConnection(client as any);
-
-      expect(client.disconnect).toHaveBeenCalled();
+      // Should still resolve without throwing.
+      await expect(gateway.handleConnection(client as any)).resolves.toBeUndefined();
     });
   });
 

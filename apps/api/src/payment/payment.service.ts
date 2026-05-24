@@ -15,6 +15,18 @@ import { devShortcutsEnabled } from '../common/dev-shortcuts';
 
 export type PaymentProviderName = 'FLITT';
 
+/**
+ * Minimal projection passed to onPaymentCompleted + each strategy. We only
+ * need these fields to know what side-effects to fire; full Payment row is
+ * re-fetched in sendPaymentReceipt with the relations the notification needs.
+ */
+interface CompletedPayment {
+  id: string;
+  userId: string;
+  type: string;
+  translationId: string | null;
+}
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
@@ -383,83 +395,112 @@ export class PaymentService {
     return { status: 'COMPLETED', paymentId };
   }
 
-  private async onPaymentCompleted(payment: {
-    id: string;
-    userId: string;
-    type: string;
-    translationId: string | null;
-  }) {
+  // ============================================================
+  // Post-completion strategies
+  //
+  // When a payment moves to COMPLETED, the side-effects depend on the
+  // payment.type. Previously this was an 80-line if-chain. Now each type
+  // has a small async strategy here, dispatched from `onPaymentCompleted`.
+  // Adding a new payment type just means adding a key — the dispatcher
+  // and the receipt notification stay untouched.
+  // ============================================================
+
+  /**
+   * Strategy for completed translations: flip the row from PENDING → PAID
+   * and kick off the translation worker.
+   */
+  private async onTranslationCompleted(payment: CompletedPayment): Promise<void> {
+    if (!payment.translationId) return;
+
+    await this.prisma.translation.update({
+      where: { id: payment.translationId },
+      data: { status: 'PAID' },
+    });
+    this.logger.log(`Translation ${payment.translationId} marked as PAID`);
+
+    await this.translationService.startTranslation(payment.translationId);
+  }
+
+  /**
+   * Strategy for purchases: grant the buyer a UserBook row of the
+   * appropriate type. Idempotent via the composite unique key.
+   */
+  private async onPurchaseCompleted(
+    payment: CompletedPayment,
+    userBookType: 'PURCHASED_TRANSLATION' | 'PURCHASED_ORIGINAL',
+  ): Promise<void> {
+    if (!payment.translationId) return;
+
+    const bookRelation = await this.prisma.translation.findUnique({
+      where: { id: payment.translationId },
+      select: { bookId: true },
+    });
+    if (!bookRelation) return;
+
+    await this.prisma.userBook.upsert({
+      where: {
+        userId_bookId_type: {
+          userId: payment.userId,
+          bookId: bookRelation.bookId,
+          type: userBookType,
+        },
+      },
+      create: {
+        userId: payment.userId,
+        bookId: bookRelation.bookId,
+        type: userBookType,
+      },
+      update: {},
+    });
+    this.logger.log(`UserBook created: ${userBookType} for book ${bookRelation.bookId}`);
+  }
+
+  private async onPaymentCompleted(payment: CompletedPayment): Promise<void> {
     this.logger.log(`Payment completed: ${payment.id} (${payment.type})`);
 
-    if (payment.type === 'TRANSLATION' && payment.translationId) {
-      // Update translation status from PENDING to PAID
-      await this.prisma.translation.update({
-        where: { id: payment.translationId },
-        data: { status: 'PAID' },
-      });
-      this.logger.log(`Translation ${payment.translationId} marked as PAID`);
+    const strategies: Record<string, (p: CompletedPayment) => Promise<void>> = {
+      TRANSLATION: (p) => this.onTranslationCompleted(p),
+      PURCHASE_TRANSLATION: (p) => this.onPurchaseCompleted(p, 'PURCHASED_TRANSLATION'),
+      PURCHASE_ORIGINAL: (p) => this.onPurchaseCompleted(p, 'PURCHASED_ORIGINAL'),
+    };
 
-      // Start translation processing
-      await this.translationService.startTranslation(payment.translationId);
+    const strategy = strategies[payment.type];
+    if (strategy) {
+      await strategy(payment);
+    } else {
+      this.logger.warn(`No strategy for payment type: ${payment.type}`);
     }
 
-    if (payment.type === 'PURCHASE_TRANSLATION' || payment.type === 'PURCHASE_ORIGINAL') {
-      // Find the book related to this payment
-      const bookRelation = payment.translationId
-        ? await this.prisma.translation.findUnique({
-            where: { id: payment.translationId },
-            select: { bookId: true },
-          })
-        : null;
+    // Receipt notification is type-agnostic — every successful payment
+    // gets one. Wrapped in try/catch so a notification provider outage
+    // can't roll back the payment side-effects above.
+    await this.sendPaymentReceipt(payment);
+  }
 
-      if (bookRelation) {
-        const userBookType = payment.type === 'PURCHASE_TRANSLATION'
-          ? 'PURCHASED_TRANSLATION'
-          : 'PURCHASED_ORIGINAL';
-
-        await this.prisma.userBook.upsert({
-          where: {
-            userId_bookId_type: {
-              userId: payment.userId,
-              bookId: bookRelation.bookId,
-              type: userBookType,
-            },
-          },
-          create: {
-            userId: payment.userId,
-            bookId: bookRelation.bookId,
-            type: userBookType,
-          },
-          update: {},
-        });
-        this.logger.log(`UserBook created: ${userBookType} for book ${bookRelation.bookId}`);
-      }
-    }
-
-    // Send payment receipt notification
+  private async sendPaymentReceipt(payment: CompletedPayment): Promise<void> {
     try {
       const fullPayment = await this.prisma.payment.findUnique({
         where: { id: payment.id },
         include: { translation: { include: { book: true } } },
       });
-      if (fullPayment) {
-        const bookTitle = fullPayment.translation?.book?.title || fullPayment.description || '';
-        await this.notificationService.notify({
-          userId: payment.userId,
-          type: 'PAYMENT_RECEIPT',
-          titleKa: 'გადახდა წარმატებულია',
-          titleEn: 'Payment Successful',
-          bodyKa: `${fullPayment.amount} ${fullPayment.currency} — ${bookTitle}`,
-          bodyEn: `${fullPayment.amount} ${fullPayment.currency} — ${bookTitle}`,
-          data: {
-            paymentId: payment.id,
-            amount: Number(fullPayment.amount),
-            currency: fullPayment.currency,
-            bookTitle,
-            paidAt: fullPayment.paidAt?.toISOString(),
-          },
-        });
-      }
+      if (!fullPayment) return;
+
+      const bookTitle = fullPayment.translation?.book?.title || fullPayment.description || '';
+      await this.notificationService.notify({
+        userId: payment.userId,
+        type: 'PAYMENT_RECEIPT',
+        titleKa: 'გადახდა წარმატებულია',
+        titleEn: 'Payment Successful',
+        bodyKa: `${fullPayment.amount} ${fullPayment.currency} — ${bookTitle}`,
+        bodyEn: `${fullPayment.amount} ${fullPayment.currency} — ${bookTitle}`,
+        data: {
+          paymentId: payment.id,
+          amount: Number(fullPayment.amount),
+          currency: fullPayment.currency,
+          bookTitle,
+          paidAt: fullPayment.paidAt?.toISOString(),
+        },
+      });
     } catch (err) {
       this.logger.error(`Payment notification failed: ${err instanceof Error ? err.message : err}`);
     }
