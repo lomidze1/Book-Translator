@@ -127,6 +127,28 @@
   align-items: center;
 }
 
+.refreshBtn {
+  padding: $spacing-sm $spacing-md;
+  background: #fff;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &:hover:not(:disabled) {
+    background: #f1f5f9;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
 .searchInput {
   flex: 1;
   min-width: 240px;
@@ -150,13 +172,22 @@
   cursor: pointer;
 }
 
-.table {
+// Horizontal scroll on narrow viewports so 6-column tables don't blow out
+// the layout on mobile. The wrapper carries the border + radius; the inner
+// <table> stays simple.
+.tableWrap {
   width: 100%;
-  border-collapse: collapse;
-  background: #fff;
   border: 1px solid $color-border;
   border-radius: $radius-lg;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #fff;
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
   font-size: 14px;
 }
 

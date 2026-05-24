@@ -3,6 +3,11 @@
     "title": "Book Translator - AI Book Translation",
     "description": "AI-powered platform for translating English books into Georgian. Upload, translate, read."
   },
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "working": "Working…"
+  },
   "errors": {
     "not_found_title": "Page not found",
     "not_found_description": "The page you are looking for does not exist or has been moved.",
@@ -571,7 +576,10 @@
     "prev": "Prev",
     "next": "Next",
     "page_of": "Page {page} of {total}",
+    "refresh": "Refresh",
+    "confirm_role_change_title": "Change role",
     "confirm_role_change": "Change role of {email} to {role}?",
+    "confirm_retry_title": "Retry translation",
     "confirm_retry": "Retry translation for \"{title}\"?"
   },
   "seo": {

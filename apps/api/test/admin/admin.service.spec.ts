@@ -28,6 +28,7 @@ describe('AdminService', () => {
   const mockTranslationService = {
     updateProgress: vi.fn(),
     startTranslation: vi.fn(),
+    clearQueuedJob: vi.fn().mockResolvedValue(false),
   };
 
   beforeEach(() => {
@@ -186,18 +187,29 @@ describe('AdminService', () => {
   });
 
   describe('retryTranslation', () => {
-    it('resets and re-enqueues a FAILED translation', async () => {
-      mockPrisma.translation.findUnique.mockResolvedValue({ id: 't1', status: 'FAILED' });
+    const STUCK_MS = 30 * 60 * 1000;
+
+    it('resets and re-enqueues a FAILED translation, clearing any stale job', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 't1',
+        status: 'FAILED',
+        updatedAt: new Date(),
+      });
       mockTranslationService.startTranslation.mockResolvedValue({ id: 't1' });
 
       await adminService.retryTranslation('t1');
 
+      expect(mockTranslationService.clearQueuedJob).toHaveBeenCalledWith('t1');
       expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('t1', 0, 'PAID');
       expect(mockTranslationService.startTranslation).toHaveBeenCalledWith('t1');
     });
 
-    it('resets and re-enqueues a stuck IN_PROGRESS translation', async () => {
-      mockPrisma.translation.findUnique.mockResolvedValue({ id: 't1', status: 'IN_PROGRESS' });
+    it('retries an IN_PROGRESS translation only after the stuck threshold elapses', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 't1',
+        status: 'IN_PROGRESS',
+        updatedAt: new Date(Date.now() - STUCK_MS - 60_000),
+      });
       mockTranslationService.startTranslation.mockResolvedValue({ id: 't1' });
 
       await adminService.retryTranslation('t1');
@@ -205,11 +217,41 @@ describe('AdminService', () => {
       expect(mockTranslationService.updateProgress).toHaveBeenCalled();
     });
 
-    it('refuses to retry a COMPLETED translation', async () => {
-      mockPrisma.translation.findUnique.mockResolvedValue({ id: 't1', status: 'COMPLETED' });
+    it('refuses to retry a recently-updated IN_PROGRESS translation', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 't1',
+        status: 'IN_PROGRESS',
+        updatedAt: new Date(Date.now() - 60_000), // 1 minute ago
+      });
 
       await expect(adminService.retryTranslation('t1')).rejects.toThrow(BadRequestException);
       expect(mockTranslationService.updateProgress).not.toHaveBeenCalled();
+    });
+
+    it('refuses to retry a COMPLETED translation', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 't1',
+        status: 'COMPLETED',
+        updatedAt: new Date(),
+      });
+
+      await expect(adminService.retryTranslation('t1')).rejects.toThrow(BadRequestException);
+      expect(mockTranslationService.updateProgress).not.toHaveBeenCalled();
+    });
+
+    it('propagates the "actively running" error from clearQueuedJob', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 't1',
+        status: 'FAILED',
+        updatedAt: new Date(),
+      });
+      mockTranslationService.clearQueuedJob.mockRejectedValueOnce(
+        new BadRequestException('Translation is actively being processed — wait for it to finish or fail.'),
+      );
+
+      await expect(adminService.retryTranslation('t1')).rejects.toThrow(BadRequestException);
+      expect(mockTranslationService.updateProgress).not.toHaveBeenCalled();
+      expect(mockTranslationService.startTranslation).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException for missing translation', async () => {

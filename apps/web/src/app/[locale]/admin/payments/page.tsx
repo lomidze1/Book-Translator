@@ -42,7 +42,7 @@ export default function AdminPaymentsPage() {
 
   const extraQuery = useMemo(() => ({ status: status || undefined }), [status]);
 
-  const { items, page, setPage, search, setSearch, loading, error, pageCount, total } =
+  const { items, page, setPage, search, setSearch, loading, error, refresh, pageCount, total } =
     useAdminList<AdminPayment>({ endpoint: '/api/admin/payments', extraQuery });
 
   return (
@@ -69,6 +69,14 @@ export default function AdminPaymentsPage() {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          className={styles.refreshBtn}
+          onClick={refresh}
+          disabled={loading}
+        >
+          {t('refresh')}
+        </button>
       </div>
 
       {error && <div className={styles.errorBanner}>{error}</div>}
@@ -78,6 +86,7 @@ export default function AdminPaymentsPage() {
       ) : items.length === 0 ? (
         <div className={styles.emptyState}>{t('no_results')}</div>
       ) : (
+        <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
             <tr>
@@ -114,6 +123,7 @@ export default function AdminPaymentsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <Pagination page={page} pageCount={pageCount} total={total} onPageChange={setPage} />

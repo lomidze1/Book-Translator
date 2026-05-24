@@ -3,6 +3,11 @@
     "title": "Book Translator - წიგნების AI თარგმანი",
     "description": "ინგლისურენოვანი წიგნების ქართულ ენაზე AI თარგმანის პლატფორმა. ატვირთე, გადათარგმნე, წაიკითხე."
   },
+  "common": {
+    "confirm": "დადასტურება",
+    "cancel": "გაუქმება",
+    "working": "მუშავდება…"
+  },
   "errors": {
     "not_found_title": "გვერდი ვერ მოიძებნა",
     "not_found_description": "მოთხოვნილი გვერდი არ არსებობს ან გადატანილია.",
@@ -571,7 +576,10 @@
     "prev": "წინა",
     "next": "შემდეგი",
     "page_of": "გვერდი {page} / {total}",
+    "refresh": "განახლება",
+    "confirm_role_change_title": "როლის ცვლა",
     "confirm_role_change": "შეცვალოთ {email}-ის როლი {role}-ად?",
+    "confirm_retry_title": "თარგმანის ხელახლა ცდა",
     "confirm_retry": "გადათარგმნოთ \"{title}\" თავიდან?"
   },
   "seo": {

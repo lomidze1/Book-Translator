@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { apiFetch } from '@/lib/api-client';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { useAdminList } from '../useAdminList';
 import Pagination from '../Pagination';
 import styles from '../admin.module.scss';
@@ -40,6 +41,7 @@ export default function AdminTranslationsPage() {
   const [status, setStatus] = useState<string>('');
   const [actionError, setActionError] = useState('');
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [retryTarget, setRetryTarget] = useState<AdminTranslation | null>(null);
 
   const extraQuery = useMemo(() => ({ status: status || undefined }), [status]);
 
@@ -56,12 +58,12 @@ export default function AdminTranslationsPage() {
     total,
   } = useAdminList<AdminTranslation>({ endpoint: '/api/admin/translations', extraQuery });
 
-  const onRetry = async (translation: AdminTranslation) => {
-    if (!window.confirm(t('confirm_retry', { title: translation.book.title }))) return;
-    setPendingId(translation.id);
+  const performRetry = async () => {
+    if (!retryTarget) return;
+    setPendingId(retryTarget.id);
     setActionError('');
     try {
-      const res = await apiFetch(`/api/admin/translations/${translation.id}/retry`, {
+      const res = await apiFetch(`/api/admin/translations/${retryTarget.id}/retry`, {
         method: 'POST',
       });
       if (!res.ok) {
@@ -69,6 +71,7 @@ export default function AdminTranslationsPage() {
         throw new Error(data.message || (await res.text()));
       }
       refresh();
+      setRetryTarget(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : t('action_failed'));
     } finally {
@@ -100,6 +103,14 @@ export default function AdminTranslationsPage() {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          className={styles.refreshBtn}
+          onClick={refresh}
+          disabled={loading}
+        >
+          {t('refresh')}
+        </button>
       </div>
 
       {actionError && <div className={styles.errorBanner}>{actionError}</div>}
@@ -110,49 +121,60 @@ export default function AdminTranslationsPage() {
       ) : items.length === 0 ? (
         <div className={styles.emptyState}>{t('no_results')}</div>
       ) : (
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.th}>{t('col_book')}</th>
-              <th className={styles.th}>{t('col_status')}</th>
-              <th className={styles.th}>{t('col_progress')}</th>
-              <th className={styles.th}>{t('col_type')}</th>
-              <th className={styles.th}>{t('col_created')}</th>
-              <th className={styles.th}>{t('col_actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(tr => (
-              <tr key={tr.id} className={styles.tr}>
-                <td className={styles.td}>
-                  <strong>{tr.book.title}</strong>
-                  {tr.book.author && <div style={{ fontSize: 12, color: '#64748b' }}>{tr.book.author}</div>}
-                </td>
-                <td className={styles.td}>
-                  <span className={`${styles.badge} ${statusBadgeClass(tr.status)}`}>{tr.status}</span>
-                </td>
-                <td className={styles.td}>{Math.round(tr.progress)}%</td>
-                <td className={styles.td}>{tr.translationType}</td>
-                <td className={styles.td}>{new Date(tr.createdAt).toLocaleDateString()}</td>
-                <td className={styles.td}>
-                  {(tr.status === 'FAILED' || tr.status === 'IN_PROGRESS') && (
-                    <button
-                      type="button"
-                      className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
-                      onClick={() => onRetry(tr)}
-                      disabled={pendingId === tr.id}
-                    >
-                      {t('retry')}
-                    </button>
-                  )}
-                </td>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th}>{t('col_book')}</th>
+                <th className={styles.th}>{t('col_status')}</th>
+                <th className={styles.th}>{t('col_progress')}</th>
+                <th className={styles.th}>{t('col_type')}</th>
+                <th className={styles.th}>{t('col_created')}</th>
+                <th className={styles.th}>{t('col_actions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map(tr => (
+                <tr key={tr.id} className={styles.tr}>
+                  <td className={styles.td}>
+                    <strong>{tr.book.title}</strong>
+                    {tr.book.author && <div style={{ fontSize: 12, color: '#64748b' }}>{tr.book.author}</div>}
+                  </td>
+                  <td className={styles.td}>
+                    <span className={`${styles.badge} ${statusBadgeClass(tr.status)}`}>{tr.status}</span>
+                  </td>
+                  <td className={styles.td}>{Math.round(tr.progress)}%</td>
+                  <td className={styles.td}>{tr.translationType}</td>
+                  <td className={styles.td}>{new Date(tr.createdAt).toLocaleDateString()}</td>
+                  <td className={styles.td}>
+                    {(tr.status === 'FAILED' || tr.status === 'IN_PROGRESS') && (
+                      <button
+                        type="button"
+                        className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+                        onClick={() => setRetryTarget(tr)}
+                        disabled={pendingId === tr.id}
+                      >
+                        {t('retry')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <Pagination page={page} pageCount={pageCount} total={total} onPageChange={setPage} />
+
+      <ConfirmDialog
+        open={retryTarget !== null}
+        title={t('confirm_retry_title')}
+        message={retryTarget ? t('confirm_retry', { title: retryTarget.book.title }) : ''}
+        busy={pendingId !== null}
+        onConfirm={performRetry}
+        onCancel={() => setRetryTarget(null)}
+      />
     </div>
   );
 }

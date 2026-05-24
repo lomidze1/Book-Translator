@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TranslationService } from '../translation/translation.service';
+import { STUCK_TRANSLATION_THRESHOLD_MS } from '../translation/translation.constants';
 import { clampPagination } from '../common/pagination';
 import {
   AdminListQueryDto,
@@ -156,13 +157,28 @@ export class AdminService {
     });
     if (!translation) throw new NotFoundException('Translation not found');
 
-    // Reset only FAILED or stuck IN_PROGRESS — refuse to clobber a healthy one.
-    if (!['FAILED', 'IN_PROGRESS'].includes(translation.status)) {
+    // FAILED is always safe. IN_PROGRESS we treat as stuck only if the row
+    // hasn't been touched in 30 minutes — otherwise a worker is probably
+    // mid-chapter and we'd race it.
+    if (translation.status === 'IN_PROGRESS') {
+      const ageMs = Date.now() - translation.updatedAt.getTime();
+      if (ageMs < STUCK_TRANSLATION_THRESHOLD_MS) {
+        const minsAgo = Math.floor(ageMs / 60000);
+        throw new BadRequestException(
+          `Translation was updated ${minsAgo} minute(s) ago — not yet considered stuck. ` +
+            `Wait until it goes ${Math.floor(STUCK_TRANSLATION_THRESHOLD_MS / 60000)} minutes without progress.`,
+        );
+      }
+    } else if (translation.status !== 'FAILED') {
       throw new BadRequestException(
         `Cannot retry translation in status ${translation.status}`,
       );
     }
 
+    // Drop the stale job before re-enqueueing so BullMQ accepts the new add()
+    // (deterministic jobId would otherwise reject the duplicate). Throws if a
+    // job is actively running — surface that to the admin instead of racing.
+    await this.translationService.clearQueuedJob(translationId);
     await this.translationService.updateProgress(translationId, 0, 'PAID');
     return this.translationService.startTranslation(translationId);
   }
