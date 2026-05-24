@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import styles from '../../../payment/page.module.scss';
+import styles from '../page.module.scss';
 
 export default function PaymentFailurePage() {
   const t = useTranslations('payment');

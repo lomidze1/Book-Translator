@@ -8,8 +8,8 @@ import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import PaymentModal from '@/components/PaymentModal';
 import Breadcrumbs from '@/components/Breadcrumbs';
-import { apiFetch, getAccessToken } from '@/lib/api-client';
-import styles from '../../../books/[id]/page.module.scss';
+import { API_URL, apiFetch, getAccessToken } from '@/lib/api-client';
+import styles from './page.module.scss';
 
 interface BookDetails {
   id: string;
@@ -38,7 +38,6 @@ interface BookDetails {
   _count: { userBooks: number };
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function BookDetailsPage() {
   const t = useTranslations('book');

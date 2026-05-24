@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
+import { API_URL } from '@/lib/api-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 const LOCALES = ['ka', 'en'] as const;
 type Locale = (typeof LOCALES)[number];

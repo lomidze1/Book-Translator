@@ -22,8 +22,8 @@ import NoteEditor from './components/NoteEditor';
 import TtsGenerationPanel from './components/TtsGenerationPanel';
 import AudioPlayer from './components/AudioPlayer';
 import styles from './reader.module.scss';
+import { API_URL } from '@/lib/api-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface TranslatedChapter {
   id: string;

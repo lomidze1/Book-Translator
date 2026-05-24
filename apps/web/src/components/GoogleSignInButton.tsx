@@ -5,8 +5,8 @@ import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import { API_URL } from '@/lib/api-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface GoogleSignInButtonProps {
   onError: (message: string) => void;

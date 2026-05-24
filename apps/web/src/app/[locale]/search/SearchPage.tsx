@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import Image from 'next/image';
 import Skeleton from '@/components/Skeleton';
-import styles from '../../search/page.module.scss';
+import styles from './page.module.scss';
+import { API_URL } from '@/lib/api-client';
 
 interface ExternalBook {
   source: 'google' | 'openlibrary';
@@ -38,7 +39,6 @@ interface SearchResult {
   total: number;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function SearchPage() {
   const t = useTranslations('search');

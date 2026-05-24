@@ -6,9 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
-import styles from '../../register/page.module.scss';
+import styles from './page.module.scss';
+import { API_URL } from '@/lib/api-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 function EyeIcon() {
   return (

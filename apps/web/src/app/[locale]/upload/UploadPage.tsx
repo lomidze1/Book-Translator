@@ -3,10 +3,9 @@
 import { useState, useRef, useEffect, useCallback, DragEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { getAccessToken } from '@/lib/api-client';
-import styles from '../../upload/page.module.scss';
+import { API_URL, getAccessToken } from '@/lib/api-client';
+import styles from './page.module.scss';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 // .zip included because macOS often reports EPUB/DOCX as .zip during drag & drop
 const ACCEPTED_EXTENSIONS = ['.pdf', '.epub', '.txt', '.docx', '.zip'];

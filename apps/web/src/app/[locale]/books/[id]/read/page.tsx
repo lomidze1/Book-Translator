@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { setApiUrl } from '@book-translator/reader';
-import { apiFetch, getAccessToken } from '@/lib/api-client';
+import { API_URL, apiFetch, getAccessToken } from '@/lib/api-client';
 import ReaderView from './ReaderView';
 import styles from './reader.module.scss';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 setApiUrl(API_URL);
 
 interface TranslatedChapter {
