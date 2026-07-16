@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { apiFetch, getAccessToken } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthContext';
 import styles from './settings.module.scss';
 
 interface ReaderDefaults {
@@ -42,6 +43,7 @@ const DEFAULT_NOTIF: NotificationPrefs = {
 export default function SettingsPage() {
   const t = useTranslations('settings');
   const locale = useLocale();
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
 
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIF);
   const [reader, setReader] = useState<ReaderDefaults>(DEFAULT_READER);
@@ -49,9 +51,11 @@ export default function SettingsPage() {
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { permission, isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications();
 
-  // Fetch notification preferences from API
+  // Fetch notification preferences from API. On a hard page load the
+  // in-memory token is empty until AuthContext's silent refresh resolves —
+  // wait for it, or saved preferences never load and defaults are shown.
   useEffect(() => {
-    if (!getAccessToken()) return;
+    if (authLoading || !isLoggedIn) return;
 
     apiFetch('/api/notifications/preferences')
       .then(res => res.ok ? res.json() : null)
@@ -68,7 +72,7 @@ export default function SettingsPage() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [authLoading, isLoggedIn]);
 
   // Load reader settings from localStorage
   useEffect(() => {

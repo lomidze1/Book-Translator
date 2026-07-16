@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { apiFetch, getAccessToken } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthContext';
 
 interface TranslationItem {
   id: string;
@@ -32,6 +33,7 @@ export interface DashboardData {
 }
 
 export function useDashboardData(): DashboardData {
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
   const [translations, setTranslations] = useState<TranslationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,9 +47,12 @@ export function useDashboardData(): DashboardData {
 
   useEffect(() => {
     const controller = new AbortController();
-    // Bail out early if there's no session — apiFetch would otherwise probe
-    // /refresh on every dashboard mount even for logged-out visitors.
-    if (!getAccessToken()) { setLoading(false); return; }
+    // On a hard page load the in-memory token is empty until AuthContext's
+    // silent refresh resolves — wait for it instead of concluding "no data"
+    // (that produced a false-empty library/dashboard on refresh). Once auth
+    // resolves, only fetch for logged-in users.
+    if (authLoading) return;
+    if (!isLoggedIn) { setLoading(false); return; }
 
     async function fetchWithRetry(attempts = 3, delay = 1000) {
       for (let i = 0; i < attempts; i++) {
@@ -76,7 +81,7 @@ export function useDashboardData(): DashboardData {
     fetchWithRetry().finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [retryCount]);
+  }, [retryCount, authLoading, isLoggedIn]);
 
   const stats = useMemo<DashboardStats>(() => {
     const completed = translations.filter((item) => item.status === 'COMPLETED');
