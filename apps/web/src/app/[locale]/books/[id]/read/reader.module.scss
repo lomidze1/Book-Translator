@@ -268,11 +268,15 @@
 
 .sidebarTabs {
   display: flex;
+  // Five tabs don't fit the 280px sidebar on one line — let them wrap
+  // instead of pushing the last tab outside the clickable area.
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--reader-border);
 }
 
 .sidebarTab {
-  flex: 1;
+  flex: 1 1 auto;
+  white-space: nowrap;
   padding: $spacing-sm $spacing-xs;
   border: none;
   background: transparent;
