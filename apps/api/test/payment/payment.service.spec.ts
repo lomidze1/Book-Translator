@@ -54,6 +54,9 @@ describe('PaymentService', () => {
           PRICE_MIN: '10',
           PRICE_EXISTING: '5',
           PRICE_CURRENCY: 'GEL',
+          // Most specs exercise the historical resale behavior — enable the flag.
+          // The 'resale disabled' describe block below overrides this.
+          ENABLE_BOOK_RESALE: 'true',
         };
         // Fall through to process.env for env-driven values like NODE_ENV.
         return map[key] ?? process.env[key];
@@ -637,6 +640,57 @@ describe('PaymentService', () => {
       await expect(
         service.simulatePayment('pay-1', 'user-1'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('resale disabled (ENABLE_BOOK_RESALE unset — production default)', () => {
+    const userId = 'user-1';
+    const bookId = 'book-1';
+
+    beforeEach(() => {
+      // Same config map minus the resale flag → resale off
+      config.get = vi.fn((key: string) => {
+        const map: Record<string, string> = {
+          PRICE_PER_PAGE_FAST: '0.15',
+          PRICE_PER_PAGE_SLOW: '0.07',
+          PRICE_MIN: '10',
+          PRICE_EXISTING: '5',
+          PRICE_CURRENCY: 'GEL',
+        };
+        return map[key] ?? process.env[key];
+      });
+      prisma.book.findUnique.mockResolvedValue({
+        id: bookId,
+        title: 'Test Book',
+        pageCount: 50,
+        userBooks: [{ userId }],
+        chapters: [],
+        translations: [{ id: 'tr-1' }],
+      });
+      prisma.payment.findFirst.mockResolvedValue(null);
+    });
+
+    it('should reject PURCHASE_TRANSLATION payments', async () => {
+      await expect(
+        service.createPayment(userId, bookId, 'PURCHASE_TRANSLATION', 'FLITT'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject PURCHASE_ORIGINAL payments', async () => {
+      await expect(
+        service.createPayment(userId, bookId, 'PURCHASE_ORIGINAL', 'FLITT'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('should offer normal translation pricing even when a completed translation exists', async () => {
+      const pricing = await service.getBookPricing(bookId);
+
+      expect(pricing.hasExistingTranslation).toBe(false);
+      expect(pricing.existing).toBeNull();
+      expect(pricing.fast).toEqual({ amount: 10, currency: 'GEL' });
+      expect(pricing.slow).toEqual({ amount: 10, currency: 'GEL' });
     });
   });
 });

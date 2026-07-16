@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ParsingService } from '../parsing/parsing.service';
@@ -50,6 +51,7 @@ export class BooksService {
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
     private readonly parsing: ParsingService,
+    private readonly config: ConfigService,
   ) {}
 
   // ========================
@@ -394,13 +396,15 @@ export class BooksService {
     });
 
     if (existing) {
+      // Advertising someone else's completed translation is part of the
+      // resale flow — hidden while ENABLE_BOOK_RESALE is off.
+      const translationAvailable =
+        existing.translations.length > 0 && this.config.get('ENABLE_BOOK_RESALE') === 'true';
       return {
         duplicate: true,
         book: { id: existing.id },
-        translationAvailable: existing.translations.length > 0,
-        message: existing.translations.length > 0
-          ? 'DUPLICATE_TRANSLATED'
-          : 'DUPLICATE_EXISTS',
+        translationAvailable,
+        message: translationAvailable ? 'DUPLICATE_TRANSLATED' : 'DUPLICATE_EXISTS',
       };
     }
 

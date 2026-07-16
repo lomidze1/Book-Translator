@@ -39,9 +39,13 @@ describe('BooksService', () => {
     generateAudioKey: vi.fn().mockReturnValue('books/book-1/audio/ab-1/chapter-1.mp3'),
   };
 
+  const mockConfigService = {
+    get: vi.fn((key: string) => (key === 'ENABLE_BOOK_RESALE' ? 'true' : process.env[key])),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    booksService = new (BooksService as any)(mockPrismaService, mockS3Service);
+    booksService = new (BooksService as any)(mockPrismaService, mockS3Service, undefined, mockConfigService);
   });
 
   // ========================
@@ -455,6 +459,21 @@ describe('BooksService', () => {
       expect(result.duplicate).toBe(true);
       expect(result.translationAvailable).toBe(true);
       expect(result.message).toBe('DUPLICATE_TRANSLATED');
+    });
+
+    it('should hide available translation when resale is disabled', async () => {
+      mockConfigService.get.mockImplementationOnce(() => undefined);
+      mockPrismaService.book.findUnique.mockResolvedValue({
+        id: 'existing-book',
+        title: 'Existing Book',
+        translations: [{ id: 'tr-1', targetLanguage: 'ka' }],
+      });
+
+      const result = await booksService.handleUpload(mockFile, userId);
+
+      expect(result.duplicate).toBe(true);
+      expect(result.translationAvailable).toBe(false);
+      expect(result.message).toBe('DUPLICATE_EXISTS');
     });
 
     it('should extract title from filename', async () => {

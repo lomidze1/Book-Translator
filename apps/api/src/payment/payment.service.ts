@@ -61,6 +61,15 @@ export class PaymentService {
   }
 
   /**
+   * Resale of already-uploaded originals / already-completed translations is
+   * disabled by default until licensing agreements exist (see
+   * docs/risk/07-action-plan.md, A1). Flip ENABLE_BOOK_RESALE=true to re-enable.
+   */
+  private isResaleEnabled(): boolean {
+    return this.config.get('ENABLE_BOOK_RESALE') === 'true';
+  }
+
+  /**
    * Get price for already-translated book (fixed price)
    */
   getExistingTranslationPrice() {
@@ -99,7 +108,7 @@ export class PaymentService {
     }
     const hasCompletedTranslation = book.translations.length > 0;
 
-    if (hasCompletedTranslation) {
+    if (hasCompletedTranslation && this.isResaleEnabled()) {
       const existing = this.getExistingTranslationPrice();
       return {
         bookId: book.id,
@@ -138,6 +147,10 @@ export class PaymentService {
       throw new BadRequestException(
         'translationType (FAST | STANDARD) is required for TRANSLATION payments',
       );
+    }
+
+    if ((type === 'PURCHASE_TRANSLATION' || type === 'PURCHASE_ORIGINAL') && !this.isResaleEnabled()) {
+      throw new ForbiddenException('Book resale is disabled');
     }
 
     // Verify book exists. Pull chapters so we can derive page count for books that
