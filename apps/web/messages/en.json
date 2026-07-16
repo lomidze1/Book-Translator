@@ -454,7 +454,11 @@
     "tts_volume": "Volume",
     "tts_all": "All",
     "tts_no_voices": "No voices available",
-    "tts_chars": "chars"
+    "tts_chars": "chars",
+    "search": "Search",
+    "search_placeholder": "Search in book...",
+    "search_no_results": "No results found",
+    "search_results": "{count} results"
   },
   "dashboard": {
     "greeting": "Hello, {name}!",

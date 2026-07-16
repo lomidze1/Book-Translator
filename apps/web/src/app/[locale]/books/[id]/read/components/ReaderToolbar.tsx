@@ -37,10 +37,11 @@ export default function ReaderToolbar({
   }, [showSettings]);
 
   const toggleFullscreen = () => {
+    // The browser may reject fullscreen (permissions, iframe) — ignore silently
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      document.exitFullscreen().catch(() => {});
     } else {
-      document.documentElement.requestFullscreen();
+      document.documentElement.requestFullscreen().catch(() => {});
     }
   };
 

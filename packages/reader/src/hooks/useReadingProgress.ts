@@ -33,8 +33,24 @@ export function useReadingProgress(bookId: string, token: string | null) {
       }
     }, AUTO_SAVE_INTERVAL);
 
+    // Flush on tab close/navigation — keepalive lets the request outlive
+    // the page, unlike the plain fetch in the unmount path.
+    const flushOnHide = () => {
+      if (!pendingRef.current || !token) return;
+      readerApi.saveProgressKeepalive(token, { bookId, ...pendingRef.current });
+      pendingRef.current = null;
+    };
+    // Guarded for React Native, where window.addEventListener is absent
+    const canListen = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
+    if (canListen) {
+      window.addEventListener('pagehide', flushOnHide);
+    }
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (canListen) {
+        window.removeEventListener('pagehide', flushOnHide);
+      }
       // Save on unmount
       if (pendingRef.current && token) {
         readerApi.saveProgress(token, { bookId, ...pendingRef.current }).catch(() => {});

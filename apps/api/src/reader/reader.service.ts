@@ -28,7 +28,7 @@ export class ReaderService {
   // ========================
 
   async saveProgress(userId: string, dto: SaveProgressDto) {
-    await this.validateBookExists(dto.bookId);
+    await this.validateBookAccess(userId, dto.bookId);
 
     return this.prisma.readingProgress.upsert({
       where: {
@@ -63,7 +63,7 @@ export class ReaderService {
   // ========================
 
   async createBookmark(userId: string, dto: CreateBookmarkDto) {
-    await this.validateBookExists(dto.bookId);
+    await this.validateBookAccess(userId, dto.bookId);
 
     try {
       return await this.prisma.bookmark.create({
@@ -108,7 +108,7 @@ export class ReaderService {
   // ========================
 
   async createHighlight(userId: string, dto: CreateHighlightDto) {
-    await this.validateBookExists(dto.bookId);
+    await this.validateBookAccess(userId, dto.bookId);
 
     if (dto.startPosition >= dto.endPosition) {
       throw new BadRequestException('startPosition უნდა იყოს endPosition-ზე ნაკლები');
@@ -166,7 +166,7 @@ export class ReaderService {
   // ========================
 
   async createNote(userId: string, dto: CreateNoteDto) {
-    await this.validateBookExists(dto.bookId);
+    await this.validateBookAccess(userId, dto.bookId);
 
     if (dto.highlightId) {
       await this.assertOwnership(
@@ -243,7 +243,12 @@ export class ReaderService {
     return entity;
   }
 
-  private async validateBookExists(bookId: string) {
+  /**
+   * The book must exist AND the user must have a UserBook relation to it
+   * (uploaded or purchased) — otherwise any authenticated user could
+   * annotate arbitrary bookIds.
+   */
+  private async validateBookAccess(userId: string, bookId: string) {
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
       select: { id: true },
@@ -251,6 +256,15 @@ export class ReaderService {
 
     if (!book) {
       throw new NotFoundException('წიგნი ვერ მოიძებნა');
+    }
+
+    const userBook = await this.prisma.userBook.findFirst({
+      where: { userId, bookId },
+      select: { id: true },
+    });
+
+    if (!userBook) {
+      throw new ForbiddenException('ამ წიგნზე წვდომა არ გაქვთ');
     }
   }
 }

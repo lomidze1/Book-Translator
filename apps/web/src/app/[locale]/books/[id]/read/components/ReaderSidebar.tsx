@@ -10,6 +10,12 @@ interface Chapter {
   title?: string;
 }
 
+export interface SearchResult {
+  chapterNumber: number;
+  splitIndex: number;
+  snippet: string;
+}
+
 interface Props {
   chapters: Chapter[];
   activeChapter: number;
@@ -21,28 +27,38 @@ interface Props {
   onBookmarkClick: (bookmark: Bookmark) => void;
   onHighlightClick: (highlight: Highlight) => void;
   onNoteClick: (note: ReaderNote) => void;
+  onEditNote: (note: ReaderNote) => void;
   onDeleteBookmark: (id: string) => void;
   onDeleteHighlight: (id: string) => void;
   onDeleteNote: (id: string) => void;
+  onSearch: (query: string) => SearchResult[];
+  onSearchResultClick: (result: SearchResult) => void;
   onClose: () => void;
 }
 
-type Tab = 'toc' | 'bookmarks' | 'highlights' | 'notes';
+type Tab = 'toc' | 'bookmarks' | 'highlights' | 'notes' | 'search';
 
 export default function ReaderSidebar({
   chapters, activeChapter, bookmarks, highlights, notes,
-  open, onChapterClick, onBookmarkClick, onHighlightClick, onNoteClick,
-  onDeleteBookmark, onDeleteHighlight, onDeleteNote, onClose,
+  open, onChapterClick, onBookmarkClick, onHighlightClick, onNoteClick, onEditNote,
+  onDeleteBookmark, onDeleteHighlight, onDeleteNote, onSearch, onSearchResultClick, onClose,
 }: Props) {
   const t = useTranslations('reader');
   const [activeTab, setActiveTab] = useState<Tab>('toc');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResult[] | null>(null);
+
+  const runSearch = (value: string) => {
+    setQuery(value);
+    setResults(value.trim().length >= 2 ? onSearch(value) : null);
+  };
 
   return (
     <>
       {open && <div className={styles.sidebarOverlay} onClick={onClose} />}
       <aside className={`${styles.sidebar} ${!open ? styles.hidden : ''}`}>
         <div className={styles.sidebarTabs}>
-          {(['toc', 'bookmarks', 'highlights', 'notes'] as const).map((tab) => (
+          {(['toc', 'bookmarks', 'highlights', 'notes', 'search'] as const).map((tab) => (
             <button
               key={tab}
               className={`${styles.sidebarTab} ${activeTab === tab ? styles.active : ''}`}
@@ -115,14 +131,60 @@ export default function ReaderSidebar({
                 <div key={note.id} className={styles.sidebarItem} onClick={() => onNoteClick(note)}>
                   <div className={styles.sidebarItemLabel}>
                     {t('chapter', { number: note.chapterNumber })}
-                    <button className={styles.deleteBtn} onClick={(e) => { e.stopPropagation(); onDeleteNote(note.id); }}>
-                      &times;
-                    </button>
+                    <span className={styles.itemActions}>
+                      <button
+                        className={styles.editBtn}
+                        title={t('note_edit')}
+                        aria-label={t('note_edit')}
+                        onClick={(e) => { e.stopPropagation(); onEditNote(note); }}
+                      >
+                        &#9998;
+                      </button>
+                      <button className={styles.deleteBtn} onClick={(e) => { e.stopPropagation(); onDeleteNote(note.id); }}>
+                        &times;
+                      </button>
+                    </span>
                   </div>
                   <div className={styles.sidebarItemText}>{note.content}</div>
                 </div>
               ))
             )
+          )}
+
+          {activeTab === 'search' && (
+            <div className={styles.searchTab}>
+              <input
+                type="search"
+                className={styles.searchInput}
+                value={query}
+                onChange={(e) => runSearch(e.target.value)}
+                placeholder={t('search_placeholder')}
+                autoFocus
+              />
+              {results !== null && (
+                results.length === 0 ? (
+                  <div className={styles.emptyState}>{t('search_no_results')}</div>
+                ) : (
+                  <>
+                    <div className={styles.sidebarItemMeta}>
+                      {t('search_results', { count: results.length })}
+                    </div>
+                    {results.map((r, i) => (
+                      <div
+                        key={`${r.chapterNumber}-${r.splitIndex}-${i}`}
+                        className={styles.sidebarItem}
+                        onClick={() => onSearchResultClick(r)}
+                      >
+                        <div className={styles.sidebarItemMeta}>
+                          {t('chapter', { number: r.chapterNumber })}
+                        </div>
+                        <div className={styles.sidebarItemText}>{r.snippet}</div>
+                      </div>
+                    ))}
+                  </>
+                )
+              )}
+            </div>
           )}
         </div>
       </aside>

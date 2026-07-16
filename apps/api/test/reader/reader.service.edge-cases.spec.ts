@@ -11,12 +11,14 @@ describe('ReaderService — Edge Cases', () => {
     highlight: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
     note: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
     book: { findUnique: vi.fn() },
+    userBook: { findFirst: vi.fn() },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     service = new (ReaderService as any)(mockPrisma);
     mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1' });
+    mockPrisma.userBook.findFirst.mockResolvedValue({ id: 'ub-1' });
   });
 
   // ========================

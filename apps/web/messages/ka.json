@@ -454,7 +454,11 @@
     "tts_volume": "ხმის სიმაღლე",
     "tts_all": "ყველა",
     "tts_no_voices": "ხმები მიუწვდომელია",
-    "tts_chars": "სიმბოლო"
+    "tts_chars": "სიმბოლო",
+    "search": "ძებნა",
+    "search_placeholder": "ძებნა წიგნში...",
+    "search_no_results": "ვერაფერი მოიძებნა",
+    "search_results": "{count} შედეგი"
   },
   "dashboard": {
     "greeting": "გამარჯობა, {name}!",

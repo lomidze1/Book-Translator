@@ -11,6 +11,7 @@ describe('ReaderService — Ownership & Authorization', () => {
     highlight: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
     note: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
     book: { findUnique: vi.fn() },
+    userBook: { findFirst: vi.fn() },
   };
 
   const userA = 'user-A';
@@ -21,6 +22,28 @@ describe('ReaderService — Ownership & Authorization', () => {
     vi.clearAllMocks();
     service = new (ReaderService as any)(mockPrisma);
     mockPrisma.book.findUnique.mockResolvedValue({ id: bookId });
+    mockPrisma.userBook.findFirst.mockResolvedValue({ id: 'ub-1' });
+  });
+
+  // ========================
+  // Book-level Access
+  // ========================
+
+  describe('Book Access', () => {
+    it.each([
+      ['saveProgress', () => service.saveProgress(userA, { bookId, currentChapter: 1, currentPosition: 0, percentage: 0 })],
+      ['createBookmark', () => service.createBookmark(userA, { bookId, chapterNumber: 1, position: 0 })],
+      ['createHighlight', () => service.createHighlight(userA, { bookId, chapterNumber: 1, startPosition: 0, endPosition: 5, selectedText: 'hello' })],
+      ['createNote', () => service.createNote(userA, { bookId, chapterNumber: 1, content: 'note' })],
+    ])('%s should reject a user without a UserBook relation', async (_name, call) => {
+      mockPrisma.userBook.findFirst.mockResolvedValue(null);
+
+      await expect(call()).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.userBook.findFirst).toHaveBeenCalledWith({
+        where: { userId: userA, bookId },
+        select: { id: true },
+      });
+    });
   });
 
   // ========================

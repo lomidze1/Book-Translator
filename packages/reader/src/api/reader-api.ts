@@ -1,7 +1,21 @@
-import { apiRequest } from './api-client';
+import { apiRequest, getApiUrl } from './api-client';
 import type { ReadingPosition, Bookmark, Highlight, ReaderNote } from '../types';
 
 const BASE = '/reader';
+
+// The API caps list endpoints at 100 items per page — walk every page so
+// heavy annotators don't silently lose items past the first 100.
+const PAGE_SIZE = 100;
+
+async function fetchAllPages<T>(fetchPage: (page: number) => Promise<T[]>): Promise<T[]> {
+  const all: T[] = [];
+  for (let page = 1; ; page++) {
+    const batch = await fetchPage(page);
+    all.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return all;
+}
 
 export const readerApi = {
   // Progress
@@ -13,13 +27,29 @@ export const readerApi = {
     return apiRequest<ReadingPosition | null>(BASE, `/progress/${bookId}`, token);
   },
 
+  /** Fire-and-forget save that survives page unload (pagehide flush). */
+  saveProgressKeepalive(token: string, data: { bookId: string; currentChapter: number; currentPosition: number; percentage: number }) {
+    try {
+      void fetch(`${getApiUrl()}/api${BASE}/progress`, {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+    } catch {
+      // Best effort — the page is going away.
+    }
+  },
+
   // Bookmarks
   createBookmark(token: string, data: { bookId: string; chapterNumber: number; position: number; label?: string }) {
     return apiRequest<Bookmark>(BASE, '/bookmarks', token, { method: 'POST', body: JSON.stringify(data) });
   },
 
   getBookmarks(token: string, bookId: string) {
-    return apiRequest<Bookmark[]>(BASE, `/bookmarks/${bookId}`, token);
+    return fetchAllPages<Bookmark>((page) =>
+      apiRequest<Bookmark[]>(BASE, `/bookmarks/${bookId}?page=${page}&limit=${PAGE_SIZE}`, token),
+    );
   },
 
   deleteBookmark(token: string, id: string) {
@@ -32,7 +62,9 @@ export const readerApi = {
   },
 
   getHighlights(token: string, bookId: string) {
-    return apiRequest<Highlight[]>(BASE, `/highlights/${bookId}`, token);
+    return fetchAllPages<Highlight>((page) =>
+      apiRequest<Highlight[]>(BASE, `/highlights/${bookId}?page=${page}&limit=${PAGE_SIZE}`, token),
+    );
   },
 
   updateHighlightColor(token: string, id: string, color: string) {
@@ -49,7 +81,9 @@ export const readerApi = {
   },
 
   getNotes(token: string, bookId: string) {
-    return apiRequest<ReaderNote[]>(BASE, `/notes/${bookId}`, token);
+    return fetchAllPages<ReaderNote>((page) =>
+      apiRequest<ReaderNote[]>(BASE, `/notes/${bookId}?page=${page}&limit=${PAGE_SIZE}`, token),
+    );
   },
 
   updateNote(token: string, id: string, content: string) {

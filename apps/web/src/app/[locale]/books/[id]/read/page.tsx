@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { setApiUrl } from '@book-translator/reader';
-import { API_URL, apiFetch, getAccessToken } from '@/lib/api-client';
+import { API_URL, apiFetch, ensureAccessToken } from '@/lib/api-client';
 import ReaderView from './ReaderView';
 import styles from './reader.module.scss';
 
@@ -35,13 +35,7 @@ export default function ReaderPage() {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const accessToken = getAccessToken();
-    if (!accessToken) {
-      setError(t('login_required'));
-      setLoading(false);
-      return;
-    }
-    setToken(accessToken);
+    let cancelled = false;
 
     async function fetchTranslation(attempt = 0) {
       try {
@@ -92,7 +86,21 @@ export default function ReaderPage() {
       }
     }
 
-    fetchTranslation();
+    // On a hard reload the in-memory token is empty — try the refresh cookie
+    // before concluding the user is logged out.
+    (async () => {
+      const accessToken = await ensureAccessToken();
+      if (cancelled) return;
+      if (!accessToken) {
+        setError(t('login_required'));
+        setLoading(false);
+        return;
+      }
+      setToken(accessToken);
+      fetchTranslation();
+    })();
+
+    return () => { cancelled = true; };
   }, [params.id, t]);
 
   if (loading) {

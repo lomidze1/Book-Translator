@@ -63,6 +63,14 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
+/**
+ * Current access token, refreshing via the httpOnly cookie when absent —
+ * e.g. on a hard reload, before AuthContext has re-established the session.
+ */
+export async function ensureAccessToken(): Promise<string | null> {
+  return accessToken ?? refreshAccessToken();
+}
+
 export interface ApiFetchOptions extends RequestInit {
   /** Skip the auto-refresh retry on 401 (useful for the refresh endpoint itself). */
   skipRefresh?: boolean;

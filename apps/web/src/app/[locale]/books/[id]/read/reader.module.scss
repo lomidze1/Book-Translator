@@ -372,6 +372,67 @@
   }
 }
 
+.itemActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.editBtn {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+  border-radius: $radius-sm;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(128, 128, 128, 0.15);
+  }
+}
+
+// ========================
+// In-book Search
+// ========================
+
+.searchTab {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.searchInput {
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid var(--card-border, rgba(128, 128, 128, 0.3));
+  border-radius: $radius-sm;
+  background: transparent;
+  color: inherit;
+  font-size: 0.9rem;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary, #3b82f6);
+  }
+}
+
+.searchFlash {
+  animation: searchFlash 2s ease-out;
+}
+
+@keyframes searchFlash {
+  0%, 40% {
+    background-color: rgba(59, 130, 246, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
 // ========================
 // Content Area
 // ========================

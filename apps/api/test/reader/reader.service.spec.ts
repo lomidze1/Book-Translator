@@ -33,6 +33,9 @@ describe('ReaderService', () => {
     book: {
       findUnique: vi.fn(),
     },
+    userBook: {
+      findFirst: vi.fn(),
+    },
   };
 
   const userId = 'user-1';
@@ -41,8 +44,9 @@ describe('ReaderService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new (ReaderService as any)(mockPrisma);
-    // Default: book exists
+    // Default: book exists and the user has access to it
     mockPrisma.book.findUnique.mockResolvedValue({ id: bookId });
+    mockPrisma.userBook.findFirst.mockResolvedValue({ id: 'ub-1' });
   });
 
   // ========================
