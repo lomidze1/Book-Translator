@@ -34,7 +34,12 @@
     "admin_panel": "ადმინ პანელი"
   },
   "footer": {
-    "copyright": "© {year} Book Translator. ყველა უფლება დაცულია."
+    "copyright": "© {year} Book Translator. ყველა უფლება დაცულია.",
+    "legal_nav": "სამართლებრივი ბმულები",
+    "terms": "წესები და პირობები",
+    "privacy": "კონფიდენციალურობა",
+    "copyright_policy": "საავტორო უფლებები",
+    "refund": "თანხის დაბრუნება"
   },
   "home": {
     "hero_title": "წიგნების",
@@ -171,7 +176,8 @@
     "how_step1": "ატვირთე ინგლისურენოვანი წიგნი (PDF, EPUB, TXT ან DOCX)",
     "how_step2": "გადაიხადე თარგმანის საფასური (10₾)",
     "how_step3": "AI (Claude) გადათარგმნის წიგნს ქართულ ენაზე",
-    "how_step4": "წაიკითხე ნათარგმნი წიგნი ონლაინ რიდერში"
+    "how_step4": "წაიკითხე ნათარგმნი წიგნი ონლაინ რიდერში",
+    "rights_note": "ატვირთვით ადასტურებ, რომ გაქვს ამ ფაილის პირადი გამოყენებისთვის თარგმნის უფლება."
   },
   "book": {
     "loading": "იტვირთება...",
@@ -604,6 +610,14 @@
     "book_not_found": "წიგნი ვერ მოიძებნა",
     "site_name": "Book Translator — წიგნების მთარგმნელი",
     "book_description_fallback": "{title} — {author}",
-    "book_description_fallback_no_author": "{title}"
+    "book_description_fallback_no_author": "{title}",
+    "terms_title": "მომსახურების პირობები",
+    "terms_description": "Book Translator-ის გამოყენების წესები და პირობები.",
+    "privacy_title": "კონფიდენციალურობის პოლიტიკა",
+    "privacy_description": "როგორ ვაგროვებთ და ვიცავთ თქვენს მონაცემებს Book Translator-ზე.",
+    "copyright_title": "საავტორო უფლებების პოლიტიკა",
+    "copyright_description": "საავტორო უფლებების დაცვა და takedown პროცესი Book Translator-ზე.",
+    "refund_title": "თანხის დაბრუნების პოლიტიკა",
+    "refund_description": "როდის და როგორ ბრუნდება თანხა Book Translator-ზე."
   }
 }

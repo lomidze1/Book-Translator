@@ -13,3 +13,20 @@
   font-size: 0.875rem;
   color: var(--text-secondary);
 }
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: $spacing-sm $spacing-lg;
+  margin-bottom: $spacing-sm;
+
+  a {
+    color: var(--text-secondary);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

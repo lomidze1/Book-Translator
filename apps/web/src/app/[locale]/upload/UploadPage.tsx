@@ -254,9 +254,12 @@ export default function UploadPage() {
         )}
 
         {file && !uploading && uploadProgress < 100 && (
-          <button className={styles.uploadBtn} onClick={handleUpload}>
-            {t('upload_button')}
-          </button>
+          <>
+            <button className={styles.uploadBtn} onClick={handleUpload}>
+              {t('upload_button')}
+            </button>
+            <p className={styles.rightsNote}>{t('rights_note')}</p>
+          </>
         )}
 
         {uploadProgress === 100 && uploadResult && (

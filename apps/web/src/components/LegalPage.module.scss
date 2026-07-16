@@ -1,0 +1,38 @@
+@use '../styles/variables' as *;
+
+.legal {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: $spacing-xl $spacing-lg;
+  line-height: 1.7;
+
+  h1 {
+    font-size: 2rem;
+    margin-bottom: $spacing-sm;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    margin-top: $spacing-xl;
+    margin-bottom: $spacing-sm;
+  }
+
+  p {
+    margin-bottom: $spacing-md;
+    color: var(--text-primary);
+  }
+
+  ul {
+    margin: 0 0 $spacing-md $spacing-lg;
+
+    li {
+      margin-bottom: $spacing-xs;
+    }
+  }
+}
+
+.updated {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: $spacing-lg;
+}

@@ -235,3 +235,10 @@
     line-height: 1.5;
   }
 }
+
+.rightsNote {
+  margin-top: $spacing-sm;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  text-align: center;
+}

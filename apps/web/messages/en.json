@@ -34,7 +34,12 @@
     "admin_panel": "Admin Panel"
   },
   "footer": {
-    "copyright": "© {year} Book Translator. All rights reserved."
+    "copyright": "© {year} Book Translator. All rights reserved.",
+    "legal_nav": "Legal links",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "copyright_policy": "Copyright Policy",
+    "refund": "Refund Policy"
   },
   "home": {
     "hero_title": "Book",
@@ -171,7 +176,8 @@
     "how_step1": "Upload an English book (PDF, EPUB, TXT, or DOCX)",
     "how_step2": "Pay the translation fee (10₾)",
     "how_step3": "AI (Claude) translates the book into Georgian",
-    "how_step4": "Read the translated book in the online reader"
+    "how_step4": "Read the translated book in the online reader",
+    "rights_note": "By uploading, you confirm that you have the right to translate this file for personal use."
   },
   "book": {
     "loading": "Loading...",
@@ -604,6 +610,14 @@
     "book_not_found": "Book Not Found",
     "site_name": "Book Translator",
     "book_description_fallback": "{title} by {author}",
-    "book_description_fallback_no_author": "{title}"
+    "book_description_fallback_no_author": "{title}",
+    "terms_title": "Terms of Service",
+    "terms_description": "The terms and conditions for using Book Translator.",
+    "privacy_title": "Privacy Policy",
+    "privacy_description": "How we collect and protect your data on Book Translator.",
+    "copyright_title": "Copyright Policy",
+    "copyright_description": "Copyright protection and the takedown process on Book Translator.",
+    "refund_title": "Refund Policy",
+    "refund_description": "When and how refunds are issued on Book Translator."
   }
 }
