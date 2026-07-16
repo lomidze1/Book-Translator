@@ -93,6 +93,8 @@ export class TranslationProcessor implements OnModuleInit {
     }
 
     const glossary = (translation?.glossary as Record<string, string>) || {};
+    // Premium (FAST) tier gets a second editor pass per chunk
+    const editorPass = translation?.translationType === 'FAST';
 
     // Mark as in progress
     await this.translationService.updateProgress(translationId, 0, 'IN_PROGRESS');
@@ -119,6 +121,25 @@ export class TranslationProcessor implements OnModuleInit {
 
       try {
         this.logger.log(`📝 Translating chapter ${chapter.number}/${totalChapters} (${chapter.originalContent.length} chars)...`);
+
+        // Keep character/place names consistent: extract new proper nouns from
+        // this chapter's source and merge them into the shared glossary before
+        // translating. Failures are non-fatal — translation proceeds without.
+        try {
+          const extraction = await this.claude.extractGlossaryTerms(
+            chapter.originalContent.slice(0, 12000),
+            glossary,
+          );
+          totalTokens += extraction.tokensUsed;
+          const newTerms = Object.keys(extraction.glossary).length;
+          if (newTerms > 0) {
+            Object.assign(glossary, extraction.glossary);
+            this.logger.log(`Glossary: +${newTerms} terms (total ${Object.keys(glossary).length})`);
+          }
+        } catch (err) {
+          this.logger.warn(`Glossary extraction failed for chapter ${chapter.number}: ${err instanceof Error ? err.message : err}`);
+        }
+
         // Translate chapter with chunk-level progress callback
         const result = await this.claude.translateChapter(chapter.originalContent, {
           bookTitle: book.title,
@@ -126,6 +147,7 @@ export class TranslationProcessor implements OnModuleInit {
           totalChapters,
           glossary,
           previousSummary,
+          editorPass,
           onChunkComplete: async () => {
             completedChunks++;
             const progress = Math.min(Math.round((completedChunks / totalChunks) * 100), 99);
@@ -151,10 +173,10 @@ export class TranslationProcessor implements OnModuleInit {
         // Generate summary for context continuity
         previousSummary = await this.claude.generateChapterSummary(result.translatedText);
 
-        // Update total tokens
+        // Persist accumulated tokens and the growing glossary
         await this.prisma.translation.update({
           where: { id: translationId },
-          data: { totalTokensUsed: totalTokens, aiModel: this.claude.getModel() },
+          data: { totalTokensUsed: totalTokens, aiModel: this.claude.getModel(), glossary },
         });
       } catch (error) {
         this.logger.error(`Failed to translate chapter ${chapter.number}: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -241,7 +241,175 @@ describe('ClaudeService', () => {
     it('should use default model when CLAUDE_MODEL not set', () => {
       delete process.env.CLAUDE_MODEL;
       const defaultService = createService();
-      expect(defaultService.getModel()).toBe('claude-sonnet-4-20250514');
+      expect(defaultService.getModel()).toBe('claude-sonnet-5');
+    });
+  });
+
+  describe('chunking', () => {
+    it('should never cut words in half and should pass continuation context to later chunks', async () => {
+      // ~20KB of text with no newlines — forces sentence-based splitting
+      const sentence = 'The quick brown fox jumps over the lazy dog near the riverbank. ';
+      const content = sentence.repeat(320); // ~20800 chars → 3 chunks
+
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ნათარგმნი '.repeat(500) }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      await service.translateChapter(content, {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(mockCreate.mock.calls.length).toBeGreaterThan(1);
+
+      const wordSet = new Set(sentence.trim().split(' ').map((w) => w.replace(/\.$/, '')));
+      for (const call of mockCreate.mock.calls) {
+        const userContent: string = call[0].messages[0].content;
+        const chunkText = userContent.replace(/^Translate the following text from English to Georgian:\n\n/, '');
+        // Every chunk must start and end on a word boundary from the source
+        const firstWord = chunkText.trim().split(/\s+/)[0].replace(/\.$/, '');
+        const lastWord = chunkText.trim().split(/\s+/).pop()!.replace(/\.$/, '');
+        expect(wordSet.has(firstWord)).toBe(true);
+        expect(wordSet.has(lastWord)).toBe(true);
+      }
+
+      // Chunks after the first must carry the previous chunk's tail
+      const secondSystem: string = mockCreate.mock.calls[1][0].system;
+      expect(secondSystem).toContain('CONTINUATION');
+      expect(secondSystem).toContain('PREVIOUS TRANSLATION (ending)');
+    });
+
+    it('should retry once when output is suspiciously short', async () => {
+      const content = 'A long paragraph of source text. '.repeat(20); // ~660 chars
+      mockCreate
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'x' }],
+          usage: { input_tokens: 100, output_tokens: 1 },
+        })
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'სრული თარგმანი. '.repeat(40) }],
+          usage: { input_tokens: 100, output_tokens: 200 },
+        });
+
+      const result = await service.translateChapter(content, {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(result.translatedText).toContain('სრული თარგმანი');
+      expect(result.tokensUsed).toBe(401); // both attempts billed
+    });
+  });
+
+  describe('editor pass', () => {
+    it('should run a second refine call when editorPass is true', async () => {
+      mockCreate
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'პირველადი თარგმანი' }],
+          usage: { input_tokens: 100, output_tokens: 50 },
+        })
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'დახვეწილი თარგმანი' }],
+          usage: { input_tokens: 80, output_tokens: 40 },
+        });
+
+      const result = await service.translateChapter('Short text', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+        editorPass: true,
+      });
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      const editorCall = mockCreate.mock.calls[1][0];
+      expect(editorCall.system).toContain('literary editor');
+      expect(editorCall.messages[0].content).toContain('ENGLISH SOURCE');
+      expect(editorCall.messages[0].content).toContain('პირველადი თარგმანი');
+      expect(result.translatedText).toBe('დახვეწილი თარგმანი');
+      expect(result.tokensUsed).toBe(270);
+    });
+
+    it('should keep the draft when the editor output is too short', async () => {
+      mockCreate
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'სრულფასოვანი პირველადი თარგმანი რომელიც საკმაოდ გრძელია' }],
+          usage: { input_tokens: 100, output_tokens: 50 },
+        })
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'x' }],
+          usage: { input_tokens: 80, output_tokens: 1 },
+        });
+
+      const result = await service.translateChapter('Short text', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+        editorPass: true,
+      });
+
+      expect(result.translatedText).toContain('სრულფასოვანი პირველადი');
+    });
+
+    it('should keep the draft when the editor call throws', async () => {
+      mockCreate
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'პირველადი თარგმანი' }],
+          usage: { input_tokens: 100, output_tokens: 50 },
+        })
+        .mockRejectedValueOnce(new Error('529 Overloaded'));
+
+      const result = await service.translateChapter('Short text', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+        editorPass: true,
+      });
+
+      expect(result.translatedText).toBe('პირველადი თარგმანი');
+    });
+  });
+
+  describe('extractGlossaryTerms', () => {
+    it('should parse the returned JSON and skip existing entries', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: '```json\n{"John":"ჯონი","Mary":"მერი"}\n```' }],
+        usage: { input_tokens: 200, output_tokens: 30 },
+      });
+
+      const result = await service.extractGlossaryTerms('John met Mary.', { John: 'ჯონი' });
+
+      expect(result.glossary).toEqual({ Mary: 'მერი' });
+      expect(result.tokensUsed).toBe(230);
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.messages[0].content).toContain('Already established');
+      expect(callArgs.messages[0].content).toContain('ჯონი');
+    });
+
+    it('should return empty glossary on unparseable output', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'no json here' }],
+        usage: { input_tokens: 200, output_tokens: 10 },
+      });
+
+      const result = await service.extractGlossaryTerms('Some text.');
+      expect(result.glossary).toEqual({});
+      expect(result.tokensUsed).toBe(210);
+    });
+
+    it('should return empty result without API key', async () => {
+      const origReadFileSync = require('fs').readFileSync;
+      require('fs').readFileSync = () => { throw new Error('no .env in test'); };
+      try {
+        const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
+        const result = await noKeyService.extractGlossaryTerms('text');
+        expect(result).toEqual({ glossary: {}, tokensUsed: 0 });
+      } finally {
+        require('fs').readFileSync = origReadFileSync;
+      }
     });
   });
 

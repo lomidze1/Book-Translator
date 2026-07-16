@@ -34,7 +34,8 @@ describe('TranslationProcessor', () => {
   const mockClaude = {
     translateChapter: vi.fn(),
     generateChapterSummary: vi.fn(),
-    getModel: vi.fn().mockReturnValue('claude-sonnet-4-20250514'),
+    extractGlossaryTerms: vi.fn().mockResolvedValue({ glossary: {}, tokensUsed: 0 }),
+    getModel: vi.fn().mockReturnValue('claude-sonnet-5'),
     estimateChunkCount: vi.fn().mockReturnValue(1),
   };
 
@@ -255,6 +256,98 @@ describe('TranslationProcessor', () => {
       );
     });
 
+    it('should merge extracted glossary terms and persist them', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+
+      mockPrisma.chapter.findMany.mockResolvedValue([
+        { id: 'ch-1', number: 1, originalContent: 'John met Mary in London.' },
+      ]);
+      mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        glossary: { John: 'ჯონი' },
+      });
+      mockPrisma.translation.update.mockResolvedValue({});
+      mockClaude.extractGlossaryTerms.mockResolvedValue({
+        glossary: { Mary: 'მერი' },
+        tokensUsed: 100,
+      });
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
+      );
+      mockClaude.generateChapterSummary.mockResolvedValue('summary');
+
+      await callProcess(job);
+
+      // NOTE: the processor mutates the same glossary object it passed in, so
+      // the recorded argument reflects the post-merge state — assert loosely.
+      expect(mockClaude.extractGlossaryTerms).toHaveBeenCalledWith(
+        'John met Mary in London.',
+        expect.objectContaining({ John: 'ჯონი' }),
+      );
+      expect(mockClaude.translateChapter).toHaveBeenCalledWith(
+        'John met Mary in London.',
+        expect.objectContaining({ glossary: { John: 'ჯონი', Mary: 'მერი' } }),
+      );
+      expect(mockPrisma.translation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ glossary: { John: 'ჯონი', Mary: 'მერი' } }),
+        }),
+      );
+    });
+
+    it('should enable editorPass for FAST (premium) translations only', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+
+      mockPrisma.chapter.findMany.mockResolvedValue([
+        { id: 'ch-1', number: 1, originalContent: 'text' },
+      ]);
+      mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        glossary: null,
+        translationType: 'FAST',
+      });
+      mockPrisma.translation.update.mockResolvedValue({});
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
+      );
+      mockClaude.generateChapterSummary.mockResolvedValue('summary');
+
+      await callProcess(job);
+
+      expect(mockClaude.translateChapter).toHaveBeenCalledWith(
+        'text',
+        expect.objectContaining({ editorPass: true }),
+      );
+
+      // STANDARD tier: single pass
+      vi.clearAllMocks();
+      mockPrisma.chapter.findMany.mockResolvedValue([
+        { id: 'ch-1', number: 1, originalContent: 'text' },
+      ]);
+      mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        glossary: null,
+        translationType: 'STANDARD',
+      });
+      mockPrisma.translation.update.mockResolvedValue({});
+      mockClaude.extractGlossaryTerms.mockResolvedValue({ glossary: {}, tokensUsed: 0 });
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
+      );
+      mockClaude.generateChapterSummary.mockResolvedValue('summary');
+      mockClaude.estimateChunkCount.mockReturnValue(1);
+
+      await callProcess(job);
+
+      expect(mockClaude.translateChapter).toHaveBeenCalledWith(
+        'text',
+        expect.objectContaining({ editorPass: false }),
+      );
+    });
+
     it('should use getModel() for aiModel field', async () => {
       const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
 
@@ -273,7 +366,7 @@ describe('TranslationProcessor', () => {
 
       expect(mockPrisma.translation.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ aiModel: 'claude-sonnet-4-20250514' }),
+          data: expect.objectContaining({ aiModel: 'claude-sonnet-5' }),
         }),
       );
       expect(mockClaude.getModel).toHaveBeenCalled();
