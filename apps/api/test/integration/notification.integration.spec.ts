@@ -37,6 +37,12 @@ describe('Notification Integration Tests', () => {
         name: 'Notif Test',
       });
 
+    // Login requires a verified email
+    await prisma.user.update({
+      where: { email: 'notif-test@integration-test.com' },
+      data: { emailVerified: new Date() },
+    });
+
     const loginRes = await request(app.getHttpServer())
       .post('/api/auth/login')
       .send({
@@ -49,8 +55,10 @@ describe('Notification Integration Tests', () => {
 
   afterAll(async () => {
     if (prisma) {
+      // Scope cleanup to this suite's user — other integration suites
+      // share the @integration-test.com domain and run in parallel.
       await prisma.user.deleteMany({
-        where: { email: { contains: '@integration-test.com' } },
+        where: { email: 'notif-test@integration-test.com' },
       });
     }
     if (app) {

@@ -31,8 +31,10 @@ describe('Auth Integration Tests', () => {
   afterAll(async () => {
     // Cleanup test users
     if (prisma) {
+      // Scope cleanup to this suite's users — other integration suites
+      // share the @integration-test.com domain and run in parallel.
       await prisma.user.deleteMany({
-        where: { email: { contains: '@integration-test.com' } },
+        where: { email: { in: ['test-register@integration-test.com', 'weak-pass@integration-test.com'] } },
       });
     }
     if (app) {
@@ -80,7 +82,25 @@ describe('Auth Integration Tests', () => {
   });
 
   describe('POST /api/auth/login', () => {
+    it('should reject login before email verification', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          email: 'test-register@integration-test.com',
+          password: 'TestPass123',
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toBe('EMAIL_NOT_VERIFIED');
+    });
+
     it('should login with correct credentials', async () => {
+      // Login requires a verified email
+      await prisma.user.update({
+        where: { email: 'test-register@integration-test.com' },
+        data: { emailVerified: new Date() },
+      });
+
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({
@@ -90,7 +110,8 @@ describe('Auth Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('accessToken');
-      expect(res.body).toHaveProperty('refreshToken');
+      // Refresh token is delivered as an httpOnly cookie, not in the body
+      expect(res.headers['set-cookie']?.join(';')).toContain('refresh_token=');
       expect(res.body.user).toHaveProperty('email', 'test-register@integration-test.com');
     });
 
@@ -106,10 +127,10 @@ describe('Auth Integration Tests', () => {
     });
   });
 
-  describe('GET /api/users/me', () => {
+  describe('GET /api/users/profile', () => {
     it('should return 401 without token', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/users/me');
+        .get('/api/users/profile');
 
       expect(res.status).toBe(401);
     });
@@ -126,7 +147,7 @@ describe('Auth Integration Tests', () => {
       const token = loginRes.body.accessToken;
 
       const res = await request(app.getHttpServer())
-        .get('/api/users/me')
+        .get('/api/users/profile')
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);

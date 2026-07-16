@@ -1,7 +1,15 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import swc from 'unplugin-swc';
 
 export default defineConfig({
+  // esbuild strips decorator metadata, which breaks Nest DI for the
+  // AppModule-based integration specs — SWC emits it.
+  plugins: [
+    swc.vite({
+      module: { type: 'es6' },
+    }),
+  ],
   test: {
     globals: true,
     root: './',
