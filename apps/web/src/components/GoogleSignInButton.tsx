@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/navigation';
@@ -18,6 +18,20 @@ export default function GoogleSignInButton({ onError, redirectTo = '/dashboard' 
   const { login } = useAuth();
   const router = useRouter();
   const t = useTranslations('google_auth');
+  // Google renders the button in an iframe with a fixed pixel width — size
+  // it to the container so it doesn't get clipped on narrow phones.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [buttonWidth, setButtonWidth] = useState(320);
+
+  useEffect(() => {
+    const measure = () => {
+      const available = wrapperRef.current?.clientWidth;
+      if (available) setButtonWidth(Math.min(320, available));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
 
   // Don't render if Google Client ID is not configured
   if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
@@ -61,7 +75,7 @@ export default function GoogleSignInButton({ onError, redirectTo = '/dashboard' 
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', opacity: loading ? 0.5 : 1, pointerEvents: loading ? 'none' : 'auto' }}>
+    <div ref={wrapperRef} style={{ display: 'flex', justifyContent: 'center', opacity: loading ? 0.5 : 1, pointerEvents: loading ? 'none' : 'auto' }}>
       <GoogleLogin
         onSuccess={handleSuccess}
         onError={handleError}
@@ -69,7 +83,7 @@ export default function GoogleSignInButton({ onError, redirectTo = '/dashboard' 
         shape="rectangular"
         theme="outline"
         text="signin_with"
-        width={320}
+        width={buttonWidth}
       />
     </div>
   );

@@ -28,6 +28,7 @@
 .header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: $spacing-md;
   margin-bottom: $spacing-lg;
   padding-bottom: $spacing-lg;
@@ -39,6 +40,10 @@
     color: var(--text-primary);
     font-weight: 600;
     flex: 1;
+    // The title can be an email — one long unbreakable "word" that would
+    // otherwise clip on narrow screens.
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
 

@@ -5,10 +5,17 @@
   margin: 0 auto;
   padding: $spacing-xl $spacing-lg;
   line-height: 1.7;
+  // Long Georgian words (e.g. „კონფიდენციალურობის") don't fit narrow
+  // screens on one line — break them instead of clipping.
+  overflow-wrap: break-word;
 
   h1 {
     font-size: 2rem;
     margin-bottom: $spacing-sm;
+
+    @media (max-width: 480px) {
+      font-size: 1.5rem;
+    }
   }
 
   h2 {

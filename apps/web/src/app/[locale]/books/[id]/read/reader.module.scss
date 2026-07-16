@@ -79,6 +79,10 @@
 
 .toolbarCenter {
   flex: 1;
+  // Allow the title to actually shrink and ellipsize — without this the
+  // flex item's min-width:auto keeps the toolbar wider than the viewport
+  // on narrow screens.
+  min-width: 0;
   text-align: center;
 
   h1 {

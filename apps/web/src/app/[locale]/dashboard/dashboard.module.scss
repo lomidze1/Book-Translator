@@ -98,6 +98,10 @@
   align-items: center;
   gap: $spacing-md;
   flex: 1;
+  // Without this the flex item refuses to shrink below its content width
+  // (min-width:auto), the title's ellipsis never activates, and the row
+  // gets clipped on narrow viewports.
+  min-width: 0;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
@@ -138,6 +142,26 @@
     font-size: 0.8rem;
     color: var(--text-secondary);
     margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+// On narrow phones the action button doesn't fit next to the title —
+// give the title row the full width and wrap the button onto its own
+// line under the cover instead of squeezing the title to nothing.
+@media (max-width: 480px) {
+  .activityItem {
+    flex-wrap: wrap;
+  }
+
+  .activityLink {
+    min-width: 100%;
+  }
+
+  .activityAction {
+    margin-left: calc(40px + #{$spacing-md});
   }
 }
 

@@ -48,6 +48,8 @@
 
 .filters {
   display: flex;
+  // Three tabs don't fit narrow phones on one line — wrap instead of clipping
+  flex-wrap: wrap;
   gap: $spacing-xs;
   margin-bottom: $spacing-lg;
   border-bottom: 1px solid var(--card-border);

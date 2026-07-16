@@ -11,6 +11,12 @@
   width: 100%;
   max-width: 420px;
   padding: $spacing-xl;
+
+  // Narrow phones: the 48px padding leaves too little room for the form
+  // content (e.g. the fixed-width Google button) — tighten it.
+  @media (max-width: 480px) {
+    padding: $spacing-lg $spacing-md;
+  }
   border: 1px solid var(--card-border);
   border-radius: $radius-lg;
   background: var(--card-bg);
