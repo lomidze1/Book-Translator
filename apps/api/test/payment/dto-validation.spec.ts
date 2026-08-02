@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { CreatePaymentDto } from '../../src/payment/dto/create-payment.dto';
-import { FlittCallbackDto } from '../../src/payment/dto/webhook-callback.dto';
 
 describe('CreatePaymentDto', () => {
   function toDto(data: Record<string, unknown>) {
@@ -65,41 +64,5 @@ describe('CreatePaymentDto', () => {
     const errors = await validate(dto);
     expect(errors.length).toBe(0);
     expect(dto.translationId).toBeUndefined();
-  });
-});
-
-describe('FlittCallbackDto', () => {
-  function toDto(data: Record<string, unknown>) {
-    return plainToInstance(FlittCallbackDto, data);
-  }
-
-  it('should pass with valid Flitt payload', async () => {
-    const dto = toDto({ order_id: 'order-123', order_status: 'approved', signature: 'abc123' });
-    const errors = await validate(dto);
-    expect(errors.length).toBe(0);
-  });
-
-  it('should fail without order_id', async () => {
-    const dto = toDto({ order_status: 'approved', signature: 'abc' });
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
-  });
-
-  it('should fail without order_status', async () => {
-    const dto = toDto({ order_id: 'order-123', signature: 'abc' });
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
-  });
-
-  it('should fail without signature', async () => {
-    const dto = toDto({ order_id: 'order-123', order_status: 'approved' });
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
-  });
-
-  it('should fail with empty order_id', async () => {
-    const dto = toDto({ order_id: '', order_status: 'approved', signature: 'abc' });
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
   });
 });

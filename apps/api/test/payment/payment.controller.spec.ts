@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ForbiddenException, ValidationPipe } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import request from 'supertest';
 import { PaymentController } from '../../src/payment/payment.controller';
-import { FlittCallbackDto } from '../../src/payment/dto';
+import { PaymentService } from '../../src/payment/payment.service';
+import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 
 describe('PaymentController', () => {
   let controller: PaymentController;
@@ -114,31 +118,57 @@ describe('PaymentController', () => {
     });
   });
 
-  // Regression: the global ValidationPipe used to strip non-whitelisted fields,
-  // which broke signature verification on real webhooks. The webhook route must
-  // preserve the full payload so the SHA1 signature can be recomputed.
-  describe('webhook payload preservation', () => {
-    it('keeps extra Flitt fields after validation', async () => {
-      const pipe = new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true });
-      const input = {
+  // Regression: the global ValidationPipe (whitelist + forbidNonWhitelisted,
+  // as configured in main.ts) runs BEFORE any per-route pipe, so a @UsePipes
+  // override could not stop it from 400-ing real Flitt payloads that carry
+  // extra fields. The route now takes a plain object body, which ValidationPipe
+  // skips. This test boots a real Nest app with the same global pipe as main.ts
+  // to prove the full payload reaches PaymentService.handleCallback.
+  describe('webhook payload preservation (with global ValidationPipe)', () => {
+    it('accepts extra Flitt fields and passes the full payload to the service', async () => {
+      const moduleRef = await Test.createTestingModule({
+        controllers: [PaymentController],
+        providers: [
+          { provide: PaymentService, useValue: paymentService },
+          { provide: ConfigService, useValue: config },
+        ],
+      })
+        .overrideGuard(JwtAuthGuard)
+        .useValue({ canActivate: () => true })
+        .compile();
+
+      const app = moduleRef.createNestApplication();
+      app.useGlobalPipes(
+        new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+        }),
+      );
+      await app.init();
+
+      const payload = {
         order_id: 'bt_1',
         order_status: 'approved',
         signature: 'abc123',
         amount: 1000,
         currency: 'GEL',
         payment_id: 'p-1',
+        merchant_id: 1396424,
+        response_status: 'success',
         masked_card: '4111****1111',
       };
 
-      const result = await pipe.transform(input, { type: 'body', metatype: FlittCallbackDto });
+      try {
+        await request(app.getHttpServer())
+          .post('/payments/flitt/callback')
+          .send(payload)
+          .expect(201);
 
-      expect(result.order_id).toBe('bt_1');
-      expect(result.order_status).toBe('approved');
-      expect(result.signature).toBe('abc123');
-      expect((result as any).amount).toBe(1000);
-      expect((result as any).currency).toBe('GEL');
-      expect((result as any).payment_id).toBe('p-1');
-      expect((result as any).masked_card).toBe('4111****1111');
+        expect(paymentService.handleCallback).toHaveBeenCalledWith('FLITT', payload);
+      } finally {
+        await app.close();
+      }
     });
   });
 });

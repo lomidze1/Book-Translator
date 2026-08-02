@@ -12,6 +12,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
+  // Behind a reverse proxy (Railway/nginx/Cloudflare) req.ip is the proxy
+  // address unless Express trusts X-Forwarded-For. Without this, every user
+  // shares one per-IP throttling bucket and rate limits lock everyone out.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // Compression
   app.use(compression());
 

@@ -339,6 +339,10 @@ export class BooksService {
   async update(id: string, dto: UpdateBookDto, userId: string) {
     await this.findOne(id); // throws if not found
     await this.verifyOwnership(id, userId);
+    // Book metadata is shared across every co-owner (duplicate-hash uploads
+    // attach unrelated users to the same Book row — see handleUpload), so one
+    // co-owner must not rewrite it for everyone else.
+    await this.verifySoleOwnership(id, userId);
 
     return this.prisma.book.update({
       where: { id },
@@ -348,6 +352,18 @@ export class BooksService {
 
   async remove(id: string, userId: string) {
     await this.verifyOwnership(id, userId);
+
+    // Same sharing caveat as update(): hard-deleting a co-owned Book would
+    // cascade away other users' translations, reading progress, bookmarks and
+    // notes. When co-owners exist, only detach the caller's own library rows
+    // and leave the shared record intact.
+    const coOwners = await this.prisma.userBook.count({
+      where: { bookId: id, userId: { not: userId } },
+    });
+    if (coOwners > 0) {
+      await this.prisma.userBook.deleteMany({ where: { bookId: id, userId } });
+      return { id, removedFromLibrary: true };
+    }
 
     // findOne intentionally projects away originalFileUrl (it's a private S3
     // key — see the comment there). Fetch it directly for the S3 cleanup.
@@ -382,6 +398,15 @@ export class BooksService {
     }
   }
 
+  private async verifySoleOwnership(bookId: string, userId: string): Promise<void> {
+    const coOwners = await this.prisma.userBook.count({
+      where: { bookId, userId: { not: userId } },
+    });
+    if (coOwners > 0) {
+      throw new ForbiddenException('წიგნი სხვა მომხმარებლებთანაც არის გაზიარებული და მისი შეცვლა შეუძლებელია');
+    }
+  }
+
   // ========================
   // File Upload
   // ========================
@@ -396,6 +421,17 @@ export class BooksService {
     });
 
     if (existing) {
+      // The uploader demonstrably possesses this file, so they get an ownership
+      // row just like a first-time uploader. Without this, a duplicate uploader
+      // owned nothing and every ownership-gated feature (preview, reader) was
+      // closed to them. Idempotent via @@unique([userId, bookId, type]).
+      if (userId) {
+        await this.prisma.userBook.createMany({
+          data: [{ userId, bookId: existing.id, type: 'UPLOADED' }],
+          skipDuplicates: true,
+        });
+      }
+
       // Advertising someone else's completed translation is part of the
       // resale flow — hidden while ENABLE_BOOK_RESALE is off.
       const translationAvailable =

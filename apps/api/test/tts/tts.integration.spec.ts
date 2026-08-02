@@ -40,6 +40,7 @@ describe('TTS Integration Flow', () => {
       update: vi.fn(),
       count: vi.fn(),
     },
+    userBook: { count: vi.fn().mockResolvedValue(0) },
   };
 
   const mockS3 = {

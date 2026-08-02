@@ -17,6 +17,7 @@ describe('TtsService', () => {
     translatedChapter: { findFirst: vi.fn(), findMany: vi.fn() },
     audioBook: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), update: vi.fn() },
     audioChapter: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), createMany: vi.fn(), upsert: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+    userBook: { count: vi.fn() },
   };
 
   const mockS3 = {
@@ -52,6 +53,9 @@ describe('TtsService', () => {
     mockPrisma.book.findUnique.mockResolvedValue({
       id: bookId, userBooks: [{ userId }],
     });
+    // Default: sole owner (clearAllMocks keeps implementations, so this must be
+    // re-set each test or a co-owner case would leak into the next one).
+    mockPrisma.userBook.count.mockResolvedValue(0);
     mockPrisma.translation.findFirst.mockResolvedValue({
       id: 'tr-1', bookId, status: 'COMPLETED',
     });
@@ -284,6 +288,23 @@ describe('TtsService', () => {
         book: { userBooks: [] },
       });
       await expect(service.deleteAudioBook('ab-1', userId)).rejects.toThrow(ForbiddenException);
+    });
+
+    // Regression: duplicate-hash uploads attach unrelated users to the same
+    // Book, and AudioBook ownership is "has any UserBook row". A co-owner must
+    // not destroy audio the other owners generated.
+    it('should throw ForbiddenException when the book has co-owners', async () => {
+      mockPrisma.audioBook.findUnique.mockResolvedValue({
+        id: 'ab-1',
+        bookId,
+        chapters: [{ audioUrl: 'key1' }],
+        book: { userBooks: [{ userId }] },
+      });
+      mockPrisma.userBook.count.mockResolvedValue(1);
+
+      await expect(service.deleteAudioBook('ab-1', userId)).rejects.toThrow(ForbiddenException);
+      expect(mockS3.delete).not.toHaveBeenCalled();
+      expect(mockPrisma.audioBook.delete).not.toHaveBeenCalled();
     });
 
     it('should handle partial cleanup (some S3 files missing)', async () => {

@@ -6,15 +6,13 @@ import {
   Body,
   Query,
   UseGuards,
-  UsePipes,
-  ValidationPipe,
   ParseIntPipe,
   DefaultValuePipe,
   ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentService } from './payment.service';
-import { CreatePaymentDto, FlittCallbackDto } from './dto';
+import { CreatePaymentDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -73,11 +71,15 @@ export class PaymentController {
 
   // Flitt webhook callback — no auth (called by Flitt servers).
   // The SHA1 signature is computed over the full payload, so we must NOT
-  // strip extra fields. Override the global ValidationPipe to keep them.
+  // strip or reject extra fields. A per-route @UsePipes override does NOT
+  // work here: global pipes run before route pipes, so the global
+  // ValidationPipe (forbidNonWhitelisted) would 400 real Flitt payloads
+  // before this handler is reached. Typing the body as a plain object makes
+  // ValidationPipe skip it entirely; FlittProvider.validateCallback checks
+  // the required fields and the signature itself.
   @Public()
-  @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
   @Post('flitt/callback')
-  async flittCallback(@Body() payload: FlittCallbackDto) {
+  async flittCallback(@Body() payload: Record<string, unknown>) {
     return this.paymentService.handleCallback('FLITT', payload);
   }
 }

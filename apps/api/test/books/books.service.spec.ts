@@ -24,7 +24,10 @@ describe('BooksService', () => {
     },
     userBook: {
       create: vi.fn(),
+      createMany: vi.fn(),
       findFirst: vi.fn(),
+      count: vi.fn(),
+      deleteMany: vi.fn(),
     },
     $transaction: vi.fn().mockResolvedValue([]),
   };
@@ -173,6 +176,19 @@ describe('BooksService', () => {
       const result = await booksService.update('b1', { title: 'New' }, 'user-1');
       expect(result.title).toBe('New');
     });
+
+    // Regression: duplicate-hash uploads attach unrelated users to the same
+    // Book row; a co-owner must not rewrite shared metadata for everyone.
+    it('should throw ForbiddenException when the book has co-owners', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({ id: 'b1', title: 'Old' });
+      mockPrismaService.userBook.findFirst.mockResolvedValue({ id: 'ub-1' });
+      mockPrismaService.userBook.count.mockResolvedValue(1);
+
+      await expect(booksService.update('b1', { title: 'X' }, 'user-1')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(mockPrismaService.book.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('remove', () => {
@@ -186,8 +202,10 @@ describe('BooksService', () => {
 
     it('should throw NotFoundException when deleting non-existent book', async () => {
       mockPrismaService.book.findUnique.mockResolvedValue(null);
+      mockPrismaService.userBook.findFirst.mockResolvedValue({ id: 'ub-1', userId: 'user-1' });
+      mockPrismaService.userBook.count.mockResolvedValue(0);
 
-      await expect(booksService.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(booksService.remove('nonexistent', 'user-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException when user does not own the book', async () => {
@@ -195,6 +213,24 @@ describe('BooksService', () => {
       mockPrismaService.userBook.findFirst.mockResolvedValue(null);
 
       await expect(booksService.remove('b1', 'user-999')).rejects.toThrow(ForbiddenException);
+    });
+
+    // Regression: User B uploads the same file as User A and becomes a
+    // co-owner of the same Book row. B's delete must not cascade away A's
+    // translations/progress — it should only detach B's own library rows.
+    it('should only detach caller rows when the book has co-owners', async () => {
+      mockPrismaService.userBook.findFirst.mockResolvedValue({ id: 'ub-b', userId: 'user-b' });
+      mockPrismaService.userBook.count.mockResolvedValue(1);
+      mockPrismaService.userBook.deleteMany.mockResolvedValue({ count: 1 });
+
+      const result = await booksService.remove('b1', 'user-b');
+
+      expect(mockPrismaService.userBook.deleteMany).toHaveBeenCalledWith({
+        where: { bookId: 'b1', userId: 'user-b' },
+      });
+      expect(mockPrismaService.book.delete).not.toHaveBeenCalled();
+      expect(mockS3Service.delete).not.toHaveBeenCalled();
+      expect(result).toEqual({ id: 'b1', removedFromLibrary: true });
     });
   });
 
@@ -474,6 +510,33 @@ describe('BooksService', () => {
       expect(result.duplicate).toBe(true);
       expect(result.translationAvailable).toBe(false);
       expect(result.message).toBe('DUPLICATE_EXISTS');
+    });
+
+    it('should grant ownership to the uploader on a duplicate upload', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({
+        id: 'existing-book',
+        title: 'Existing Book',
+        translations: [],
+      });
+
+      await booksService.handleUpload(mockFile, userId);
+
+      expect(mockPrismaService.userBook.createMany).toHaveBeenCalledWith({
+        data: [{ userId, bookId: 'existing-book', type: 'UPLOADED' }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('should not create ownership on a duplicate upload without a user', async () => {
+      mockPrismaService.book.findUnique.mockResolvedValue({
+        id: 'existing-book',
+        title: 'Existing Book',
+        translations: [],
+      });
+
+      await booksService.handleUpload(mockFile, undefined);
+
+      expect(mockPrismaService.userBook.createMany).not.toHaveBeenCalled();
     });
 
     it('should extract title from filename', async () => {

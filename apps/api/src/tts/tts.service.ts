@@ -380,6 +380,19 @@ export class TtsService implements OnModuleDestroy {
       chapters: true,
     });
 
+    // An AudioBook hangs off a Book that duplicate-hash uploads can attach
+    // unrelated users to (see BooksService.handleUpload), and ownership here is
+    // "has any UserBook row". Deleting would destroy audio the other owners
+    // paid to generate, so a co-owned AudioBook is not the caller's to remove.
+    const coOwners = await this.prisma.userBook.count({
+      where: { bookId: audioBook.bookId, userId: { not: userId } },
+    });
+    if (coOwners > 0) {
+      throw new ForbiddenException(
+        'აუდიოწიგნი სხვა მომხმარებლებთანაც არის გაზიარებული და მისი წაშლა შეუძლებელია',
+      );
+    }
+
     // Delete S3 files in parallel — sequential awaits could take 30s+ on a
     // 100-chapter audiobook. Failures are swallowed so a missing object never
     // blocks the DB cascade.
