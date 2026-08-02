@@ -60,6 +60,13 @@
 - DSN-ების კონფიგურაცია
 
 ## 10. App Store / Play Store პუბლიკაცია
+- `apps/mobile/app.json` → `extra.eas.projectId` — ჩაანაცვლე `REPLACE_WITH_EAS_PROJECT_ID`
+  რეალური EAS project ID-ით (Expo dashboard). სანამ placeholder-ია, push notifications
+  გამორთულია (კოდი ამას ამოწმებს და release build-ში console.error-ს წერს).
+- `apps/mobile/eas.json` → `submit.production.ios` — ჩაანაცვლე `appleId`,
+  `ascAppId`, `appleTeamId` (App Store Connect). `eas submit` placeholder-ებით ვერ გაეშვება.
+- `apps/mobile/eas.json` → `submit.production.android.serviceAccountKeyPath` —
+  `google-play-service-account.json` უნდა არსებობდეს (repo-ში არ commit-დება).
 - React Native აპის build (iOS + Android)
 - App Store review submission
 - Play Store review submission
