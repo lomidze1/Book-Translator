@@ -10,6 +10,6 @@ import { NotificationModule } from '../notification/notification.module';
   imports: [ParsingModule, forwardRef(() => NotificationModule)],
   controllers: [TranslationController],
   providers: [TranslationService, TranslationProcessor, ClaudeService],
-  exports: [TranslationService],
+  exports: [TranslationService, ClaudeService],
 })
 export class TranslationModule {}

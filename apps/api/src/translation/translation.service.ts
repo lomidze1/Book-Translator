@@ -39,7 +39,7 @@ export class TranslationService {
         originalFileUrl: true,
         originalFormat: true,
         userBooks: { where: { userId }, select: { id: true } },
-        _count: { select: { chapters: true } },
+        _count: { select: { chapters: true, userBooks: true } },
       },
     });
 
@@ -47,9 +47,15 @@ export class TranslationService {
       throw new NotFoundException('Book not found');
     }
 
-    // Auto-create UserBook if user doesn't own the book yet
-    // (e.g., book was uploaded anonymously before login)
+    // Claim ownership only for a book nobody owns yet — the anonymous-upload
+    // case. Claiming unconditionally was a privilege escalation: book ids are
+    // enumerable via the @Public() GET /books, and books.service.verifyOwnership
+    // treats any UserBook row as the right to PATCH/DELETE the book. So any
+    // logged-in user could POST a stranger's bookId here and then delete it.
     if (book.userBooks.length === 0) {
+      if (book._count.userBooks > 0) {
+        throw new ForbiddenException('You do not have access to this book');
+      }
       await this.prisma.userBook.create({
         data: { userId, bookId, type: 'UPLOADED' },
       });
@@ -258,7 +264,12 @@ export class TranslationService {
     });
   }
 
-  private async parseAndSaveChapters(bookId: string, s3Key: string, format: string) {
+  /**
+   * Public so the preview worker can warm a book's chapters before the user
+   * pays — which also moves this S3-download-and-parse off the HTTP request
+   * path for the eventual purchase.
+   */
+  async parseAndSaveChapters(bookId: string, s3Key: string, format: string) {
     // Download from S3 (large files — give a generous timeout).
     const url = await this.s3.getPresignedUrl(s3Key);
     const response = await fetchWithTimeout(url, {}, 60_000);
@@ -267,20 +278,20 @@ export class TranslationService {
     // Parse
     const parsed = await this.parsing.parse(buffer, format);
 
-    // Save chapters in transaction
-    await this.prisma.$transaction(
-      parsed.chapters.map((ch) =>
-        this.prisma.chapter.create({
-          data: {
-            bookId,
-            number: ch.number,
-            title: ch.title,
-            originalContent: ch.content,
-            wordCount: ch.wordCount,
-          },
-        }),
-      ),
-    );
+    // createMany + skipDuplicates, not a transaction of creates: two callers can
+    // race here (the preview worker and POST /translations on the same book) and
+    // @@unique([bookId, number]) would abort the whole transaction with P2002,
+    // surfacing as a 500 on the user's purchase.
+    await this.prisma.chapter.createMany({
+      data: parsed.chapters.map((ch) => ({
+        bookId,
+        number: ch.number,
+        title: ch.title,
+        originalContent: ch.content,
+        wordCount: ch.wordCount,
+      })),
+      skipDuplicates: true,
+    });
 
     // Update book page count estimate
     await this.prisma.book.update({

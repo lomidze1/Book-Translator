@@ -35,6 +35,7 @@ describe('TranslationService', () => {
     },
     chapter: {
       create: vi.fn(),
+      createMany: vi.fn(),
     },
     $transaction: vi.fn(),
   };
@@ -111,13 +112,13 @@ describe('TranslationService', () => {
       await expect(service.createTranslation('no-book', 'user-1')).rejects.toThrow(NotFoundException);
     });
 
-    it('should auto-create UserBook if user does not own the book yet', async () => {
+    it('should auto-create UserBook for an unowned book (anonymous upload)', async () => {
       mockPrisma.book.findUnique.mockResolvedValue({
         id: 'book-1',
         originalFileUrl: 's3://key',
         originalFormat: 'PDF',
         userBooks: [],
-        _count: { chapters: 1 },
+        _count: { chapters: 1, userBooks: 0 },
       });
       mockPrisma.translation.findFirst.mockResolvedValue(null);
       mockPrisma.translation.create.mockResolvedValue({
@@ -137,6 +138,24 @@ describe('TranslationService', () => {
       expect(mockPrisma.userBook.create).toHaveBeenCalledWith({
         data: { userId: 'user-1', bookId: 'book-1', type: 'UPLOADED' },
       });
+    });
+
+    // Regression: book ids are enumerable via the @Public() GET /books, and
+    // books.service.verifyOwnership treats any UserBook row as edit/delete
+    // rights. Claiming ownership here unconditionally let any logged-in user
+    // delete a stranger's book.
+    it('should refuse to claim a book that someone else already owns', async () => {
+      mockPrisma.book.findUnique.mockResolvedValue({
+        id: 'book-1',
+        originalFileUrl: 's3://key',
+        originalFormat: 'PDF',
+        userBooks: [],
+        _count: { chapters: 1, userBooks: 1 },
+      });
+
+      await expect(service.createTranslation('book-1', 'attacker')).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.userBook.create).not.toHaveBeenCalled();
+      expect(mockPrisma.translation.create).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException if translation already exists', async () => {
@@ -172,6 +191,53 @@ describe('TranslationService', () => {
           data: expect.objectContaining({ targetLanguage: 'ka' }),
         }),
       );
+    });
+  });
+
+  describe('parseAndSaveChapters', () => {
+    beforeEach(() => {
+      mockS3.getPresignedUrl.mockResolvedValue('https://s3.example/presigned');
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(8),
+      }) as any;
+    });
+
+    it('inserts chapters with skipDuplicates so concurrent parses cannot collide', async () => {
+      mockParsing.parse.mockResolvedValue({
+        totalWordCount: 500,
+        chapters: [
+          { number: 1, title: 'One', content: 'a', wordCount: 200 },
+          { number: 2, title: 'Two', content: 'b', wordCount: 300 },
+        ],
+      });
+
+      await service.parseAndSaveChapters('book-1', 's3://key', 'PDF');
+
+      expect(mockPrisma.chapter.createMany).toHaveBeenCalledWith({
+        data: [
+          { bookId: 'book-1', number: 1, title: 'One', originalContent: 'a', wordCount: 200 },
+          { bookId: 'book-1', number: 2, title: 'Two', originalContent: 'b', wordCount: 300 },
+        ],
+        skipDuplicates: true,
+      });
+      // The old $transaction(map(create)) form aborted wholesale on P2002.
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockPrisma.chapter.create).not.toHaveBeenCalled();
+    });
+
+    it('updates the book page count from the parsed word total', async () => {
+      mockParsing.parse.mockResolvedValue({
+        totalWordCount: 1000,
+        chapters: [{ number: 1, title: 'One', content: 'a', wordCount: 1000 }],
+      });
+
+      await service.parseAndSaveChapters('book-1', 's3://key', 'PDF');
+
+      expect(mockPrisma.book.update).toHaveBeenCalledWith({
+        where: { id: 'book-1' },
+        data: { pageCount: 4 },
+      });
     });
   });
 
