@@ -46,15 +46,73 @@ export class ParsingService {
     // ships ESM-first. Dynamic import keeps Nest's CJS build happy.
     const { extractText, getDocumentProxy } = await import('unpdf');
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
-    const { text } = await extractText(pdf, { mergePages: true });
+    // Per-page text (mergePages: false) so repeating headers/footers and page
+    // numbers can be detected before the pages are stitched together.
+    const { text } = await extractText(pdf, { mergePages: false });
+    const pages = Array.isArray(text) ? text : [text];
 
-    const trimmed = (Array.isArray(text) ? text.join('\n') : text).trim();
+    const cleaned = this.cleanPdfPages(pages);
 
-    if (!trimmed) {
+    if (!cleaned) {
       throw new BadRequestException('PDF file contains no extractable text');
     }
 
-    return this.splitIntoChapters(trimmed);
+    return this.splitIntoChapters(cleaned);
+  }
+
+  /**
+   * Clean per-page PDF text before it reaches the translator:
+   * - strip running headers/footers (a first/last line repeating across pages)
+   * - strip standalone page-number lines at page edges
+   * - rejoin words hyphenated across line breaks ("beauti-\nful" → "beautiful")
+   */
+  private cleanPdfPages(pages: string[]): string {
+    const pageLines = pages.map((page) => page.split('\n').map((line) => line.trim()));
+
+    // Page numbers inside a header vary per page — ignore digits when
+    // deciding whether a line repeats.
+    const normalize = (line: string) =>
+      line.replace(/\d+/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+    const isPageNumber = (line: string) =>
+      /^[-–—\s]*(?:page\s+)?\d{1,4}(?:\s*(?:\/|of)\s*\d{1,4})?[-–—\s]*$/i.test(line);
+
+    // Count how often each normalized line opens/closes a page.
+    const firstCounts = new Map<string, number>();
+    const lastCounts = new Map<string, number>();
+    for (const lines of pageLines) {
+      const nonEmpty = lines.filter((l) => l);
+      if (nonEmpty.length === 0) continue;
+      const first = normalize(nonEmpty[0]);
+      const last = normalize(nonEmpty[nonEmpty.length - 1]);
+      if (first) firstCounts.set(first, (firstCounts.get(first) || 0) + 1);
+      if (last) lastCounts.set(last, (lastCounts.get(last) || 0) + 1);
+    }
+
+    const threshold = Math.max(2, Math.ceil(pageLines.length * 0.6));
+    const repeats = (counts: Map<string, number>, line: string) =>
+      pageLines.length >= 3 && (counts.get(normalize(line)) || 0) >= threshold;
+
+    const cleanedPages = pageLines.map((lines) => {
+      const kept = lines.filter((l) => l);
+      // Strip up to two matching lines from each edge (header + page number
+      // can stack), never touching lines in the middle of the page.
+      for (let pass = 0; pass < 2; pass++) {
+        if (kept.length && (isPageNumber(kept[0]) || repeats(firstCounts, kept[0]))) kept.shift();
+        if (kept.length && (isPageNumber(kept[kept.length - 1]) || repeats(lastCounts, kept[kept.length - 1]))) kept.pop();
+      }
+      return kept.join('\n');
+    });
+
+    return cleanedPages
+      .filter((p) => p)
+      .join('\n')
+      // Line-break hyphenation: lowercase continuation means a split word;
+      // an uppercase continuation is a real hyphen (Anna-Maria) — keep it,
+      // drop only the line break.
+      .replace(/([A-Za-z])-\n([a-z])/g, '$1$2')
+      .replace(/([A-Za-z])-\n([A-Z])/g, '$1-$2')
+      .trim();
   }
 
   private async parseEpub(buffer: Buffer): Promise<ParsedBook> {
@@ -87,8 +145,7 @@ export class ParsingService {
                   });
                 });
 
-                // Strip HTML tags
-                const plainText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                const plainText = this.htmlToPlainText(text);
                 if (plainText.length < 50) continue;
 
                 chapterNum++;
@@ -130,6 +187,42 @@ export class ParsingService {
         fs.rmdirSync(tmpDir);
       } catch { /* ignore cleanup errors */ }
     }
+  }
+
+  /**
+   * Convert chapter HTML to plain text while preserving paragraph structure.
+   * Block-level tag boundaries become newlines (the chunker and the translation
+   * prompt both rely on newlines to keep paragraphs intact); inline tags are
+   * stripped without breaking the line.
+   */
+  private htmlToPlainText(html: string): string {
+    return (
+      html
+        .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/<br\s*\/?>/gi, '\n')
+        // Closing (or self-closing) block-level tags end a paragraph
+        .replace(/<\/(p|div|h[1-6]|li|blockquote|section|article|header|footer|figure|figcaption|table|tr|ul|ol|dl|dd|dt|pre|aside|hr)\s*>/gi, '\n\n')
+        .replace(/<hr[^>]*\/?>/gi, '\n\n')
+        .replace(/<[^>]*>/g, ' ')
+        // Decode the entities that actually occur in book markup
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&mdash;/gi, '—')
+        .replace(/&ndash;/gi, '–')
+        .replace(/&hellip;/gi, '…')
+        .replace(/&(ldquo|rdquo|quot);/gi, '"')
+        .replace(/&(lsquo|rsquo|apos|#39);/gi, "'")
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+        .replace(/&amp;/gi, '&')
+        // Collapse horizontal whitespace, keep line structure
+        .replace(/[^\S\n]+/g, ' ')
+        .replace(/ ?\n ?/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    );
   }
 
   private async parseDocx(buffer: Buffer): Promise<ParsedBook> {
@@ -194,23 +287,51 @@ export class ParsingService {
   }
 
   private splitByWordCount(text: string, wordsPerChapter: number): ParsedChapter[] {
-    const words = text.split(/\s+/);
-    const chapters: ParsedChapter[] = [];
-    let chapterNum = 0;
-
-    for (let i = 0; i < words.length; i += wordsPerChapter) {
-      chapterNum++;
-      const chunkWords = words.slice(i, i + wordsPerChapter);
-      const content = chunkWords.join(' ');
-
-      chapters.push({
-        number: chapterNum,
-        title: null,
-        content,
-        wordCount: chunkWords.length,
-      });
+    // Accumulate whole paragraphs (units keep their trailing newlines) so the
+    // source structure survives — mirrors ClaudeService.splitIntoChunks.
+    // Joining a flat word list with spaces here used to erase every paragraph
+    // break for any book without chapter markers.
+    const parts = text.split(/(\n+)/);
+    const units: string[] = [];
+    for (let i = 0; i < parts.length; i += 2) {
+      const unit = parts[i] + (parts[i + 1] || '');
+      if (unit) units.push(unit);
     }
 
-    return chapters;
+    const contents: string[] = [];
+    let current = '';
+    let currentWords = 0;
+
+    const flush = () => {
+      if (current.trim()) contents.push(current.replace(/\s+$/, ''));
+      current = '';
+      currentWords = 0;
+    };
+
+    for (const unit of units) {
+      const trimmed = unit.trim();
+      const unitWords = trimmed ? trimmed.split(/\s+/).length : 0;
+      if (unitWords > wordsPerChapter) {
+        // Single paragraph bigger than a whole chapter (e.g. text with no
+        // line breaks at all) — fall back to plain word slicing within it.
+        flush();
+        const words = trimmed.split(/\s+/);
+        for (let i = 0; i < words.length; i += wordsPerChapter) {
+          contents.push(words.slice(i, i + wordsPerChapter).join(' '));
+        }
+        continue;
+      }
+      if (currentWords + unitWords > wordsPerChapter) flush();
+      current += unit;
+      currentWords += unitWords;
+    }
+    flush();
+
+    return contents.map((content, i) => ({
+      number: i + 1,
+      title: null,
+      content,
+      wordCount: content.split(/\s+/).length,
+    }));
   }
 }
