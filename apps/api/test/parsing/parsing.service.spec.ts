@@ -454,6 +454,49 @@ describe('ParsingService', () => {
       expect(paragraphs.length).toBe(2);
     });
 
+    it('should fall back to TOC titles when flow items have no title', async () => {
+      const epub2Module = await import('epub2');
+      const MockEPub = (epub2Module as any).default;
+
+      MockEPub.prototype.parse = function () {
+        // Flow items without titles — common in real EPUBs
+        this.flow = [{ id: 'ch1' }, { id: 'ch2', href: 'text/part2.xhtml' }];
+        this.toc = [
+          { id: 'ch1', title: 'The Beginning' },
+          { id: 'nav-2', href: 'text/part2.xhtml#start', title: 'The End' },
+        ];
+        setTimeout(() => this.emit('end'), 0);
+      };
+
+      MockEPub.prototype.getChapter = function (_id: string, cb: any) {
+        cb(null, '<p>This is a long enough chapter content that exceeds the minimum character limit of fifty characters easily.</p>');
+      };
+
+      const result = await service.parse(Buffer.from('fake-epub'), 'EPUB');
+      expect(result.chapters.length).toBe(2);
+      expect(result.chapters[0].title).toBe('The Beginning'); // matched by id
+      expect(result.chapters[1].title).toBe('The End'); // matched by href (fragment ignored)
+    });
+
+    it('should prefer the flow item title over the TOC title', async () => {
+      const epub2Module = await import('epub2');
+      const MockEPub = (epub2Module as any).default;
+
+      MockEPub.prototype.parse = function () {
+        this.flow = [{ id: 'ch1', title: 'Flow Title' }, { id: 'ch2' }];
+        this.toc = [{ id: 'ch1', title: 'TOC Title' }];
+        setTimeout(() => this.emit('end'), 0);
+      };
+
+      MockEPub.prototype.getChapter = function (_id: string, cb: any) {
+        cb(null, '<p>This is a long enough chapter content that exceeds the minimum character limit of fifty characters easily.</p>');
+      };
+
+      const result = await service.parse(Buffer.from('fake-epub'), 'EPUB');
+      expect(result.chapters[0].title).toBe('Flow Title');
+      expect(result.chapters[1].title).toBeNull(); // nothing matches → stays null
+    });
+
     it('should throw if EPUB has no extractable chapters', async () => {
       const epub2Module = await import('epub2');
       const MockEPub = (epub2Module as any).default;
@@ -603,6 +646,63 @@ describe('ParsingService', () => {
       const text = 'Chapter I\nFirst chapter content.\nChapter II\nSecond chapter content.';
       const result = service.splitIntoChapters(text);
       expect(result.chapters.length).toBe(2);
+    });
+
+    it('should detect Prologue and Epilogue as chapter markers', () => {
+      const text =
+        'Prologue\nBefore the war began there was peace in the valley.\n' +
+        'Chapter 1\nThe war started in spring without warning.\n' +
+        'Epilogue\nAfter the war ended came a long silence.';
+      const result = service.splitIntoChapters(text);
+
+      expect(result.chapters.length).toBe(3);
+      expect(result.chapters[0].title).toContain('Prologue');
+      expect(result.chapters[1].title).toContain('Chapter 1');
+      expect(result.chapters[2].title).toContain('Epilogue');
+    });
+
+    it('should detect "Prologue: Subtitle" style headings', () => {
+      const text =
+        'Prologue: The Fall\nBefore everything changed the city stood tall.\n' +
+        'Chapter 1\nThe morning after was quiet and cold.';
+      const result = service.splitIntoChapters(text);
+
+      expect(result.chapters.length).toBe(2);
+      expect(result.chapters[0].title).toContain('The Fall');
+    });
+
+    it('should detect standalone Roman numeral headings on their own line', () => {
+      const text =
+        'I.\nThe first section tells of the journey north.\n' +
+        'II.\nThe second section describes the mountain pass.\n' +
+        'III.\nThe third section brings them home again.';
+      const result = service.splitIntoChapters(text);
+
+      expect(result.chapters.length).toBe(3);
+      expect(result.chapters[0].content).toContain('journey north');
+      expect(result.chapters[2].content).toContain('home again');
+    });
+
+    it('should NOT treat a bare "I" line (pronoun/poetry) as a chapter marker', () => {
+      const text =
+        'The poem began softly.\nI\nwalked to the sea alone at dusk.\nI\nreturned before the dawn came.';
+      const result = service.splitIntoChapters(text);
+
+      // No valid markers → word-count fallback, single chapter, text intact
+      expect(result.chapters.length).toBe(1);
+      expect(result.chapters[0].content).toContain('walked to the sea');
+      expect(result.chapters[0].content).toContain('returned before the dawn');
+    });
+
+    it('should detect spelled-out chapter numbers ("Chapter One")', () => {
+      const text =
+        'Chapter One\nThe story opens on a rainy evening in town.\n' +
+        'Chapter Two\nThe next day brought unexpected visitors.';
+      const result = service.splitIntoChapters(text);
+
+      expect(result.chapters.length).toBe(2);
+      expect(result.chapters[0].title).toContain('Chapter One');
+      expect(result.chapters[1].title).toContain('Chapter Two');
     });
 
     it('should fall back to word count splitting if no chapter markers', () => {

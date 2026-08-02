@@ -134,6 +134,15 @@ export class ParsingService {
             const chapters: ParsedChapter[] = [];
             let chapterNum = 0;
 
+            // Flow items often lack titles — fall back to the TOC, matching
+            // by id or by href (ignoring the #fragment part).
+            const tocTitles = new Map<string, string>();
+            for (const entry of epub.toc || []) {
+              if (!entry?.title) continue;
+              if (entry.id) tocTitles.set(String(entry.id), entry.title);
+              if (entry.href) tocTitles.set(String(entry.href).split('#')[0], entry.title);
+            }
+
             for (const item of epub.flow) {
               try {
                 const chapterId = item.id as string;
@@ -149,9 +158,10 @@ export class ParsingService {
                 if (plainText.length < 50) continue;
 
                 chapterNum++;
+                const hrefKey = item.href ? String(item.href).split('#')[0] : '';
                 chapters.push({
                   number: chapterNum,
-                  title: item.title || null,
+                  title: item.title || tocTitles.get(chapterId) || (hrefKey && tocTitles.get(hrefKey)) || null,
                   content: plainText,
                   wordCount: plainText.split(/\s+/).length,
                 });
@@ -248,21 +258,21 @@ export class ParsingService {
 
   /**
    * Split text into chapters by common patterns:
-   * - "Chapter N", "CHAPTER N", "Part N"
-   * - "თავი N" (Georgian)
+   * - "Chapter N" / "Part N" (arabic, Roman, or spelled-out numbers), "თავი N"
+   * - "Prologue" / "Epilogue" headings (with an optional subtitle)
+   * - standalone Roman numeral headings on their own line ("I.", "IV")
    * Falls back to splitting by ~5000 words if no chapter markers found.
    */
   splitIntoChapters(text: string): ParsedBook {
-    const chapterPattern = /(?:^|\n)(?:chapter|CHAPTER|Chapter|Part|PART|თავი)\s+(\d+|[IVXLCDM]+)[.:)?\s-]*/gm;
-    const matches = [...text.matchAll(chapterPattern)];
+    const markerIndices = this.findChapterMarkers(text);
 
     let chapters: ParsedChapter[];
 
-    if (matches.length >= 2) {
+    if (markerIndices.length >= 2) {
       chapters = [];
-      for (let i = 0; i < matches.length; i++) {
-        const start = matches[i].index!;
-        const end = i + 1 < matches.length ? matches[i + 1].index! : text.length;
+      for (let i = 0; i < markerIndices.length; i++) {
+        const start = markerIndices[i];
+        const end = i + 1 < markerIndices.length ? markerIndices[i + 1] : text.length;
         const content = text.slice(start, end).trim();
 
         // Extract title from first line
@@ -284,6 +294,31 @@ export class ParsingService {
       chapters,
       totalWordCount: chapters.reduce((sum, ch) => sum + ch.wordCount, 0),
     };
+  }
+
+  /**
+   * Start offsets of every recognized chapter heading, sorted and deduped.
+   * A bare "I" line is deliberately not a marker (pronoun/poetry) — a
+   * standalone Roman heading needs either a trailing dot or 2+ numerals.
+   */
+  private findChapterMarkers(text: string): number[] {
+    const spelled =
+      'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty';
+    const patterns = [
+      new RegExp(`(?:^|\\n)(?:chapter|part|თავი)\\s+(?:\\d+|[ivxlcdm]+|${spelled})\\b[.:)?\\s-]*`, 'gi'),
+      // Prologue / Epilogue alone on a line, optionally with a short subtitle
+      /(?:^|\n)[ \t]*(?:prologue|epilogue)\b(?:[ \t.:—-][^\n]{0,60})?(?=\n|$)/gi,
+      // Standalone Roman numeral heading on its own line
+      /(?:^|\n)[ \t]*(?:[IVXLCDM]{2,7}|[IVXLCDM]\.)\.?[ \t]*(?=\n|$)/g,
+    ];
+
+    const indices = new Set<number>();
+    for (const pattern of patterns) {
+      for (const match of text.matchAll(pattern)) {
+        indices.add(match.index! + (match[0].startsWith('\n') ? 1 : 0));
+      }
+    }
+    return [...indices].sort((a, b) => a - b);
   }
 
   private splitByWordCount(text: string, wordsPerChapter: number): ParsedChapter[] {
