@@ -38,9 +38,10 @@ model User {
   tokenVersion  Int       @default(0)
 
   // Relations
-  accounts        Account[]
-  books           UserBook[]
-  payments        Payment[]
+  accounts          Account[]
+  books             UserBook[]
+  payments          Payment[]
+  previewsRequested BookPreview[]
   bookmarks       Bookmark[]
   highlights      Highlight[]
   notes           Note[]
@@ -101,6 +102,7 @@ model Book {
   userBooks       UserBook[]
   chapters        Chapter[]
   audioBooks      AudioBook[]
+  previews        BookPreview[]
   bookmarks       Bookmark[]
   highlights      Highlight[]
   notes           Note[]
@@ -198,6 +200,56 @@ model TranslatedChapter {
   @@unique([translationId, chapterId])
   @@index([translationId])
   @@index([chapterId])
+}
+
+/// A free sample translation of a book's opening pages, shown before purchase.
+/// Deliberately NOT a Translation row: Translation's duplicate guard would
+/// permanently block the user from buying, and getTranslation() hands back every
+/// TranslatedChapter at any status. One preview per (book, language), cached and
+/// shared — the API cost is paid once.
+model BookPreview {
+  id     String @id @default(cuid())
+  bookId String
+  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  targetLanguage String        @default("ka")
+  status         PreviewStatus @default(PENDING)
+
+  /// The English slice sent to Claude. Kept for the side-by-side view; no new
+  /// copyright exposure since the full text already lives in Chapter.originalContent.
+  sourceText      String?
+  content         String?
+  sourceWordCount Int?
+  chapterNumber   Int?
+
+  tokensUsed Int?
+  aiModel    String?
+  /// Whether the second refinement pass ran. False by default — a preview must
+  /// never be better than the tier the user goes on to buy.
+  editorPass Boolean @default(false)
+
+  /// Who paid the API cost. Drives the per-user daily quota. Nullable so
+  /// deleting a user doesn't cascade away a preview other users read.
+  requestedById String?
+  requestedBy   User?   @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  errorMessage String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bookId, targetLanguage])
+  @@index([requestedById, createdAt])
+  @@index([status])
+}
+
+enum PreviewStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
 }
 
 model UserBook {

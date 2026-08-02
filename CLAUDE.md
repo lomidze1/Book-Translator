@@ -49,6 +49,7 @@ Book-Translator/
 /{locale}/upload               # File upload (drag & drop)
 /{locale}/books/:id            # Book detail + translation options
 /{locale}/books/:id/read       # Online Reader
+/{locale}/books/:id/preview    # უფასო ნიმუში (ENABLE_PREVIEW)
 /{locale}/forgot-password      # Forgot password
 /{locale}/reset-password       # Reset password (token)
 /{locale}/verify-email         # Email verification

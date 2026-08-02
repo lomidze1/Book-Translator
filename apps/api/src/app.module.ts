@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { BooksModule } from './books/books.module';
 import { TranslationModule } from './translation/translation.module';
+import { PreviewModule } from './preview/preview.module';
 import { PaymentModule } from './payment/payment.module';
 import { ReaderModule } from './reader/reader.module';
 import { TtsModule } from './tts/tts.module';
@@ -51,6 +52,14 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
         ttl: 60000,
         limit: process.env.NODE_ENV === 'production' ? 5 : 10000,
       },
+      {
+        // Preview generation spends real Claude tokens. This is the per-IP
+        // ceiling; the per-user daily quota in preview.service.ts is the
+        // primary guard, since IPs rotate.
+        name: 'preview',
+        ttl: 3600000, // 1 hour
+        limit: process.env.NODE_ENV === 'production' ? 5 : 10000,
+      },
     ]),
     PrismaModule,
     RedisModule,
@@ -59,6 +68,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     UsersModule,
     BooksModule,
     TranslationModule,
+    PreviewModule,
     PaymentModule,
     ReaderModule,
     TtsModule,

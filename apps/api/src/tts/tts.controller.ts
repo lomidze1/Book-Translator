@@ -8,6 +8,7 @@ import { SynthesizeDto, SynthesizeBookDto } from './dto/synthesize.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProviderManager } from './providers/provider-manager';
+import { TtsEnabledGuard } from './guards/tts-enabled.guard';
 
 @Controller('tts')
 @UseGuards(JwtAuthGuard)
@@ -39,6 +40,7 @@ export class TtsController {
   }
 
   @Post('synthesize')
+  @UseGuards(TtsEnabledGuard)
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   synthesize(
     @CurrentUser() user: { id: string },
@@ -52,6 +54,7 @@ export class TtsController {
   // ========================
 
   @Post('synthesize-book')
+  @UseGuards(TtsEnabledGuard)
   @Throttle({ default: { ttl: 3600000, limit: 5 } })
   synthesizeBook(
     @CurrentUser() user: { id: string },
@@ -103,6 +106,7 @@ export class TtsController {
   }
 
   @Post('retry/:audioBookId')
+  @UseGuards(TtsEnabledGuard)
   @Throttle({ default: { ttl: 3600000, limit: 10 } })
   retry(
     @CurrentUser() user: { id: string },
