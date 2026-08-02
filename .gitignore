@@ -13,3 +13,6 @@ apps/api/*.json
 !apps/api/tsconfig*.json
 apps/api/test/**/*.js
 apps/api/test/**/*.d.ts
+
+# macOS
+.DS_Store

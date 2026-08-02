@@ -21,8 +21,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
-    "@aws-sdk/client-s3": "^3.1016.0",
-    "@aws-sdk/s3-request-presigner": "^3.1016.0",
+    "@aws-sdk/client-s3": "^3.1101.0",
+    "@aws-sdk/s3-request-presigner": "^3.1101.0",
     "@google-cloud/text-to-speech": "^6.4.0",
     "@nestjs/common": "^10.4.0",
     "@nestjs/config": "^3.3.0",
