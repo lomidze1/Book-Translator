@@ -1,14 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Alert,
+  Linking, ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/theme/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
 import { apiRequest } from '@/services/api';
+import { authService } from '@/services/auth';
+import { WEB_URL } from '@/config';
 
 const READER_SETTINGS_KEY = 'reader-settings';
+const DANGER = '#dc2626';
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+
+const LEGAL_LINKS = [
+  { path: '/terms', labelKey: 'settings.terms' },
+  { path: '/privacy', labelKey: 'settings.privacy' },
+  { path: '/copyright', labelKey: 'settings.copyright' },
+  { path: '/refund', labelKey: 'settings.refund' },
+] as const;
 
 interface NotificationPrefs {
   emailEnabled: boolean;
@@ -46,6 +60,33 @@ export default function SettingsScreen() {
   });
 
   const [saved, setSaved] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
+
+  const deleteAccount = useCallback(async () => {
+    setDeleting(true);
+    try {
+      await apiRequest('/users/profile', { method: 'DELETE' });
+      await authService.logout();
+      router.replace('/(auth)/login');
+    } catch {
+      showToast(t('settings.delete_failed'), 'error');
+    } finally {
+      setDeleting(false);
+    }
+  }, [router, showToast, t]);
+
+  const confirmDeleteAccount = useCallback(() => {
+    Alert.alert(
+      t('settings.delete_confirm_title'),
+      t('settings.delete_confirm_body'),
+      [
+        { text: t('settings.cancel'), style: 'cancel' },
+        { text: t('settings.delete_confirm_cta'), style: 'destructive', onPress: deleteAccount },
+      ],
+      { cancelable: true },
+    );
+  }, [deleteAccount, t]);
 
   // Load notification prefs
   useEffect(() => {
@@ -58,7 +99,13 @@ export default function SettingsScreen() {
   useEffect(() => {
     AsyncStorage.getItem(READER_SETTINGS_KEY).then((raw) => {
       if (raw) {
-        try { setReaderSettings(JSON.parse(raw)); } catch {}
+        // Corrupt stored JSON just falls back to defaults, but log it —
+        // silently ignoring makes "my settings keep resetting" undebuggable.
+        try {
+          setReaderSettings(JSON.parse(raw));
+        } catch (err) {
+          console.warn('[settings] discarding corrupt reader settings:', err);
+        }
       }
     });
   }, []);
@@ -96,7 +143,10 @@ export default function SettingsScreen() {
     { key: 'pushEnabled', label: t('settings.push_notifications') },
     { key: 'inAppEnabled', label: t('settings.in_app_notifications') },
     { key: 'translationCompleted', label: t('settings.event_translation') },
-    { key: 'ttsCompleted', label: t('settings.event_tts') },
+    // Audio (TTS) paused for launch — see EXPO_PUBLIC_ENABLE_TTS.
+    ...(process.env.EXPO_PUBLIC_ENABLE_TTS === 'true'
+      ? [{ key: 'ttsCompleted' as const, label: t('settings.event_tts') }]
+      : []),
     { key: 'paymentReceipt', label: t('settings.event_payment') },
   ];
 
@@ -229,6 +279,50 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Legal — required by both stores. Plain informational links; these are
+          not purchase steering, which Apple 3.1.3 forbids. */}
+      <Text style={[s.sectionTitle, { color: theme.text }]}>{t('settings.legal')}</Text>
+      <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        {LEGAL_LINKS.map((link, i) => (
+          <TouchableOpacity
+            key={link.path}
+            style={[
+              s.linkRow,
+              { borderBottomColor: theme.border, borderBottomWidth: i === LEGAL_LINKS.length - 1 ? 0 : 1 },
+            ]}
+            onPress={() => Linking.openURL(`${WEB_URL}/${locale}${link.path}`)}
+            accessibilityRole="link"
+          >
+            <Text style={[s.linkLabel, { color: theme.text }]}>{t(link.labelKey)}</Text>
+            <Text style={[s.linkChevron, { color: theme.textSecondary }]}>›</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Account — in-app deletion is mandatory (Apple 5.1.1(v), Play Data Safety). */}
+      <Text style={[s.sectionTitle, { color: theme.text }]}>{t('settings.account')}</Text>
+      <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[s.settingLabel, { color: theme.textSecondary }]}>
+          {t('settings.delete_account_desc')}
+        </Text>
+        <TouchableOpacity
+          style={[s.dangerBtn, { borderColor: DANGER }]}
+          onPress={confirmDeleteAccount}
+          disabled={deleting}
+          accessibilityRole="button"
+        >
+          {deleting ? (
+            <ActivityIndicator color={DANGER} />
+          ) : (
+            <Text style={[s.dangerText, { color: DANGER }]}>{t('settings.delete_account')}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <Text style={[s.version, { color: theme.textSecondary }]}>
+        {t('settings.app_version')} {APP_VERSION}
+      </Text>
     </ScrollView>
   );
 }
@@ -244,6 +338,18 @@ const s = StyleSheet.create({
     paddingVertical: 10, borderBottomWidth: 1,
   },
   switchLabel: { fontSize: 14, flex: 1 },
+  linkRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 12,
+  },
+  linkLabel: { fontSize: 14 },
+  linkChevron: { fontSize: 20, lineHeight: 20 },
+  dangerBtn: {
+    marginTop: 12, paddingVertical: 12, borderRadius: 8, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', minHeight: 44,
+  },
+  dangerText: { fontSize: 14, fontWeight: '600' },
+  version: { fontSize: 12, textAlign: 'center', marginTop: 20 },
   settingLabel: { fontSize: 13, marginBottom: 8, marginTop: 4 },
   chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 },
   chip: {

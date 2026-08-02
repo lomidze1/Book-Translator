@@ -8,6 +8,7 @@ import { useTheme } from '@/theme/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
 import GoogleSignInButton from '@/components/common/GoogleSignInButton';
+import { API_URL } from '@/config';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function LoginScreen() {
   const handleResendVerification = useCallback(async () => {
     if (resendCooldown > 0 || !email) return;
     try {
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/resend-verification`, {
+      await fetch(`${API_URL}/api/auth/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

@@ -7,7 +7,7 @@ import { useTheme } from '@/theme/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
+import { API_URL } from '@/config';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();

@@ -1,9 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
+import { API_URL } from '@/config';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
 
 // Stable error codes — UI translates via i18n (auth.errors.<code>)
 export const AUTH_ERROR_CODES = {

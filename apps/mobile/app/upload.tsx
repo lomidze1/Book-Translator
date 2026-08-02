@@ -8,8 +8,8 @@ import { authService } from '@/services/auth';
 import { useTheme } from '@/theme/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
+import { API_URL } from '@/config';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 const ALLOWED_EXTENSIONS = ['pdf', 'epub', 'txt', 'docx'];
 

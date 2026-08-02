@@ -1,8 +1,12 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView,
   useWindowDimensions, Modal, TextInput, FlatList, ActivityIndicator,
 } from 'react-native';
+import {
+  resolveHighlightRanges, segmentChapterText, selectionToChapterRange,
+  type TextSegment,
+} from '@book-translator/reader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { apiRequest } from '@/services/api';
@@ -12,6 +16,8 @@ import { useTheme } from '@/theme/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
 import ColorPicker, { HIGHLIGHT_HEX, type HighlightColor } from '@/components/reader/ColorPicker';
+import SelectableChapterText from '@/components/reader/SelectableChapterText';
+import { API_URL } from '@/config';
 
 // ── Types ──
 
@@ -50,6 +56,14 @@ interface HighlightItem {
   selectedText: string;
   color: string;
   createdAt: string;
+}
+
+/** A live text selection, already in chapter-text coordinates. */
+interface SelectionState {
+  chapterNumber: number;
+  start: number;
+  end: number;
+  text: string;
 }
 
 interface ReaderSettings {
@@ -113,14 +127,50 @@ export default function MobileReaderScreen() {
   // Highlights
   const [highlights, setHighlights] = useState<HighlightItem[]>([]);
   const [showHighlights, setShowHighlights] = useState(false);
+  const [selection, setSelection] = useState<SelectionState | null>(null);
+  // The input that owns the live selection, so it can be cleared after saving.
+  const selectedInput = useRef<TextInput | null>(null);
 
   const bookId = translation?.book.id;
+
+  // Chapters sorted once; everything below indexes into them by chapter number.
+  const chapters = useMemo(
+    () => [...(translation?.translatedChapters ?? [])].sort(
+      (a, b) => a.chapter.number - b.chapter.number,
+    ),
+    [translation],
+  );
+
+  const chapterTexts = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const ch of chapters) map.set(ch.chapter.number, ch.translatedContent);
+    return map;
+  }, [chapters]);
+
+  // Stored highlights → coloured runs of chapter text, ready to render.
+  const chapterSegments = useMemo(() => {
+    const map = new Map<number, TextSegment[]>();
+    for (const ch of chapters) {
+      const ranges = resolveHighlightRanges(
+        ch.translatedContent,
+        highlights.filter((h) => h.chapterNumber === ch.chapter.number),
+      );
+      map.set(ch.chapter.number, segmentChapterText(ch.translatedContent, ranges));
+    }
+    return map;
+  }, [chapters, highlights]);
 
   // ── Load reader settings ──
   useEffect(() => {
     AsyncStorage.getItem(READER_SETTINGS_KEY).then((raw) => {
       if (raw) {
-        try { setReaderSettings(JSON.parse(raw)); } catch {}
+        // Corrupt stored JSON just falls back to defaults, but log it —
+        // silently ignoring makes "my settings keep resetting" undebuggable.
+        try {
+          setReaderSettings(JSON.parse(raw));
+        } catch (err) {
+          console.warn('[reader] discarding corrupt reader settings:', err);
+        }
       }
     });
   }, []);
@@ -178,7 +228,11 @@ export default function MobileReaderScreen() {
               return;
             }
           }
-        } catch {}
+        } catch (cacheErr) {
+          // Cache lookup failed too — the user still gets load_error, but
+          // without this the real reason never surfaces anywhere.
+          console.warn('[reader] offline cache fallback failed:', cacheErr);
+        }
         setError(t('reader.load_error'));
       } finally {
         setLoading(false);
@@ -217,7 +271,7 @@ export default function MobileReaderScreen() {
   useEffect(() => {
     if (!token || !translation || percentage === 0) return;
     const timer = setTimeout(() => {
-      fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000'}/api/reader/progress`, {
+      fetch(`${API_URL}/api/reader/progress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -236,8 +290,14 @@ export default function MobileReaderScreen() {
     if (!bookId) return;
     const existing = bookmarks.find((b) => b.chapterNumber === activeChapter);
     if (existing) {
-      await apiRequest(`/reader/bookmarks/${existing.id}`, { method: 'DELETE' }).catch(() => {});
-      setBookmarks((prev) => prev.filter((b) => b.id !== existing.id));
+      try {
+        await apiRequest(`/reader/bookmarks/${existing.id}`, { method: 'DELETE' });
+        setBookmarks((prev) => prev.filter((b) => b.id !== existing.id));
+      } catch (err: any) {
+        // Dropping it from local state on failure would make it reappear on
+        // the next load, so keep the row and tell the user.
+        showToast(err?.message || t('common.error'), 'error');
+      }
     } else {
       try {
         const created = await apiRequest<BookmarkItem>('/reader/bookmarks', {
@@ -245,7 +305,9 @@ export default function MobileReaderScreen() {
           body: JSON.stringify({ bookId, chapterNumber: activeChapter, position: 0 }),
         });
         setBookmarks((prev) => [...prev, created]);
-      } catch {}
+      } catch (err: any) {
+        showToast(err?.message || t('common.error'), 'error');
+      }
     }
   };
   const isChapterBookmarked = bookmarks.some((b) => b.chapterNumber === activeChapter);
@@ -260,32 +322,64 @@ export default function MobileReaderScreen() {
       });
       setNotes((prev) => [...prev, created]);
       setNoteText('');
-    } catch {}
+    } catch (err: any) {
+      showToast(err?.message || t('common.error'), 'error');
+    }
   };
 
   const deleteNote = async (noteId: string) => {
-    await apiRequest(`/reader/notes/${noteId}`, { method: 'DELETE' }).catch(() => {});
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    try {
+      await apiRequest(`/reader/notes/${noteId}`, { method: 'DELETE' });
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    } catch (err: any) {
+      showToast(err?.message || t('common.error'), 'error');
+    }
   };
 
   // ── Highlights ──
+  // The chapter text is one selectable input, so the offsets the platform
+  // reports are already offsets into `translatedContent` — the same coordinate
+  // space the web reader stores, which is what keeps a highlight on the same
+  // words across devices.
+  const handleSelect = useCallback((
+    chapterNumber: number,
+    start: number,
+    end: number,
+    input: TextInput | null,
+  ) => {
+    const chapterText = chapterTexts.get(chapterNumber);
+    if (!chapterText) return;
+    const range = selectionToChapterRange(chapterText, start, end);
+    selectedInput.current = range ? input : null;
+    setSelection(range ? { chapterNumber, ...range } : null);
+  }, [chapterTexts]);
+
+  const clearSelection = useCallback(() => {
+    selectedInput.current?.blur();
+    selectedInput.current = null;
+    setSelection(null);
+  }, []);
+
   const addHighlight = async (color: HighlightColor) => {
-    if (!bookId) return;
+    if (!bookId || !selection) return;
     try {
       const created = await apiRequest<HighlightItem>('/reader/highlights', {
         method: 'POST',
         body: JSON.stringify({
           bookId,
-          chapterNumber: activeChapter,
-          startPosition: 0,
-          endPosition: 0,
-          selectedText: `Chapter ${activeChapter} highlight`,
+          chapterNumber: selection.chapterNumber,
+          startPosition: selection.start,
+          endPosition: selection.end,
+          selectedText: selection.text,
           color,
         }),
       });
       setHighlights((prev) => [...prev, created]);
-      showToast(t('reader.highlights'), 'success');
-    } catch {}
+      clearSelection();
+      showToast(t('reader.highlight_saved'), 'success');
+    } catch (err: any) {
+      showToast(err?.message || t('common.error'), 'error');
+    }
   };
 
   const updateHighlightColor = async (highlightId: string, color: HighlightColor) => {
@@ -297,12 +391,18 @@ export default function MobileReaderScreen() {
       setHighlights((prev) =>
         prev.map((h) => (h.id === highlightId ? { ...h, color } : h))
       );
-    } catch {}
+    } catch (err: any) {
+      showToast(err?.message || t('common.error'), 'error');
+    }
   };
 
   const deleteHighlight = async (highlightId: string) => {
-    await apiRequest(`/reader/highlights/${highlightId}`, { method: 'DELETE' }).catch(() => {});
-    setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+    try {
+      await apiRequest(`/reader/highlights/${highlightId}`, { method: 'DELETE' });
+      setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+    } catch (err: any) {
+      showToast(err?.message || t('common.error'), 'error');
+    }
   };
 
   // ── Offline download ──
@@ -343,10 +443,6 @@ export default function MobileReaderScreen() {
       </SafeAreaView>
     );
   }
-
-  const chapters = [...translation.translatedChapters].sort(
-    (a, b) => a.chapter.number - b.chapter.number,
-  );
 
   const fontLabels: Record<string, string> = {
     default: t('reader.font_default'),
@@ -397,29 +493,50 @@ export default function MobileReaderScreen() {
         scrollEventThrottle={100}
         onScrollBeginDrag={() => { isScrolling.current = true; }}
         onScrollEndDrag={() => { isScrolling.current = false; }}
-        onTouchEnd={() => { if (!isScrolling.current) setShowControls((prev) => !prev); }}
+        onTouchEnd={() => {
+          // A long press that selected text shouldn't also toggle the chrome.
+          if (!isScrolling.current && !selection) setShowControls((prev) => !prev);
+        }}
       >
         {chapters.map((ch) => (
           <View key={ch.id} style={s.chapter}>
             <Text style={[s.chapterTitle, { color: readerTheme.text, borderBottomColor: theme.border }]}>
               {ch.chapter.title || t('reader.chapter', { number: ch.chapter.number })}
             </Text>
-            <Text
-              style={[
-                s.chapterText,
-                {
-                  fontSize: readerSettings.fontSize,
-                  lineHeight: readerSettings.fontSize * readerSettings.lineHeight,
-                  color: readerTheme.text,
-                  ...(fontFamily ? { fontFamily } : {}),
-                },
-              ]}
-            >
-              {ch.translatedContent}
-            </Text>
+            <SelectableChapterText
+              chapterNumber={ch.chapter.number}
+              segments={chapterSegments.get(ch.chapter.number) || []}
+              onSelect={handleSelect}
+              style={{
+                fontSize: readerSettings.fontSize,
+                lineHeight: readerSettings.fontSize * readerSettings.lineHeight,
+                color: readerTheme.text,
+                ...(fontFamily ? { fontFamily } : {}),
+              }}
+            />
           </View>
         ))}
       </ScrollView>
+
+      {/* ── Selection toolbar ── */}
+      {selection && (
+        <View
+          style={[
+            s.selectionBar,
+            { backgroundColor: theme.surface, borderColor: theme.border, bottom: showControls ? 60 : 16 },
+          ]}
+        >
+          <Text style={[s.selectionText, { color: theme.textSecondary }]} numberOfLines={1}>
+            {selection.text}
+          </Text>
+          <View style={s.selectionActions}>
+            <ColorPicker onSelect={addHighlight} />
+            <TouchableOpacity onPress={clearSelection}>
+              <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* ── Bottom progress ── */}
       {showControls && (
@@ -534,11 +651,9 @@ export default function MobileReaderScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Quick add */}
             <Text style={[s.settingLabel, { color: theme.textSecondary }]}>
-              {t('reader.chapter', { number: activeChapter })}
+              {t('reader.highlight_hint')}
             </Text>
-            <ColorPicker onSelect={addHighlight} />
 
             {highlights.length === 0 ? (
               <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('reader.highlights_empty')}</Text>
@@ -686,7 +801,12 @@ const s = StyleSheet.create({
     fontSize: 22, fontWeight: '700', marginBottom: 16, paddingBottom: 8,
     borderBottomWidth: 1,
   },
-  chapterText: {},
+  selectionBar: {
+    position: 'absolute', left: 12, right: 12,
+    borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  selectionText: { fontSize: 13, marginBottom: 4 },
+  selectionActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   bottomBar: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8,
     borderTopWidth: 1,

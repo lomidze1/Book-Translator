@@ -23,13 +23,17 @@ export default function LibraryScreen() {
   const [books, setBooks] = useState<BookWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   const fetchLibrary = useCallback(async () => {
     try {
       const data = await apiRequest<BookWithProgress[]>('/translations/my');
       setBooks(data);
+      setError(false);
     } catch {
-      setBooks([]);
+      // Swallowing this into an empty list made a failed request look like an
+      // empty library — the user would think their books were gone.
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -86,6 +90,20 @@ export default function LibraryScreen() {
     return (
       <View style={[s.center, { backgroundColor: theme.background }]}>
         <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('library.loading')}</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[s.center, { backgroundColor: theme.background }]}>
+        <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('common.network_error')}</Text>
+        <TouchableOpacity
+          style={[s.searchBtn, { backgroundColor: theme.primary }]}
+          onPress={() => { setLoading(true); fetchLibrary(); }}
+        >
+          <Text style={s.searchBtnText}>{t('common.retry')}</Text>
+        </TouchableOpacity>
       </View>
     );
   }

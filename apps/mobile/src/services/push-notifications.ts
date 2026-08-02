@@ -20,10 +20,20 @@ export async function registerForPushNotifications(): Promise<string | null> {
     return null;
   }
 
-  // Check if projectId is available (requires EAS / development build)
+  // Check if projectId is available (requires EAS / development build).
+  // app.json ships a REPLACE_WITH_* placeholder until the real EAS project is
+  // wired up. A placeholder is a truthy string, so without this guard we would
+  // call getExpoPushTokenAsync with an invalid id, throw, and lose the error in
+  // the catch below — push would be dead in a store build with nothing logged.
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  if (!projectId) {
-    // Running in Expo Go or EAS not configured — skip silently
+  if (!projectId || String(projectId).startsWith('REPLACE_WITH_')) {
+    if (!__DEV__) {
+      console.error(
+        '[push] EAS projectId is not configured (app.json extra.eas.projectId). ' +
+          'Push notifications are disabled in this build.',
+      );
+    }
+    // Running in Expo Go or EAS not configured — nothing to register.
     return null;
   }
 
@@ -67,8 +77,11 @@ export async function registerForPushNotifications(): Promise<string | null> {
     }
 
     return pushToken;
-  } catch {
-    // Push notifications not available in this environment
+  } catch (err) {
+    // Push notifications not available in this environment. Log it — a silent
+    // null here previously made a misconfigured build indistinguishable from
+    // a user who simply denied the permission prompt.
+    console.warn('[push] registration failed:', err);
     return null;
   }
 }

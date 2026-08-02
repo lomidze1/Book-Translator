@@ -1,4 +1,16 @@
 {
+  "_comment_audio_paused": [
+    "AUDIO / TTS IS PAUSED FOR RELEASE 1. The players and cache are intentionally",
+    "KEPT (src/components/audio, src/components/reader/AudioPlayer.tsx,",
+    "src/hooks/useAudioPlayer.ts, src/services/audio-cache.ts) — nothing imports",
+    "them yet. When audio ships in release 2-3, set EXPO_PUBLIC_ENABLE_TTS=true,",
+    "wire the players into app/reader/[id].tsx, and RESTORE these declarations:",
+    "  ios.infoPlist.UIBackgroundModes: [\"audio\"]",
+    "  android.permissions: FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+    "  (Play additionally requires the Foreground Service declaration form.)",
+    "They are removed for now because Apple rejects background modes an app does",
+    "not actually use, and Play requires a justification form for those permissions."
+  ],
   "expo": {
     "name": "Book Translator",
     "slug": "book-translator",
@@ -8,6 +20,8 @@
     "scheme": "booktranslator",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "platforms": ["ios", "android"],
+    "runtimeVersion": { "policy": "appVersion" },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -16,9 +30,30 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ge.booktranslator.app",
+      "buildNumber": "1",
+      "_comment_icon": "icon.png has transparent pixels, which App Store Connect rejects. icon-ios.png is the same artwork flattened onto the brand background; regenerate it if icon.png changes.",
+      "icon": "./assets/icon-ios.png",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "associatedDomains": ["applinks:booktranslator.ge"],
       "infoPlist": {
-        "UIBackgroundModes": [
-          "audio"
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["booktranslator"]
+          }
+        ]
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+          }
         ]
       }
     },
@@ -28,9 +63,15 @@
         "backgroundColor": "#2563eb"
       },
       "package": "ge.booktranslator.app",
-      "permissions": [
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      "versionCode": 1,
+      "permissions": ["android.permission.POST_NOTIFICATIONS"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "https", "host": "booktranslator.ge", "pathPrefix": "/" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "plugins": [
@@ -44,6 +85,11 @@
           "color": "#2563eb"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
   }
 }

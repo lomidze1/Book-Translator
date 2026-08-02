@@ -9,7 +9,7 @@ import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
 import GoogleSignInButton from '@/components/common/GoogleSignInButton';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
+import { API_URL } from '@/config';
 
 export default function RegisterScreen() {
   const router = useRouter();

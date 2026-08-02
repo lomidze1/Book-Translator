@@ -22,6 +22,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
@@ -31,8 +32,12 @@ export default function SearchScreen() {
         `/books/search?q=${encodeURIComponent(query)}`
       );
       setResults(data.external || []);
+      setError(false);
     } catch {
+      // An empty result list and a failed request are very different things —
+      // don't render "nothing found" when the network is down.
       setResults([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -84,8 +89,13 @@ export default function SearchScreen() {
           !loading ? (
             <View style={s.center}>
               <Text style={[s.emptyText, { color: theme.textSecondary }]}>
-                {query ? t('search.no_results') : t('search.hint')}
+                {error ? t('common.network_error') : query ? t('search.no_results') : t('search.hint')}
               </Text>
+              {error && (
+                <TouchableOpacity onPress={handleSearch}>
+                  <Text style={[s.emptyText, { color: theme.primary }]}>{t('common.retry')}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={s.center}>

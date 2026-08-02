@@ -35,16 +35,24 @@ export default function PaymentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState(false);
 
   const fetchPayments = useCallback(async (pageNum: number, reset = false) => {
+    // Without this, `loading` stayed false after the first page and loadMore's
+    // guard never fired — fast scrolling fetched the same page twice.
+    setLoading(true);
     try {
       const data = await apiRequest<PaymentsResponse>(
         `/payments/history?page=${pageNum}&limit=10`
       );
       setPayments((prev) => reset ? data.payments : [...prev, ...data.payments]);
       setHasMore(data.payments.length === 10);
+      setError(false);
     } catch {
-      if (reset) setPayments([]);
+      // Only a first-page failure is a page-level error; a failed "load more"
+      // should keep the rows already on screen.
+      if (reset) setError(true);
+      setHasMore(false);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -124,7 +132,17 @@ export default function PaymentsScreen() {
           </View>
         )}
         ListEmptyComponent={
-          !loading ? (
+          loading ? null : error ? (
+            <View style={s.emptyContainer}>
+              <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('common.network_error')}</Text>
+              <TouchableOpacity
+                style={[s.searchBtn, { backgroundColor: theme.primary }]}
+                onPress={() => { setPage(1); setHasMore(true); fetchPayments(1, true); }}
+              >
+                <Text style={s.searchBtnText}>{t('common.retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <View style={s.emptyContainer}>
               <Text style={s.emptyIcon}>💳</Text>
               <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('payment_history.empty')}</Text>
@@ -135,7 +153,7 @@ export default function PaymentsScreen() {
                 <Text style={s.searchBtnText}>{t('payment_history.start_translating')}</Text>
               </TouchableOpacity>
             </View>
-          ) : null
+          )
         }
       />
     </View>

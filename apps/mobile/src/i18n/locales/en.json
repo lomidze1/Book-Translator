@@ -138,7 +138,8 @@
     "status_failed": "Failed",
     "read": "Read",
     "translation_in_progress": "Translation in progress ({{progress}}%)",
-    "order_translation": "Order Translation"
+    "order_translation": "Order Translation",
+    "no_translation_yet": "No translation ordered yet"
   },
   "reader": {
     "login_required": "Please sign in",
@@ -152,6 +153,8 @@
     "note_placeholder": "Add a note...",
     "highlights": "Highlights",
     "highlights_empty": "No highlights",
+    "highlight_saved": "Highlight saved",
+    "highlight_hint": "Press and hold the book text to highlight it",
     "highlight_color_yellow": "Yellow",
     "highlight_color_green": "Green",
     "highlight_color_blue": "Blue",
@@ -272,7 +275,22 @@
     "theme_dark": "Dark",
     "language": "Language",
     "language_desc": "Change app language",
-    "saved": "Saved"
+    "saved": "Saved",
+    "account": "Account",
+    "legal": "Legal",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "copyright": "Copyright & DMCA",
+    "refund": "Refund Policy",
+    "delete_account": "Delete account",
+    "delete_account_desc": "Permanently deletes your account and all your data.",
+    "delete_confirm_title": "Delete account?",
+    "delete_confirm_body": "This permanently deletes your account, uploaded books and translations. This cannot be undone.",
+    "delete_confirm_cta": "Delete",
+    "delete_password_prompt": "Enter your password to confirm",
+    "delete_failed": "Could not delete the account",
+    "cancel": "Cancel",
+    "app_version": "Version"
   },
   "upload": {
     "title": "Upload Book",

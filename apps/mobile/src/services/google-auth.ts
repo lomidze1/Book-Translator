@@ -1,10 +1,9 @@
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { authService } from './auth';
+import { API_URL } from '@/config';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
 
 const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;

@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
 import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import { LocaleProvider } from '@/context/LocaleContext';
 import { ToastProvider } from '@/context/ToastContext';
@@ -19,6 +21,40 @@ function RootStack() {
       if (token) registerForPushNotifications();
     });
   }, []);
+
+  // Deep links. Email links (password reset, email verification) and the
+  // payment return all point at the website; with App Links / Universal Links
+  // configured in app.json those same https URLs open here instead. Without
+  // this handler the reset screen made users type the token by hand.
+  useEffect(() => {
+    const routeFromUrl = (url: string | null) => {
+      if (!url) return;
+      const { path, queryParams } = Linking.parse(url);
+      if (!path) return;
+      const token = typeof queryParams?.token === 'string' ? queryParams.token : undefined;
+      const segment = path.replace(/^\/+/, '').split('/').pop();
+
+      switch (segment) {
+        case 'reset-password':
+          if (token) router.push(`/(auth)/reset-password?token=${encodeURIComponent(token)}`);
+          break;
+        case 'verify-email':
+          if (token) router.push(`/(auth)/verify-email?token=${encodeURIComponent(token)}`);
+          break;
+        case 'confirm-password-change':
+          if (token) router.push(`/(auth)/confirm-password-change?token=${encodeURIComponent(token)}`);
+          break;
+        default:
+          break;
+      }
+    };
+
+    // Cold start.
+    Linking.getInitialURL().then(routeFromUrl).catch(() => {});
+    // Warm start.
+    const sub = Linking.addEventListener('url', (event) => routeFromUrl(event.url));
+    return () => sub.remove();
+  }, [router]);
 
   // Handle notification tap
   useEffect(() => {
@@ -59,12 +95,16 @@ function RootStack() {
 
 export default function RootLayout() {
   return (
-    <LocaleProvider>
-      <ThemeProvider>
-        <ToastProvider>
-          <RootStack />
-        </ToastProvider>
-      </ThemeProvider>
-    </LocaleProvider>
+    // SafeAreaProvider is required: Toast calls useSafeAreaInsets(), which
+    // throws (or silently returns zeros) without a provider above it.
+    <SafeAreaProvider>
+      <LocaleProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <RootStack />
+          </ToastProvider>
+        </ThemeProvider>
+      </LocaleProvider>
+    </SafeAreaProvider>
   );
 }

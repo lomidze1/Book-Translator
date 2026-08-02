@@ -29,7 +29,6 @@ export default function ProfileScreen() {
       .catch(() => { if (!cancelled) router.replace('/(auth)/login'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogout = () => {
@@ -73,9 +72,10 @@ export default function ProfileScreen() {
         <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/translations')}>
           <Text style={[s.menuText, { color: theme.text }]}>{t('profile.my_translations')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/favorites')}>
-          <Text style={[s.menuText, { color: theme.text }]}>{t('profile.my_favorites')}</Text>
-        </TouchableOpacity>
+        {/* Favorites is hidden, not deleted. app/favorites.tsx calls GET /favorites,
+            which does not exist in the API — the screen 404s into a permanent
+            "empty" state and nothing can add a favorite. Restore this entry once
+            the backend ships the endpoint. */}
         <TouchableOpacity style={[s.menuItem, { borderBottomColor: theme.border }]} onPress={() => router.push('/payments')}>
           <Text style={[s.menuText, { color: theme.text }]}>{t('profile.my_payments')}</Text>
         </TouchableOpacity>

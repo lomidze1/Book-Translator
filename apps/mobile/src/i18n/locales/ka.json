@@ -138,7 +138,8 @@
     "status_failed": "წარუმატებელი",
     "read": "წაკითხვა",
     "translation_in_progress": "თარგმნა მიმდინარეობს ({{progress}}%)",
-    "order_translation": "თარგმნის შეკვეთა"
+    "order_translation": "თარგმნის შეკვეთა",
+    "no_translation_yet": "თარგმანი ჯერ არ არის შეკვეთილი"
   },
   "reader": {
     "login_required": "გთხოვთ შეხვიდეთ",
@@ -152,6 +153,8 @@
     "note_placeholder": "შენიშვნის დამატება...",
     "highlights": "მონიშვნები",
     "highlights_empty": "მონიშვნები არ არის",
+    "highlight_saved": "მონიშვნა შენახულია",
+    "highlight_hint": "ტექსტის მოსანიშნად ხანგრძლივად შეეხეთ წიგნის ტექსტს",
     "highlight_color_yellow": "ყვითელი",
     "highlight_color_green": "მწვანე",
     "highlight_color_blue": "ლურჯი",
@@ -272,7 +275,22 @@
     "theme_dark": "მუქი",
     "language": "ენა",
     "language_desc": "აპლიკაციის ენის შეცვლა",
-    "saved": "შენახულია"
+    "saved": "შენახულია",
+    "account": "ანგარიში",
+    "legal": "იურიდიული",
+    "terms": "წესები და პირობები",
+    "privacy": "კონფიდენციალურობა",
+    "copyright": "საავტორო უფლებები",
+    "refund": "თანხის დაბრუნება",
+    "delete_account": "ანგარიშის წაშლა",
+    "delete_account_desc": "სამუდამოდ წაშლის შენს ანგარიშს და ყველა მონაცემს.",
+    "delete_confirm_title": "წავშალოთ ანგარიში?",
+    "delete_confirm_body": "ეს სამუდამოდ წაშლის შენს ანგარიშს, ატვირთულ წიგნებსა და თარგმანებს. მოქმედება შეუქცევადია.",
+    "delete_confirm_cta": "წაშლა",
+    "delete_password_prompt": "დასადასტურებლად შეიყვანე პაროლი",
+    "delete_failed": "ანგარიშის წაშლა ვერ მოხერხდა",
+    "cancel": "გაუქმება",
+    "app_version": "ვერსია"
   },
   "upload": {
     "title": "წიგნის ატვირთვა",

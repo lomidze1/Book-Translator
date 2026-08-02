@@ -1,0 +1,55 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:4000",
+        "EXPO_PUBLIC_WEB_URL": "http://localhost:3000",
+        "EXPO_PUBLIC_ENABLE_PURCHASES": "false",
+        "EXPO_PUBLIC_ENABLE_TTS": "false"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "autoIncrement": true,
+      "ios": { "simulator": false },
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.booktranslator.ge",
+        "EXPO_PUBLIC_WEB_URL": "https://booktranslator.ge",
+        "EXPO_PUBLIC_ENABLE_PURCHASES": "false",
+        "EXPO_PUBLIC_ENABLE_TTS": "false"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.booktranslator.ge",
+        "EXPO_PUBLIC_WEB_URL": "https://booktranslator.ge",
+        "_comment_purchases": "Keep false while checkout is external Flitt — Apple 3.1.1 / Play Billing. Flip only once StoreKit + Play Billing ship.",
+        "EXPO_PUBLIC_ENABLE_PURCHASES": "false",
+        "_comment_tts": "Audio paused for release 1. Restoring it also needs the app.json native declarations — see _comment_audio_paused there.",
+        "EXPO_PUBLIC_ENABLE_TTS": "false"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "REPLACE_WITH_APPLE_ID_EMAIL",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal"
+      }
+    }
+  }
+}

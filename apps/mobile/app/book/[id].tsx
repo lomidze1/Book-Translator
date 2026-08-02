@@ -7,6 +7,7 @@ import { apiRequest } from '@/services/api';
 import { useTheme } from '@/theme/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import PaymentModal from '@/components/common/PaymentModal';
+import { PURCHASES_ENABLED } from '@/config';
 
 interface BookData {
   id: string;
@@ -184,29 +185,41 @@ export default function BookDetailsScreen() {
             </View>
           )}
           {translations.length === 0 && (
-            <TouchableOpacity
-              style={[s.btn, s.btnPrimary, { backgroundColor: theme.primary }]}
-              onPress={() => setShowPayment(true)}
-            >
-              <Text style={s.btnText}>{t('book.order_translation')}</Text>
-            </TouchableOpacity>
+            PURCHASES_ENABLED ? (
+              <TouchableOpacity
+                style={[s.btn, s.btnPrimary, { backgroundColor: theme.primary }]}
+                onPress={() => setShowPayment(true)}
+              >
+                <Text style={s.btnText}>{t('book.order_translation')}</Text>
+              </TouchableOpacity>
+            ) : (
+              // Neutral status only. Apple 3.1.3 forbids steering users to an
+              // external purchase, so there is deliberately no CTA and no link.
+              <View style={[s.btn, s.btnDisabled, { backgroundColor: theme.surface }]}>
+                <Text style={[s.btnDisabledText, { color: theme.textSecondary }]}>
+                  {t('book.no_translation_yet')}
+                </Text>
+              </View>
+            )
           )}
         </View>
       </ScrollView>
 
-      <PaymentModal
-        visible={showPayment}
-        onClose={() => setShowPayment(false)}
-        onSuccess={() => {
-          setShowPayment(false);
-          // Refresh translations
-          apiRequest<TranslationInfo[]>(`/translations/book/${id}`)
-            .then(setTranslations)
-            .catch(() => {});
-        }}
-        bookId={book.id}
-        type="TRANSLATION"
-      />
+      {PURCHASES_ENABLED && (
+        <PaymentModal
+          visible={showPayment}
+          onClose={() => setShowPayment(false)}
+          onSuccess={() => {
+            setShowPayment(false);
+            // Refresh translations
+            apiRequest<TranslationInfo[]>(`/translations/book/${id}`)
+              .then(setTranslations)
+              .catch(() => {});
+          }}
+          bookId={book.id}
+          type="TRANSLATION"
+        />
+      )}
     </SafeAreaView>
   );
 }

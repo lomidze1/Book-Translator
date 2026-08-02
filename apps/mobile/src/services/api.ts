@@ -1,6 +1,5 @@
 import { authService } from './auth';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
+import { API_URL } from '@/config';
 
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_RETRIES = 3;

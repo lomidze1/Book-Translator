@@ -10,7 +10,7 @@ export default function TranslationsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const { t } = useTranslation();
-  const { translations, loading, retry } = useDashboardData();
+  const { translations, loading, error, retry } = useDashboardData();
 
   const statusColor = (status: string) => {
     switch (status) {
@@ -75,7 +75,16 @@ export default function TranslationsScreen() {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          !loading ? (
+          loading ? null : error ? (
+            // The hook already surfaced an error; ignoring it rendered "no
+            // translations yet" over what is really a failed request.
+            <View style={s.emptyContainer}>
+              <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('common.network_error')}</Text>
+              <TouchableOpacity style={[s.searchBtn, { backgroundColor: theme.primary }]} onPress={retry}>
+                <Text style={s.searchBtnText}>{t('common.retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <View style={s.emptyContainer}>
               <Text style={s.emptyIcon}>📚</Text>
               <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('translation_history.empty')}</Text>
@@ -86,7 +95,7 @@ export default function TranslationsScreen() {
                 <Text style={s.searchBtnText}>{t('translation_history.start_translating')}</Text>
               </TouchableOpacity>
             </View>
-          ) : null
+          )
         }
       />
     </View>
