@@ -3,13 +3,15 @@ import { TranslationService } from './translation.service';
 import { TranslationController } from './translation.controller';
 import { TranslationProcessor } from './translation.processor';
 import { ClaudeService } from './claude.service';
+import { QualityCheckService } from './quality-check.service';
+import { GeminiJudgeService } from './gemini-judge.service';
 import { ParsingModule } from '../parsing/parsing.module';
 import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [ParsingModule, forwardRef(() => NotificationModule)],
   controllers: [TranslationController],
-  providers: [TranslationService, TranslationProcessor, ClaudeService],
-  exports: [TranslationService, ClaudeService],
+  providers: [TranslationService, TranslationProcessor, ClaudeService, QualityCheckService, GeminiJudgeService],
+  exports: [TranslationService, ClaudeService, QualityCheckService, GeminiJudgeService],
 })
 export class TranslationModule {}

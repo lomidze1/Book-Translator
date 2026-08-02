@@ -154,6 +154,8 @@ model Translation {
   aiModel         String?
   totalTokensUsed Int?
   glossary        Json?
+  qualityScore    Float?
+  qualityReport   Json?
 
   translatedChapters TranslatedChapter[]
   audioBooks         AudioBook[]
@@ -193,6 +195,7 @@ model TranslatedChapter {
   translatedContent String
   editedContent     String?
   isEdited          Boolean     @default(false)
+  qualityReport     Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

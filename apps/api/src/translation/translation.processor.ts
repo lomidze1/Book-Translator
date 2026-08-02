@@ -1,16 +1,29 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Worker, Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ClaudeService } from './claude.service';
 import { TranslationService } from './translation.service';
 import { NotificationService } from '../notification/notification.service';
+import { QualityCheckService, ChapterQualityReport } from './quality-check.service';
+import { GeminiJudgeService, JudgeScores } from './gemini-judge.service';
 import { TRANSLATION_QUEUE, getRedisConnection } from './translation.constants';
 
 interface TranslationJobData {
   translationId: string;
   bookId: string;
 }
+
+interface QualitySample {
+  number: number;
+  source: string;
+  translated: string;
+}
+
+// The judge scores an aligned slice from the top of each sampled chapter —
+// enough to evaluate, small enough to keep judging cost negligible.
+const JUDGE_SAMPLE_CHARS = 2500;
 
 @Injectable()
 export class TranslationProcessor implements OnModuleInit {
@@ -23,6 +36,8 @@ export class TranslationProcessor implements OnModuleInit {
     private readonly claude: ClaudeService,
     private readonly translationService: TranslationService,
     private readonly notificationService: NotificationService,
+    private readonly qualityCheck: QualityCheckService,
+    private readonly geminiJudge: GeminiJudgeService,
   ) {}
 
   onModuleInit() {
@@ -115,6 +130,8 @@ export class TranslationProcessor implements OnModuleInit {
     let previousSummary: string | undefined;
     let completedChunks = 0;
     const totalChapters = chapterContents.length;
+    const qualityReports: ChapterQualityReport[] = [];
+    const qualitySamples: QualitySample[] = [];
 
     for (let i = 0; i < totalChapters; i++) {
       const { chapter } = chapterContents[i];
@@ -159,11 +176,27 @@ export class TranslationProcessor implements OnModuleInit {
         totalTokens += result.tokensUsed;
         this.logger.log(`✅ Chapter ${chapter.number} translated (${result.tokensUsed} tokens, ${result.translatedText.length} chars)`);
 
-        // Save translated chapter
+        // Mechanical quality checks — deterministic, no API calls
+        const qualityReport = this.qualityCheck.checkChapter(
+          chapter.originalContent,
+          result.translatedText,
+        );
+        qualityReports.push(qualityReport);
+        qualitySamples.push({
+          number: chapter.number,
+          source: chapter.originalContent,
+          translated: result.translatedText,
+        });
+        if (qualityReport.flags.length > 0) {
+          this.logger.warn(`⚠️ Chapter ${chapter.number} quality flags: ${qualityReport.flags.join(', ')}`);
+        }
+
+        // Save translated chapter with its quality report
         await this.translationService.saveTranslatedChapter(
           translationId,
           chapter.id,
           result.translatedText,
+          qualityReport,
         );
 
         // Save to S3
@@ -193,10 +226,80 @@ export class TranslationProcessor implements OnModuleInit {
       }
     }
 
+    // Persist the quality picture (mechanical summary + optional LLM judge).
+    // Best-effort: quality must never fail a finished translation.
+    await this.finalizeQuality(translationId, qualityReports, qualitySamples);
+
     // Mark as completed
     await this.translationService.updateProgress(translationId, 100, 'COMPLETED');
 
     // Send notification
+    await this.notifyCompletion(translationId, bookId);
+  }
+
+  /**
+   * Aggregate per-chapter mechanical reports and, when a GEMINI_API_KEY is
+   * configured, score up to 3 sampled chapters (first, middle, last) with the
+   * Gemini judge. Never throws — quality reporting must not fail a translation.
+   */
+  private async finalizeQuality(
+    translationId: string,
+    reports: ChapterQualityReport[],
+    samples: QualitySample[],
+  ) {
+    try {
+      const mechanical = this.qualityCheck.summarize(reports);
+
+      let judge: Record<string, unknown> | null = null;
+      let qualityScore: number | undefined;
+
+      if (this.geminiJudge.isEnabled() && samples.length > 0) {
+        const pickIndices = [
+          ...new Set([0, Math.floor(samples.length / 2), samples.length - 1]),
+        ];
+        const judged: Array<{ chapterNumber: number } & JudgeScores> = [];
+        for (const index of pickIndices) {
+          const sample = samples[index];
+          const scores = await this.geminiJudge.judgeSample(
+            sample.source.slice(0, JUDGE_SAMPLE_CHARS),
+            sample.translated.slice(0, JUDGE_SAMPLE_CHARS),
+          );
+          if (scores) judged.push({ chapterNumber: sample.number, ...scores });
+        }
+
+        if (judged.length > 0) {
+          const average = (key: 'accuracy' | 'fluency' | 'consistency' | 'overall') =>
+            Math.round((judged.reduce((sum, item) => sum + item[key], 0) / judged.length) * 100) / 100;
+          judge = {
+            samples: judged,
+            averages: {
+              accuracy: average('accuracy'),
+              fluency: average('fluency'),
+              consistency: average('consistency'),
+              overall: average('overall'),
+            },
+          };
+          qualityScore = average('overall');
+        }
+      }
+
+      await this.prisma.translation.update({
+        where: { id: translationId },
+        data: {
+          qualityReport: { mechanical, judge } as unknown as Prisma.InputJsonValue,
+          ...(qualityScore !== undefined ? { qualityScore } : {}),
+        },
+      });
+      this.logger.log(
+        `Quality: ${mechanical.chaptersFlagged}/${mechanical.chaptersChecked} chapters flagged` +
+          (qualityScore !== undefined ? `, judge score ${qualityScore}/5` : ''),
+      );
+    } catch (err) {
+      this.logger.warn(`Quality finalization failed (non-fatal): ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  private async notifyCompletion(translationId: string, bookId: string) {
     try {
       const completedTranslation = await this.prisma.translation.findUnique({
         where: { id: translationId },

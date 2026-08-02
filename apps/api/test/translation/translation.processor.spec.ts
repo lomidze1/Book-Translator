@@ -44,6 +44,27 @@ describe('TranslationProcessor', () => {
     saveTranslatedChapter: vi.fn().mockResolvedValue(undefined),
   };
 
+  const cleanReport = {
+    flags: [],
+    latinRatio: 0,
+    latinSamples: [],
+    missingNumbers: [],
+    extraNumbers: [],
+    sourceParagraphs: 1,
+    translatedParagraphs: 1,
+    repeatedParagraphs: 0,
+  };
+
+  const mockQualityCheck = {
+    checkChapter: vi.fn().mockReturnValue(cleanReport),
+    summarize: vi.fn().mockReturnValue({ chaptersChecked: 1, chaptersFlagged: 0, flagCounts: {} }),
+  };
+
+  const mockGeminiJudge = {
+    isEnabled: vi.fn().mockReturnValue(false),
+    judgeSample: vi.fn().mockResolvedValue(null),
+  };
+
   const createMockJob = (data: { translationId: string; bookId: string }) => ({
     data,
     id: 'job-1',
@@ -60,12 +81,18 @@ describe('TranslationProcessor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockQualityCheck.checkChapter.mockReturnValue(cleanReport);
+    mockQualityCheck.summarize.mockReturnValue({ chaptersChecked: 1, chaptersFlagged: 0, flagCounts: {} });
+    mockGeminiJudge.isEnabled.mockReturnValue(false);
+    mockGeminiJudge.judgeSample.mockResolvedValue(null);
     processor = new (TranslationProcessor as any)(
       mockPrisma,
       mockS3,
       mockClaude,
       mockTranslationService,
       { notify: vi.fn().mockResolvedValue(undefined) },
+      mockQualityCheck,
+      mockGeminiJudge,
     );
   });
 
@@ -95,8 +122,8 @@ describe('TranslationProcessor', () => {
 
       // Should save both translated chapters
       expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledTimes(2);
-      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith('tr-1', 'ch-1', 'ნათარგმნი ტექსტი');
-      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith('tr-1', 'ch-2', 'ნათარგმნი ტექსტი');
+      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith('tr-1', 'ch-1', 'ნათარგმნი ტექსტი', cleanReport);
+      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith('tr-1', 'ch-2', 'ნათარგმნი ტექსტი', cleanReport);
 
       // Should upload to S3
       expect(mockS3.upload).toHaveBeenCalledTimes(2);
@@ -433,6 +460,148 @@ describe('TranslationProcessor', () => {
           errorMessage: 'Translation failed',
         },
       });
+    });
+  });
+
+  describe('quality pipeline', () => {
+    const callProcess = (job: any) => (processor as any).processTranslation(job);
+
+    const setupTwoChapters = () => {
+      mockPrisma.chapter.findMany.mockResolvedValue([
+        { id: 'ch-1', number: 1, originalContent: 'Source one text here.' },
+        { id: 'ch-2', number: 2, originalContent: 'Source two text here.' },
+      ]);
+      mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
+      mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
+      mockPrisma.translation.update.mockResolvedValue({});
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'ნათარგმნი ტექსტი', tokensUsed: 10 }),
+      );
+      mockClaude.generateChapterSummary.mockResolvedValue('summary');
+      mockClaude.estimateChunkCount.mockReturnValue(1);
+    };
+
+    it('should run mechanical checks on every chapter with source and translation', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupTwoChapters();
+
+      await callProcess(job);
+
+      expect(mockQualityCheck.checkChapter).toHaveBeenCalledTimes(2);
+      expect(mockQualityCheck.checkChapter).toHaveBeenCalledWith('Source one text here.', 'ნათარგმნი ტექსტი');
+      expect(mockQualityCheck.checkChapter).toHaveBeenCalledWith('Source two text here.', 'ნათარგმნი ტექსტი');
+    });
+
+    it('should store the mechanical summary in the translation qualityReport', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupTwoChapters();
+      const summary = { chaptersChecked: 2, chaptersFlagged: 1, flagCounts: { LATIN_LEAKAGE: 1 } };
+      mockQualityCheck.summarize.mockReturnValue(summary);
+
+      await callProcess(job);
+
+      expect(mockPrisma.translation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'tr-1' },
+          data: expect.objectContaining({
+            qualityReport: expect.objectContaining({ mechanical: summary }),
+          }),
+        }),
+      );
+      // Judge disabled → no qualityScore written
+      const qualityCall = mockPrisma.translation.update.mock.calls.find(
+        (call) => call[0].data.qualityReport,
+      );
+      expect(qualityCall[0].data.qualityScore).toBeUndefined();
+    });
+
+    it('should judge samples and store the average as qualityScore when enabled', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupTwoChapters();
+      mockGeminiJudge.isEnabled.mockReturnValue(true);
+      mockGeminiJudge.judgeSample
+        .mockResolvedValueOnce({ accuracy: 4, fluency: 5, consistency: 4, overall: 4, issues: [] })
+        .mockResolvedValueOnce({ accuracy: 5, fluency: 5, consistency: 5, overall: 5, issues: [] });
+
+      await callProcess(job);
+
+      expect(mockGeminiJudge.judgeSample).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.translation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'tr-1' },
+          data: expect.objectContaining({
+            qualityScore: 4.5,
+            qualityReport: expect.objectContaining({
+              judge: expect.objectContaining({
+                averages: expect.objectContaining({ overall: 4.5 }),
+              }),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('should complete the translation even if judging fails entirely', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupTwoChapters();
+      mockGeminiJudge.isEnabled.mockReturnValue(true);
+      mockGeminiJudge.judgeSample.mockResolvedValue(null); // every sample fails
+
+      await callProcess(job);
+
+      expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
+      const qualityCall = mockPrisma.translation.update.mock.calls.find(
+        (call) => call[0].data.qualityReport,
+      );
+      expect(qualityCall[0].data.qualityScore).toBeUndefined();
+    });
+
+    it('should sample at most 3 chapters (first, middle, last) for judging', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      mockPrisma.chapter.findMany.mockResolvedValue(
+        Array.from({ length: 7 }, (_, i) => ({
+          id: `ch-${i + 1}`,
+          number: i + 1,
+          originalContent: `Source chapter ${i + 1}.`,
+        })),
+      );
+      mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
+      mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
+      mockPrisma.translation.update.mockResolvedValue({});
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'ტექსტი', tokensUsed: 10 }),
+      );
+      mockClaude.generateChapterSummary.mockResolvedValue('summary');
+      mockGeminiJudge.isEnabled.mockReturnValue(true);
+      mockGeminiJudge.judgeSample.mockResolvedValue({
+        accuracy: 4, fluency: 4, consistency: 4, overall: 4, issues: [],
+      });
+
+      await callProcess(job);
+
+      expect(mockGeminiJudge.judgeSample).toHaveBeenCalledTimes(3);
+      // First chapter's source is among the judged samples
+      expect(mockGeminiJudge.judgeSample).toHaveBeenCalledWith(
+        expect.stringContaining('Source chapter 1.'),
+        expect.any(String),
+      );
+      // Last chapter too
+      expect(mockGeminiJudge.judgeSample).toHaveBeenCalledWith(
+        expect.stringContaining('Source chapter 7.'),
+        expect.any(String),
+      );
+    });
+
+    it('should not fail the translation if the quality step itself throws', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupTwoChapters();
+      mockQualityCheck.summarize.mockImplementation(() => {
+        throw new Error('summarize exploded');
+      });
+
+      await callProcess(job);
+
+      expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
     });
   });
 

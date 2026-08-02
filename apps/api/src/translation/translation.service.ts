@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Queue } from 'bullmq';
+import { ChapterQualityReport } from './quality-check.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ParsingService } from '../parsing/parsing.service';
@@ -254,13 +256,17 @@ export class TranslationService {
     translationId: string,
     chapterId: string,
     translatedContent: string,
+    qualityReport?: ChapterQualityReport,
   ) {
+    const reportData = qualityReport
+      ? { qualityReport: qualityReport as unknown as Prisma.InputJsonValue }
+      : {};
     return this.prisma.translatedChapter.upsert({
       where: {
         translationId_chapterId: { translationId, chapterId },
       },
-      create: { translationId, chapterId, translatedContent },
-      update: { translatedContent },
+      create: { translationId, chapterId, translatedContent, ...reportData },
+      update: { translatedContent, ...reportData },
     });
   }
 

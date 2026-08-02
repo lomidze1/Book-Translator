@@ -17,7 +17,8 @@
     "db:seed": "prisma db seed"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "quality:golden": "tsx scripts/quality-golden.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
