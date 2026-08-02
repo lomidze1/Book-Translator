@@ -22,7 +22,11 @@ export function useNotifications(onNewNotification?: (n: Notification) => void) 
   const [total, setTotal] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const callbackRef = useRef(onNewNotification);
-  callbackRef.current = onNewNotification;
+  // Keep the latest callback without re-subscribing the socket. Writing a ref
+  // during render breaks concurrent rendering, so sync it after every commit.
+  useEffect(() => {
+    callbackRef.current = onNewNotification;
+  });
 
   // Fetch initial data
   const fetchUnreadCount = useCallback(async () => {
@@ -81,6 +85,9 @@ export function useNotifications(onNewNotification?: (n: Notification) => void) 
     const token = getAccessToken();
     if (!token) return;
 
+    // The state update happens after `await apiFetch(...)`, i.e. in a later
+    // microtask — never synchronously inside this effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUnreadCount();
 
     const socket = io(`${API_URL}/notifications`, {

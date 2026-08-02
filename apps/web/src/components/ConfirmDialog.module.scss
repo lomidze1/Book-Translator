@@ -18,7 +18,7 @@
 
 .dialog {
   background: var(--card-bg, #fff);
-  border: 1px solid var(--card-border, #{$color-border});
+  border: 2px solid var(--card-border, #{$color-border});
   border-radius: $radius-lg;
   padding: $spacing-xl;
   max-width: 440px;

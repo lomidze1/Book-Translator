@@ -7,7 +7,8 @@ export interface ReaderSettings {
 }
 
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
-  fontSize: 18,
+  // The reading spec: serif at 20px / 1.8 on the paper ground.
+  fontSize: 20,
   fontFamily: 'default',
   lineHeight: 1.8,
   theme: 'light',
@@ -66,5 +67,7 @@ export const FONT_FAMILIES: Record<ReaderSettings['fontFamily'], string> = {
   bpg: '"BPG Glaho", Georgia, serif',
 };
 
-export const FONT_SIZE_RANGE = { min: 14, max: 28, step: 2 };
+// A− / A+ step the serif between 17 and 23px; outside that the measure stops
+// holding 62–66 characters at the page's 33em width.
+export const FONT_SIZE_RANGE = { min: 17, max: 23, step: 1 };
 export const LINE_HEIGHT_RANGE = { min: 1.4, max: 2.2, step: 0.2 };

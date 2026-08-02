@@ -16,19 +16,19 @@
   align-items: center;
   gap: $spacing-sm;
   padding: 12px $spacing-md;
-  border-radius: $radius-md;
+  // No soft shadows in this system — a 2px edge carries the overlay instead.
+  border: $rule solid var(--foreground);
   color: white;
   font-size: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   animation: slideIn 0.3s ease;
 }
 
 .success {
-  background-color: #16a34a;
+  background-color: #2f6a3f;
 }
 
 .error {
-  background-color: #dc2626;
+  background-color: var(--bt-accent);
 }
 
 .info {

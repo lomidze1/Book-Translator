@@ -21,6 +21,7 @@ import TextSelectionPopup from './components/TextSelectionPopup';
 import NoteEditor from './components/NoteEditor';
 import TtsGenerationPanel from './components/TtsGenerationPanel';
 import AudioPlayer from './components/AudioPlayer';
+import { TTS_ENABLED } from '@/lib/features';
 import styles from './reader.module.scss';
 import { API_URL } from '@/lib/api-client';
 
@@ -163,6 +164,7 @@ export default function ReaderView({ translation, token }: Props) {
 
   // Load existing audio chapters on mount
   useEffect(() => {
+    if (!TTS_ENABLED) return;
     async function loadAudioChapters() {
       try {
         const res = await fetch(`${API_URL}/api/tts/chapters/${bookId}`, {
@@ -688,7 +690,7 @@ export default function ReaderView({ translation, token }: Props) {
       )}
 
       {/* TTS Generation Panel */}
-      {showTtsPanel && (
+      {TTS_ENABLED && showTtsPanel && (
         <div className={styles.ttsSidePanel}>
           <TtsGenerationPanel
             bookId={bookId}
@@ -706,7 +708,7 @@ export default function ReaderView({ translation, token }: Props) {
       )}
 
       {/* TTS toggle button */}
-      {!showTtsPanel && audioChapters.length === 0 && (
+      {TTS_ENABLED && !showTtsPanel && audioChapters.length === 0 && (
         <button
           className={styles.ttsFloatingBtn}
           onClick={() => setShowTtsPanel(true)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 interface Timestamp {
   text: string;
@@ -25,24 +25,13 @@ export default function KaraokeHighlight({
   activeClassName,
   onChunkClick,
 }: Props) {
-  const [activeIndex, setActiveIndex] = useState(-1);
   const prevIndexRef = useRef(-1);
 
-  // Find active chunk based on current time
-  useEffect(() => {
-    if (!isPlaying || timestamps.length === 0) {
-      if (activeIndex !== -1) setActiveIndex(-1);
-      return;
-    }
-
-    const idx = timestamps.findIndex(
-      (ts) => currentTimeMs >= ts.startMs && currentTimeMs < ts.endMs,
-    );
-
-    if (idx !== activeIndex) {
-      setActiveIndex(idx);
-    }
-  }, [currentTimeMs, timestamps, isPlaying, activeIndex]);
+  // Active chunk is fully derived from the current playback time — no state.
+  const activeIndex =
+    !isPlaying || timestamps.length === 0
+      ? -1
+      : timestamps.findIndex((ts) => currentTimeMs >= ts.startMs && currentTimeMs < ts.endMs);
 
   // Apply highlighting to matching text chunks in the content
   useEffect(() => {
@@ -85,7 +74,8 @@ export default function KaraokeHighlight({
 
   // Expose chunk click handler for parent to bind
   useEffect(() => {
-    if (!contentRef.current || !onChunkClick) return;
+    const content = contentRef.current;
+    if (!content || !onChunkClick) return;
 
     const handler = (e: Event) => {
       const target = e.target as HTMLElement;
@@ -96,9 +86,9 @@ export default function KaraokeHighlight({
       }
     };
 
-    contentRef.current.addEventListener('click', handler);
+    content.addEventListener('click', handler);
     return () => {
-      contentRef.current?.removeEventListener('click', handler);
+      content.removeEventListener('click', handler);
     };
   }, [contentRef, handleChunkClick, onChunkClick]);
 

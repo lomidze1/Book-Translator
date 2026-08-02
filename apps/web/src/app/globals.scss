@@ -1,35 +1,66 @@
+// ---------------------------------------------------------------------------
+// Modernist design system (see docs / design handoff).
+//
+// Ground #f3f2f2, ink #201e1d, a single accent #ec3013, 2px dividers as the
+// only organising device, zero border-radius and no soft shadows. The app's
+// pre-existing token names are kept and re-pointed at the system's ramps, so
+// every SCSS module inherits the new look without being rewritten.
+// ---------------------------------------------------------------------------
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --card-bg: #ffffff;
-  --card-border: #e2e8f0;
-  --input-bg: #ffffff;
-  --input-border: #e2e8f0;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --text-secondary: #64748b;
-  --text-muted: #999999;
-  --surface: #f8fafc;
-  --surface-hover: #f1f5f9;
-  --success-bg: #f0fdf4;
-  --success-text: #166534;
-  --error-bg: #fef2f2;
-  --error-text: #dc2626;
-  --info-bg: #f0f9ff;
-  --info-border: #dbeafe;
-  --shadow: rgba(0, 0, 0, 0.08);
-  --shadow-lg: rgba(0, 0, 0, 0.15);
-  --progress-bg: #e2e8f0;
-  --badge-green-bg: #dcfce7;
-  --badge-green-text: #166534;
-  --badge-blue-bg: #dbeafe;
-  --badge-blue-text: #1e40af;
-  --badge-blue-hover: #bfdbfe;
-  --remove-bg: #fee2e2;
-  --remove-hover: #fecaca;
-  --remove-text: #dc2626;
-  --input-border-error: #dc2626;
-  --input-border-valid: #16a34a;
+  // System primitives
+  --bt-accent: #ec3013;
+  --bt-accent-600: #dd2b0f;
+  --bt-accent-700: #ae1800;
+  --bt-neutral-100: #f8f4f4;
+  --bt-neutral-200: #eae7e7;
+  --bt-neutral-300: #d7d3d3;
+  --bt-neutral-400: #bab6b6;
+  --bt-neutral-500: #9b9797;
+  --bt-neutral-600: #7d7979;
+  --bt-neutral-700: #605d5d;
+  --bt-neutral-800: #444141;
+  --bt-neutral-900: #2d2b2b;
+  --bt-divider: rgba(32, 30, 29, 0.4); // ink @ 40%
+  --bt-rule: 2px;
+  --bt-gutter: 40px;
+  // "The quiet page" — the reader's second register: a warmer paper ground
+  // than the app's cool ground, so page and chrome read as different materials.
+  --bt-paper: #f6f3ec;
+  --bt-paper-ink: #26221e;
+  --bt-paper-ink-soft: #6b645c;
+
+  --background: #f3f2f2;
+  --foreground: #201e1d;
+  --card-bg: #f8f4f4;
+  --card-border: var(--bt-divider);
+  --input-bg: #f3f2f2;
+  --input-border: var(--bt-divider);
+  --primary: var(--bt-accent);
+  --primary-hover: var(--bt-accent-600);
+  --text-secondary: var(--bt-neutral-700);
+  --text-muted: var(--bt-neutral-600);
+  --surface: var(--bt-neutral-100);
+  --surface-hover: var(--bt-neutral-200);
+  --success-bg: var(--bt-neutral-100);
+  --success-text: #2f6a3f;
+  --error-bg: var(--bt-neutral-100);
+  --error-text: var(--bt-accent-700);
+  --info-bg: var(--bt-neutral-100);
+  --info-border: var(--bt-divider);
+  // No soft shadows in layout — depth comes from 2px rules only.
+  --shadow: transparent;
+  --shadow-lg: transparent;
+  --progress-bg: var(--bt-neutral-200);
+  --badge-green-bg: var(--bt-neutral-200);
+  --badge-green-text: #2f6a3f;
+  --badge-blue-bg: var(--bt-neutral-200);
+  --badge-blue-text: var(--bt-neutral-900);
+  --badge-blue-hover: var(--bt-neutral-300);
+  --remove-bg: var(--bt-neutral-200);
+  --remove-hover: var(--bt-neutral-300);
+  --remove-text: var(--bt-accent-700);
+  --input-border-error: var(--bt-accent);
+  --input-border-valid: #2f6a3f;
 
   // ---------------------------------------------------------------------
   // Legacy aliases. Several SCSS modules in profile/, reader/, and upload/
@@ -48,38 +79,37 @@
   color-scheme: light;
 }
 
+// Night reading. Same variables, different values — never a second stylesheet.
 [data-theme="dark"] {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --card-bg: #1a1a1a;
-  --card-border: #2e2e2e;
-  --input-bg: #1a1a1a;
-  --input-border: #3a3a3a;
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --surface: #141414;
-  --surface-hover: #1e1e1e;
-  --success-bg: #052e16;
-  --success-text: #4ade80;
-  --error-bg: #450a0a;
-  --error-text: #f87171;
-  --info-bg: #0c1929;
-  --info-border: #1e3a5f;
-  --shadow: rgba(0, 0, 0, 0.3);
-  --shadow-lg: rgba(0, 0, 0, 0.5);
-  --progress-bg: #2e2e2e;
-  --badge-green-bg: #052e16;
-  --badge-green-text: #4ade80;
-  --badge-blue-bg: #172554;
-  --badge-blue-text: #93c5fd;
-  --badge-blue-hover: #1e3a5f;
-  --remove-bg: #450a0a;
-  --remove-hover: #7f1d1d;
-  --remove-text: #f87171;
-  --input-border-error: #f87171;
-  --input-border-valid: #4ade80;
+  --bt-neutral-100: #1b1a19;
+  --bt-neutral-200: #262423;
+  --bt-neutral-300: #373433;
+  --bt-neutral-400: #4a4746;
+  --bt-neutral-500: #6b6766;
+  --bt-neutral-600: #918c8c;
+  --bt-neutral-700: #b3aeae;
+  --bt-neutral-800: #d6d2d2;
+  --bt-neutral-900: #ece8e8;
+  --bt-divider: rgba(243, 242, 242, 0.42);
+  --bt-accent-700: #ff9783;
+  --bt-paper: #191715;
+  --bt-paper-ink: #e6e0d6;
+  --bt-paper-ink-soft: #98918a;
+
+  --background: #141312;
+  --foreground: #f3f2f2;
+  --card-bg: #201e1d;
+  --input-bg: #141312;
+  --text-secondary: var(--bt-neutral-700);
+  --text-muted: var(--bt-neutral-600);
+  --surface: var(--bt-neutral-100);
+  --surface-hover: var(--bt-neutral-200);
+  --success-text: #7fbf92;
+  --error-text: var(--bt-accent-700);
+  --badge-green-text: #7fbf92;
+  --badge-blue-text: var(--bt-neutral-900);
+  --remove-text: var(--bt-accent-700);
+  --input-border-valid: #7fbf92;
   color-scheme: dark;
 }
 
@@ -99,9 +129,11 @@ body {
   flex-direction: column;
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-sans), 'Noto Sans Georgian', system-ui, sans-serif;
+  // Archivo carries Latin + numerals; Georgian glyphs fall through to Noto.
+  font-family: var(--font-archivo), var(--font-sans), 'Noto Sans Georgian', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-wrap: pretty;
 }
 
 * {
@@ -113,6 +145,25 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+// Display type is Archivo 800–900 with tight tracking at every size.
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+}
+
+// Never leave browser defaults on focus.
+:focus-visible {
+  outline: 2px solid var(--bt-accent);
+  outline-offset: 2px;
+}
+
+// Photography is grayscale only — never tinted.
+.grayscale {
+  filter: grayscale(1);
 }
 
 // Visually hidden but available to assistive tech. Used to caption
@@ -147,10 +198,10 @@ a {
     overflow: visible;
     z-index: 10000;
     padding: 12px 24px;
-    background: #2563eb;
-    color: white;
-    border-radius: 8px;
+    background: var(--bt-accent);
+    color: #fff;
     text-decoration: none;
     font-size: 14px;
+    font-weight: 700;
   }
 }

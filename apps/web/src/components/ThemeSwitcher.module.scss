@@ -7,14 +7,13 @@
   justify-content: center;
   // 34px works on desktop where pointer precision is high. Mobile users need
   // ≥44px per WCAG 2.5.5; we bump up at the tablet breakpoint.
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   background: none;
-  border: 1px solid var(--card-border);
-  border-radius: 8px;
-  color: var(--text-secondary);
+  border: $rule solid var(--bt-divider);
+  color: var(--foreground);
   cursor: pointer;
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  transition: color 0.15s, border-color 0.15s;
 
   @include tablet {
     width: 44px;
@@ -22,9 +21,8 @@
   }
 
   &:hover {
-    color: var(--foreground);
-    background: var(--surface-hover);
-    border-color: var(--text-muted);
+    color: var(--bt-accent);
+    border-color: var(--bt-accent);
   }
 
   &:focus-visible {

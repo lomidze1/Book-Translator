@@ -16,7 +16,7 @@
   width: 100%;
   max-width: 520px;
   background: var(--card-bg);
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color);
   border-radius: $radius-lg;
   padding: $spacing-xl $spacing-lg;
 
@@ -32,7 +32,7 @@
   gap: $spacing-md;
   margin-bottom: $spacing-lg;
   padding-bottom: $spacing-lg;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
 
   h1 {
     margin: 0;
@@ -103,7 +103,7 @@
   flex: 1;
   padding: 8px 12px;
   background: var(--input-bg);
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color);
   border-radius: $radius-md;
   color: var(--text-primary);
   font-size: 0.9rem;
@@ -139,7 +139,7 @@
 .cancelBtn {
   background: transparent;
   color: var(--text-secondary);
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color);
 }
 
 .editBtn {
@@ -167,7 +167,7 @@
   gap: $spacing-sm;
   margin-top: $spacing-xl;
   padding-top: $spacing-lg;
-  border-top: 1px solid var(--border-color);
+  border-top: 2px solid var(--border-color);
 }
 
 .actionLink {
@@ -176,7 +176,7 @@
   gap: 12px;
   padding: 14px 16px;
   background: transparent;
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color);
   border-radius: $radius-md;
   color: var(--text-primary);
   text-decoration: none;

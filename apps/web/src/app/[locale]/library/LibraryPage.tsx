@@ -41,17 +41,19 @@ export default function LibraryPage() {
     <ProtectedRoute>
       <div className={styles.container}>
         <div className={styles.header}>
-          <h1>{t('title')}</h1>
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder={t('search_placeholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div>
+            <h1>{t('title')}</h1>
+            <div className={styles.meta}>
+              {t('meta', { books: translations.length })}
+            </div>
+          </div>
+          <Link href="/upload" className={styles.newBtn}>
+            {t('new_book')}
+          </Link>
         </div>
 
-        <div className={styles.filters}>
+        <div className={styles.toolbar}>
+          <div className={styles.filters}>
           {(['all', 'in_progress', 'completed'] as const).map((f) => (
             <button
               key={f}
@@ -61,21 +63,31 @@ export default function LibraryPage() {
               {t(`filter_${f}`)}
             </button>
           ))}
+          </div>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder={t('search_placeholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
 
         {loading ? (
-          // Skeleton grid that mirrors the real card layout so the page
+          // Skeleton rows that mirror the real table layout so the page
           // doesn't reflow when data arrives.
           <div className={styles.grid} aria-busy="true" aria-live="polite">
             <span className="sr-only">{t('loading')}</span>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className={styles.bookCard}>
-                <Skeleton variant="image" height={200} />
-                <div className={styles.bookInfo}>
-                  <Skeleton variant="text" width="90%" />
-                  <Skeleton variant="text" width="60%" />
-                  <Skeleton variant="text" width={64} height={18} />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className={styles.row}>
+                <Skeleton variant="image" height={84} />
+                <div>
+                  <Skeleton variant="text" width="70%" />
+                  <Skeleton variant="text" width="40%" />
                 </div>
+                <Skeleton variant="text" width="100%" height={8} />
+                <Skeleton variant="text" width={80} />
+                <Skeleton variant="text" width={90} />
               </div>
             ))}
           </div>
@@ -101,47 +113,58 @@ export default function LibraryPage() {
             )}
           </div>
         ) : (
+          // Ruled table: cover · title/author · progress · status · action.
           <div className={styles.grid}>
-            {filtered.map((item) => (
-              <Link key={item.id} href={`/books/${item.book.id}`} className={styles.bookCard}>
-                {item.book.coverUrl ? (
-                  <Image
-                    src={item.book.coverUrl}
-                    alt={item.book.title}
-                    width={140}
-                    height={210}
-                    className={styles.bookCover}
-                    sizes="(max-width: 640px) 30vw, 140px"
-                  />
-                ) : (
-                  <div className={styles.bookCoverPlaceholder}>
-                    {item.book.title?.[0] || '?'}
+            {filtered.map((item) => {
+              const done = item.status === 'COMPLETED';
+              return (
+                <Link key={item.id} href={`/books/${item.book.id}`} className={styles.row}>
+                  <div className={`${styles.cover} grayscale`}>
+                    {item.book.coverUrl ? (
+                      <Image
+                        src={item.book.coverUrl}
+                        alt=""
+                        width={56}
+                        height={84}
+                        className={styles.bookCover}
+                        sizes="56px"
+                      />
+                    ) : (
+                      <span className={styles.bookCoverPlaceholder}>
+                        {item.book.title?.[0] || '?'}
+                      </span>
+                    )}
                   </div>
-                )}
-                <div className={styles.bookInfo}>
-                  <div className={styles.bookTitle}>{item.book.title}</div>
-                  {item.book.author && (
-                    <div className={styles.bookAuthor}>{item.book.author}</div>
-                  )}
-                  <span className={`${styles.statusBadge} ${item.status === 'COMPLETED' ? styles.completed : styles.inProgress}`}>
-                    {item.status === 'COMPLETED' ? t('filter_completed') : `${Math.round(item.progress)}%`}
-                  </span>
-                  {item.status !== 'COMPLETED' && (
-                    <div className={styles.progressContainer}>
-                      <div className={styles.progressBar}>
-                        <div className={styles.progressFill} style={{ width: `${item.progress}%` }} />
-                      </div>
-                      <span className={styles.progressText}>{Math.round(item.progress)}%</span>
+
+                  <div className={styles.cellTitle}>
+                    <div className={styles.bookTitle}>{item.book.title}</div>
+                    {item.book.author && (
+                      <div className={styles.bookAuthor}>{item.book.author}</div>
+                    )}
+                  </div>
+
+                  <div className={styles.cellProgress}>
+                    <div className={styles.progressBar}>
+                      <div
+                        className={`${styles.progressFill} ${done ? styles.progressDone : ''}`}
+                        style={{ width: `${done ? 100 : item.progress}%` }}
+                      />
                     </div>
-                  )}
-                  {item.status === 'COMPLETED' ? (
-                    <span className={styles.readBtn}>
-                      {t('read')}
-                    </span>
-                  ) : null}
-                </div>
-              </Link>
-            ))}
+                    <div className={styles.progressText}>
+                      {done ? t('filter_completed') : `${Math.round(item.progress)}%`}
+                    </div>
+                  </div>
+
+                  <div className={styles.cellStatus}>
+                    {done ? t('status_translated') : t('filter_in_progress')}
+                  </div>
+
+                  <span className={`${styles.action} ${done ? styles.actionAccent : ''}`}>
+                    {done ? t('read') : t('waiting')}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

@@ -100,7 +100,7 @@ self.addEventListener('push', (event) => {
         data: payload.data || {},
       })
     );
-  } catch (e) {
+  } catch {
     // Fallback for plain text push
     event.waitUntil(
       self.registration.showNotification('Book Translator', {

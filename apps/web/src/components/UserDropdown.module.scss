@@ -9,7 +9,7 @@
   align-items: center;
   gap: $spacing-sm;
   padding: 6px 12px;
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-full;
   background: var(--card-bg);
   color: var(--foreground);
@@ -52,7 +52,7 @@
   right: 0;
   width: 240px;
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-md;
   box-shadow: 0 8px 24px var(--shadow-lg);
   z-index: 200;
@@ -61,7 +61,7 @@
 
 .header {
   padding: $spacing-md;
-  border-bottom: 1px solid var(--card-border);
+  border-bottom: 2px solid var(--card-border);
 
   .name {
     font-weight: 600;
@@ -78,7 +78,7 @@
 
 .section {
   padding: $spacing-xs 0;
-  border-bottom: 1px solid var(--card-border);
+  border-bottom: 2px solid var(--card-border);
 
   &:last-child {
     border-bottom: none;

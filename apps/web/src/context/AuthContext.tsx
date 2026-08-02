@@ -137,7 +137,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         // Don't blow away cached user on a transient network failure.
       } finally {
-        if (!cancelled) setIsLoading(false);
+        // Deliberately NOT guarded by `cancelled`. React can tear this effect
+        // down and re-run it on the SAME instance (a locale switch re-enters
+        // the [locale] layout), and the re-run exits early on `bootstrapped`.
+        // Guarding here left `isLoading` true forever, which hid the navbar's
+        // login/register buttons permanently after switching language.
+        // If the component really did unmount, this is a harmless no-op.
+        setIsLoading(false);
       }
     })();
 

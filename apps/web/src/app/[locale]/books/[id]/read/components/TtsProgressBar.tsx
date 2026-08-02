@@ -26,16 +26,34 @@ interface StatusData {
   }>;
 }
 
+/** Minutes left, extrapolated from progress made since generation started. */
+function computeEta(progress: number, completedChapters: number, startedAt: number): string {
+  if (progress <= 0 || completedChapters <= 0) return '';
+  const elapsed = (Date.now() - startedAt) / 1000 / 60; // minutes
+  if (elapsed <= 0) return '';
+  const rate = progress / elapsed; // progress per minute
+  if (rate <= 0) return '';
+  const remaining = (100 - progress) / rate;
+  if (!isFinite(remaining) || remaining <= 0) return '';
+
+  if (remaining < 1) return '< 1';
+  return Math.round(remaining).toString();
+}
+
 export default function TtsProgressBar({ audioBookId, apiUrl, token, totalChapters, onComplete }: Props) {
   const t = useTranslations('reader');
   const [status, setStatus] = useState<StatusData | null>(null);
   const [progress, setProgress] = useState(0);
   const [completedChapters, setCompletedChapters] = useState(0);
+  const [eta, setEta] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef(Date.now());
+  // Clock reads belong in effects/handlers, never in render.
+  const startTimeRef = useRef(0);
 
   // Poll for status updates
   useEffect(() => {
+    startTimeRef.current = Date.now();
+
     const fetchStatus = async () => {
       try {
         const res = await fetch(`${apiUrl}/api/tts/status/${audioBookId}`, {
@@ -46,6 +64,7 @@ export default function TtsProgressBar({ audioBookId, apiUrl, token, totalChapte
           setStatus(data);
           setProgress(data.progress);
           setCompletedChapters(data.completedChapters);
+          setEta(computeEta(data.progress, data.completedChapters, startTimeRef.current));
 
           if (data.status === 'COMPLETED') {
             if (pollRef.current) clearInterval(pollRef.current);
@@ -69,22 +88,6 @@ export default function TtsProgressBar({ audioBookId, apiUrl, token, totalChapte
     };
   }, [audioBookId, apiUrl, token, onComplete]);
 
-  // Calculate ETA
-  const getEta = (): string => {
-    if (progress <= 0 || completedChapters <= 0) return '';
-    const elapsed = (Date.now() - startTimeRef.current) / 1000 / 60; // minutes
-    if (elapsed <= 0) return '';
-    const rate = progress / elapsed; // progress per minute
-    if (rate <= 0) return '';
-    const remaining = (100 - progress) / rate;
-    if (!isFinite(remaining) || remaining <= 0) return '';
-
-    if (remaining < 1) return '< 1';
-    return Math.round(remaining).toString();
-  };
-
-  const eta = getEta();
-
   return (
     <div className={styles.ttsProgress}>
       <div className={styles.ttsProgressHeader}>
@@ -98,6 +101,7 @@ export default function TtsProgressBar({ audioBookId, apiUrl, token, totalChapte
               headers: { Authorization: `Bearer ${token}` },
             });
             startTimeRef.current = Date.now();
+            setEta('');
           }}>
             {t('tts_retry')}
           </button>

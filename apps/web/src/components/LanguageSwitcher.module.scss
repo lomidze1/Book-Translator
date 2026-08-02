@@ -4,7 +4,11 @@
 .switcher {
   display: flex;
   align-items: center;
-  gap: 4px;
+  border: $rule solid var(--bt-divider);
+
+  &:hover {
+    border-color: var(--bt-accent);
+  }
 }
 
 .btn {
@@ -12,22 +16,21 @@
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.85rem;
-  padding: 4px 6px;
-  border-radius: 4px;
-  transition: color 0.2s, background 0.2s;
+  font: 700 12px/1 inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 10px 11px;
+  transition: color 0.15s, background 0.15s;
 
   // Mobile / touch: WCAG-compliant 44×44 minimum tap target.
   @include tablet {
     min-width: 44px;
     min-height: 44px;
-    padding: 8px 12px;
-    font-size: 1rem;
+    padding: 12px;
   }
 
   &:hover {
-    color: var(--foreground);
-    background: var(--surface-hover);
+    color: var(--bt-accent);
   }
 
   &:focus-visible {
@@ -36,12 +39,17 @@
   }
 
   &.active {
-    color: var(--foreground);
-    font-weight: 600;
+    background: var(--foreground);
+    color: var(--background);
   }
 }
 
+// The segmented control is separated by a 2px rule, not a glyph.
 .divider {
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  width: $rule;
+  align-self: stretch;
+  background: var(--bt-divider);
+  font-size: 0;
+  color: transparent;
+  overflow: hidden;
 }

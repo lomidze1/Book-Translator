@@ -227,7 +227,7 @@
 .badgeSuccess { background: #dcfce7; color: #166534; }
 .badgeWarning { background: #fef3c7; color: #92400e; }
 .badgeDanger  { background: #fee2e2; color: #991b1b; }
-.badgeInfo    { background: #dbeafe; color: #1e40af; }
+.badgeInfo    { background: var(--bt-neutral-200); color: var(--bt-neutral-900); }
 
 .actionBtn {
   padding: 4px 10px;

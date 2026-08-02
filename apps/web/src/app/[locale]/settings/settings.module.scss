@@ -15,7 +15,7 @@
 
 .section {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-lg;
   padding: $spacing-lg;
   margin-bottom: $spacing-lg;
@@ -36,7 +36,7 @@
   // screens — let the row wrap instead of clipping.
   flex-wrap: wrap;
   padding: $spacing-sm 0;
-  border-bottom: 1px solid var(--card-border);
+  border-bottom: 2px solid var(--card-border);
   gap: $spacing-md;
 
   &:last-child {
@@ -65,7 +65,7 @@
   position: relative;
   width: 44px;
   height: 24px;
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--progress-bg);
   border: none;
   cursor: pointer;
@@ -94,7 +94,7 @@
 
 .select {
   padding: 6px 12px;
-  border: 1px solid var(--input-border);
+  border: 2px solid var(--input-border);
   border-radius: $radius-sm;
   background: var(--input-bg);
   color: var(--foreground);
@@ -113,7 +113,7 @@
   height: 4px;
   appearance: none;
   background: var(--progress-bg);
-  border-radius: 2px;
+  border-radius: 0;
   cursor: pointer;
 
   &::-webkit-slider-thumb {
@@ -141,7 +141,7 @@
 
 .themeOption {
   padding: 6px 14px;
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-md;
   background: transparent;
   color: var(--text-secondary);
@@ -163,7 +163,7 @@
 
 .langOption {
   padding: 8px 20px;
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-md;
   background: transparent;
   color: var(--text-secondary);

@@ -38,7 +38,7 @@
 
 .loginPrompt {
   background: var(--surface);
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-md;
   padding: $spacing-lg;
   margin-bottom: $spacing-lg;
@@ -266,14 +266,14 @@
   flex: 1;
   height: 8px;
   background: var(--progress-bg);
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
   background: var(--primary);
-  border-radius: 4px;
+  border-radius: 0;
   transition: width 0.3s;
 }
 

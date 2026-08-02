@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
+import AuthAside from '@/components/AuthAside';
 import styles from './page.module.scss';
 import { API_URL } from '@/lib/api-client';
 
@@ -115,7 +116,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${styles.split}`}>
       <div className={styles.formCard}>
         <h1 className={styles.title}>{t('title')}</h1>
 
@@ -222,6 +223,7 @@ export default function LoginPage() {
           <Link href="/register">{t('register_link')}</Link>
         </p>
       </div>
+      <AuthAside />
     </div>
   );
 }

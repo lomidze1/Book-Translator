@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
+import AuthAside from '@/components/AuthAside';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 import styles from './page.module.scss';
 import { API_URL } from '@/lib/api-client';
@@ -290,7 +291,7 @@ export default function RegisterPage() {
 
   // Step: Registration form
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${styles.split}`}>
       <div className={styles.formCard}>
         <h1 className={styles.title}>{t('title')}</h1>
 
@@ -406,6 +407,7 @@ export default function RegisterPage() {
           <Link href="/login">{t('login_link')}</Link>
         </p>
       </div>
+      <AuthAside />
     </div>
   );
 }

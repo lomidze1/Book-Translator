@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { apiFetch, getAccessToken } from '@/lib/api-client';
 import { useAuth } from '@/context/AuthContext';
+import { TTS_ENABLED } from '@/lib/features';
 import styles from './settings.module.scss';
 
 interface ReaderDefaults {
@@ -31,6 +32,28 @@ const DEFAULT_READER: ReaderDefaults = {
   theme: 'light',
 };
 
+/**
+ * Reader settings live in localStorage, which doesn't exist during SSR — read
+ * them lazily on the client. The settings UI only renders once ProtectedRoute
+ * resolves auth, so there is nothing to mismatch at hydration.
+ */
+function loadReaderDefaults(): ReaderDefaults {
+  if (typeof window === 'undefined') return DEFAULT_READER;
+  try {
+    const readerStr = localStorage.getItem('reader-settings');
+    if (!readerStr) return DEFAULT_READER;
+    const parsed = JSON.parse(readerStr);
+    return {
+      fontFamily: ['default', 'serif', 'sans-serif', 'bpg'].includes(parsed.fontFamily) ? parsed.fontFamily : DEFAULT_READER.fontFamily,
+      fontSize: typeof parsed.fontSize === 'number' && parsed.fontSize >= 14 && parsed.fontSize <= 28 ? parsed.fontSize : DEFAULT_READER.fontSize,
+      lineHeight: typeof parsed.lineHeight === 'number' && parsed.lineHeight >= 1.4 && parsed.lineHeight <= 2.2 ? parsed.lineHeight : DEFAULT_READER.lineHeight,
+      theme: ['light', 'sepia', 'dark'].includes(parsed.theme) ? parsed.theme : DEFAULT_READER.theme,
+    };
+  } catch {
+    return DEFAULT_READER;
+  }
+}
+
 const DEFAULT_NOTIF: NotificationPrefs = {
   emailEnabled: true,
   pushEnabled: true,
@@ -46,7 +69,7 @@ export default function SettingsPage() {
   const { isLoggedIn, isLoading: authLoading } = useAuth();
 
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIF);
-  const [reader, setReader] = useState<ReaderDefaults>(DEFAULT_READER);
+  const [reader, setReader] = useState<ReaderDefaults>(loadReaderDefaults);
   const [saved, setSaved] = useState(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { permission, isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications();
@@ -73,22 +96,6 @@ export default function SettingsPage() {
       })
       .catch(() => {});
   }, [authLoading, isLoggedIn]);
-
-  // Load reader settings from localStorage
-  useEffect(() => {
-    try {
-      const readerStr = localStorage.getItem('reader-settings');
-      if (readerStr) {
-        const parsed = JSON.parse(readerStr);
-        setReader({
-          fontFamily: ['default', 'serif', 'sans-serif', 'bpg'].includes(parsed.fontFamily) ? parsed.fontFamily : DEFAULT_READER.fontFamily,
-          fontSize: typeof parsed.fontSize === 'number' && parsed.fontSize >= 14 && parsed.fontSize <= 28 ? parsed.fontSize : DEFAULT_READER.fontSize,
-          lineHeight: typeof parsed.lineHeight === 'number' && parsed.lineHeight >= 1.4 && parsed.lineHeight <= 2.2 ? parsed.lineHeight : DEFAULT_READER.lineHeight,
-          theme: ['light', 'sepia', 'dark'].includes(parsed.theme) ? parsed.theme : DEFAULT_READER.theme,
-        });
-      }
-    } catch {}
-  }, []);
 
   // Auto-save reader settings to localStorage
   useEffect(() => {
@@ -223,18 +230,20 @@ export default function SettingsPage() {
             />
           </div>
 
-          <div className={styles.settingRow}>
-            <div className={styles.settingLabel}>
-              <div className={styles.labelText}>{t('event_tts')}</div>
+          {TTS_ENABLED && (
+            <div className={styles.settingRow}>
+              <div className={styles.settingLabel}>
+                <div className={styles.labelText}>{t('event_tts')}</div>
+              </div>
+              <button
+                className={`${styles.toggle} ${notifPrefs.ttsCompleted ? styles.active : ''}`}
+                onClick={() => updateNotifPref({ ttsCompleted: !notifPrefs.ttsCompleted })}
+                role="switch"
+                aria-checked={notifPrefs.ttsCompleted}
+                aria-label={t('event_tts')}
+              />
             </div>
-            <button
-              className={`${styles.toggle} ${notifPrefs.ttsCompleted ? styles.active : ''}`}
-              onClick={() => updateNotifPref({ ttsCompleted: !notifPrefs.ttsCompleted })}
-              role="switch"
-              aria-checked={notifPrefs.ttsCompleted}
-              aria-label={t('event_tts')}
-            />
-          </div>
+          )}
 
           <div className={styles.settingRow}>
             <div className={styles.settingLabel}>

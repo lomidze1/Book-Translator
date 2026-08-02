@@ -1,0 +1,190 @@
+@use '../../../../../styles/variables' as *;
+
+.page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: $spacing-xl $spacing-md;
+  min-height: calc(100vh - 140px);
+}
+
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-xl 0;
+}
+
+.header {
+  margin-bottom: $spacing-lg;
+  padding-bottom: $spacing-md;
+  border-bottom: 2px solid var(--card-border);
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: $spacing-sm;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.9rem;
+
+  &:hover {
+    color: var(--primary);
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.meta {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: $spacing-md;
+}
+
+.toggle {
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 2px solid var(--card-border);
+  border-radius: $radius-md;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+}
+
+.single {
+  display: block;
+}
+
+.sideBySide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-lg;
+
+  // Two columns of prose are unreadable on a phone — stack them.
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.column {
+  min-width: 0;
+}
+
+.original {
+  color: var(--text-secondary);
+  border-left: 2px solid var(--card-border);
+  padding-left: $spacing-md;
+
+  @media (max-width: 768px) {
+    border-left: none;
+    border-top: 2px solid var(--card-border);
+    padding-left: 0;
+    padding-top: $spacing-md;
+  }
+}
+
+.paragraph {
+  margin: 0 0 1.1em;
+  font-size: 1.05rem;
+  line-height: 1.8;
+  // Georgian has no hyphenation dictionary in most browsers; leave words whole.
+  overflow-wrap: break-word;
+}
+
+.end {
+  margin-top: $spacing-xl;
+  padding: $spacing-lg;
+  background: var(--info-bg);
+  border-radius: $radius-md;
+  text-align: center;
+}
+
+.endTitle {
+  margin: 0 0 $spacing-xs;
+  font-size: 1.25rem;
+}
+
+.endBody {
+  margin: 0 0 $spacing-md;
+  color: var(--text-secondary);
+}
+
+.btnPrimary {
+  display: inline-block;
+  padding: 12px 28px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: $radius-md;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--primary-hover);
+  }
+}
+
+.qualityNote {
+  margin: $spacing-md 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.disclaimer {
+  margin: $spacing-xs 0 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.notice {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto;
+  border: 3px solid var(--card-border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation-duration: 2.4s;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

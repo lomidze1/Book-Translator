@@ -1,0 +1,51 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+// The accent field beside the auth form — one of only two places in the
+// system where the accent runs as a field rather than as an accent.
+.aside {
+  background: var(--bt-accent);
+  color: #fff;
+  padding: 64px var(--bt-gutter);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+
+  @include tablet {
+    padding: 40px 20px;
+  }
+}
+
+.eyebrow {
+  font: 700 12px/1 inherit;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.statement {
+  font-weight: 900;
+  font-size: 46px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  max-width: 20ch;
+
+  @include tablet {
+    font-size: 32px;
+  }
+}
+
+.benefits {
+  margin-top: 40px;
+}
+
+.benefit {
+  padding: 14px 0;
+  border-top: $rule solid rgba(255, 255, 255, 0.4);
+  font: 600 15px/1.4 inherit;
+
+  &:last-child {
+    border-bottom: $rule solid rgba(255, 255, 255, 0.4);
+  }
+}

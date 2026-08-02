@@ -9,3 +9,14 @@ export { useBookmarks } from './hooks/useBookmarks';
 export { useHighlights } from './hooks/useHighlights';
 export { useNotes } from './hooks/useNotes';
 export { useAudioPlayer } from './hooks/useAudioPlayer';
+export {
+  resolveHighlightRanges,
+  segmentChapterText,
+  selectionToChapterRange,
+} from './utils/highlight-text';
+export type {
+  HighlightAnchor,
+  HighlightRange,
+  TextSegment,
+  SelectionRange,
+} from './utils/highlight-text';

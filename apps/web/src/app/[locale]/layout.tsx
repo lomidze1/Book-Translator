@@ -2,7 +2,7 @@ import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import type { Metadata, Viewport } from 'next';
-import { Noto_Sans_Georgian, Noto_Serif_Georgian } from 'next/font/google';
+import { Archivo, Noto_Sans_Georgian, Noto_Serif_Georgian } from 'next/font/google';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
 import GoogleOAuthWrapper from '@/components/GoogleOAuthWrapper';
@@ -19,6 +19,17 @@ const TWITTER_HANDLE = process.env.NEXT_PUBLIC_TWITTER_HANDLE;
 // glyphs, so it silently fell back to Arial for the entire app. Noto Sans
 // Georgian is the de-facto choice for Georgian UI; the serif variant powers
 // the reader view.
+//
+// Archivo carries Latin + numerals across the whole UI (the Modernist design
+// system's display face); Georgian glyphs fall through to Noto Sans Georgian
+// automatically because Archivo has no Georgian coverage.
+const archivo = Archivo({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800', '900'],
+  display: 'swap',
+  variable: '--font-archivo',
+});
+
 const notoSans = Noto_Sans_Georgian({
   subsets: ['georgian', 'latin'],
   display: 'swap',
@@ -35,8 +46,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#1a1a1a' },
+    { media: '(prefers-color-scheme: light)', color: '#f3f2f2' },
+    { media: '(prefers-color-scheme: dark)', color: '#141312' },
   ],
 };
 
@@ -108,7 +119,11 @@ export default async function LocaleLayout({
   }
 
   return (
-    <html lang={locale} className={`${notoSans.variable} ${notoSerif.variable}`} suppressHydrationWarning>
+    <html
+      lang={locale}
+      className={`${archivo.variable} ${notoSans.variable} ${notoSerif.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script
           type="application/ld+json"

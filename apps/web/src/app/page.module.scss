@@ -1,162 +1,679 @@
 @use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
-.page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 $spacing-lg;
+// ---------------------------------------------------------------------------
+// Landing page — Modernist system.
+// Full-bleed sections on a 40px gutter, separated by 2px rules. Nothing is
+// centred: every label, heading and button label is flush left.
+// ---------------------------------------------------------------------------
+
+// Mid widths (below the 1024px desktop breakpoint) step the display sizes down
+// before the layout collapses to one column at $breakpoint-md.
+@mixin below-desktop {
+  @media (max-width: $breakpoint-lg) {
+    @content;
+  }
 }
 
-// Hero
+.page {
+  width: 100%;
+}
+
+// ---- Hero -----------------------------------------------------------------
+
 .hero {
-  text-align: center;
-  padding: $spacing-xl * 2 0 $spacing-xl;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  border-bottom: $rule solid var(--bt-divider);
+
+  @include tablet {
+    grid-template-columns: 1fr;
+  }
+}
+
+.heroCopy {
+  padding: 72px var(--bt-gutter) 56px;
+  border-right: $rule solid var(--bt-divider);
+
+  @include tablet {
+    padding: 44px 20px 40px;
+    border-right: none;
+    border-bottom: $rule solid var(--bt-divider);
+  }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: $rule solid var(--bt-accent);
+  color: var(--bt-accent);
+  padding: 7px 12px;
+  font: 700 11px/1 inherit;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 28px;
 }
 
 .title {
-  font-size: 3rem;
-  font-weight: 800;
-  line-height: 1.2;
-  margin-bottom: $spacing-md;
+  margin: 0;
+  font-weight: 900;
+  font-size: 76px;
+  line-height: 0.94;
+  letter-spacing: -0.03em;
+
+  @include below-desktop {
+    font-size: 56px;
+  }
+
+  @include tablet {
+    font-size: 44px;
+  }
 
   @include mobile {
-    font-size: 2rem;
+    font-size: 34px;
   }
 }
 
 .highlight {
-  color: var(--primary);
+  color: var(--bt-accent);
 }
 
-.subtitle {
-  font-size: 1.25rem;
-  color: var(--text-secondary);
-  max-width: 640px;
-  margin: 0 auto $spacing-lg;
-  line-height: 1.6;
+.lead {
+  max-width: 46ch;
+  margin: 28px 0 0;
+  font: 400 19px/1.5 inherit;
+  color: var(--bt-neutral-800);
 
-  @include mobile {
-    font-size: 1rem;
+  @include tablet {
+    font-size: 16px;
   }
 }
 
 .actions {
   display: flex;
-  gap: $spacing-md;
-  justify-content: center;
+  gap: 12px;
+  margin-top: 36px;
   flex-wrap: wrap;
 }
 
 .primaryBtn {
-  padding: $spacing-sm + 4 $spacing-lg;
-  background: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bt-accent);
   color: #fff;
-  border-radius: $radius-md;
-  font-weight: 600;
-  font-size: 1.1rem;
-  transition: background 0.2s;
+  padding: 16px 22px;
+  font: 700 15px/1 inherit;
+  text-align: left;
+  transition: background 0.15s;
 
   &:hover {
-    background: var(--primary-hover);
+    background: var(--bt-accent-600);
   }
 }
 
 .secondaryBtn {
-  padding: $spacing-sm + 4 $spacing-lg;
-  border: 2px solid var(--card-border);
-  border-radius: $radius-md;
-  font-weight: 600;
-  font-size: 1.1rem;
-  transition: border-color 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  border: $rule solid var(--foreground);
+  color: var(--foreground);
+  padding: 16px 22px;
+  font: 700 15px/1 inherit;
+  transition: border-color 0.15s, color 0.15s;
 
   &:hover {
-    border-color: var(--primary);
-    color: var(--primary);
+    border-color: var(--bt-accent);
+    color: var(--bt-accent);
   }
 }
 
-// Features
-.features {
-  padding: $spacing-xl * 2 0;
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 56px;
+  border-top: $rule solid var(--bt-divider);
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
 }
+
+.stat {
+  padding: 20px 20px 0;
+
+  &:first-child {
+    padding-left: 0;
+  }
+
+  &:last-child {
+    padding-right: 0;
+  }
+
+  & + & {
+    border-left: $rule solid var(--bt-divider);
+
+    @include mobile {
+      border-left: none;
+      border-top: $rule solid var(--bt-divider);
+    }
+  }
+
+  @include mobile {
+    padding: 20px 0 0;
+  }
+}
+
+.statValue {
+  font-weight: 900;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.statUnit {
+  font-size: 16px;
+  margin-left: 4px;
+}
+
+.statLabel {
+  margin-top: 6px;
+  font: 500 13px/1.35 inherit;
+  color: var(--bt-neutral-700);
+}
+
+.heroFigure {
+  position: relative;
+  background: var(--bt-neutral-200);
+  min-height: 620px;
+
+  @include tablet {
+    min-height: 300px;
+  }
+}
+
+// Sits on the ground colour over the (grayscale) photography.
+.heroPlate {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px 24px;
+  background: var(--background);
+  border-top: $rule solid var(--bt-divider);
+  pointer-events: none;
+}
+
+.heroPlateKicker {
+  font: 700 12px/1 inherit;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bt-accent);
+}
+
+.heroPlateText {
+  margin-top: 8px;
+  font: 500 15px/1.45 inherit;
+  max-width: 42ch;
+}
+
+// ---- Shared section furniture ---------------------------------------------
 
 .sectionTitle {
-  text-align: center;
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: $spacing-xl;
+  margin: 0;
+  font: 800 42px/1 inherit;
+  letter-spacing: -0.02em;
+
+  @include tablet {
+    font-size: 30px;
+  }
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: $spacing-lg;
+.colLabel {
+  font: 700 11px/1 inherit;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bt-neutral-700);
+}
 
-  @include mobile {
+// ---- Live demo ------------------------------------------------------------
+
+.demo {
+  border-bottom: $rule solid var(--bt-divider);
+  padding: 64px var(--bt-gutter);
+
+  @include tablet {
+    padding: 44px 20px;
+  }
+}
+
+.demoHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.demoNote {
+  margin: 0;
+  font: 500 14px/1.4 inherit;
+  color: var(--bt-neutral-700);
+  max-width: 44ch;
+}
+
+.demoPanel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 32px;
+  border: $rule solid var(--bt-divider);
+
+  @include tablet {
     grid-template-columns: 1fr;
   }
 }
 
-.card {
-  padding: $spacing-lg;
-  border: 1px solid var(--card-border);
-  border-radius: $radius-lg;
-  background: var(--card-bg);
-  transition: box-shadow 0.2s;
+.demoSource {
+  padding: 28px 30px;
+  border-right: $rule solid var(--bt-divider);
 
-  h3 {
-    font-size: 1.25rem;
-    margin-bottom: $spacing-sm;
+  @include tablet {
+    border-right: none;
+    border-bottom: $rule solid var(--bt-divider);
+    padding: 22px 20px;
+  }
+}
+
+.demoTarget {
+  padding: 28px 30px;
+  background: var(--bt-neutral-100);
+
+  @include tablet {
+    padding: 22px 20px;
+  }
+}
+
+.demoLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: 700 11px/1 inherit;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bt-neutral-700);
+  padding-bottom: 14px;
+  border-bottom: $rule solid var(--bt-divider);
+}
+
+.demoLabelAccent {
+  color: var(--bt-accent);
+}
+
+.demoText {
+  margin: 20px 0 0;
+  font: 400 17px/1.65 inherit;
+  color: var(--bt-neutral-800);
+
+  & + & {
+    margin-top: 16px;
+  }
+}
+
+// Reveals once and stays — finished text must never fade back out.
+.demoReveal {
+  color: var(--foreground);
+  line-height: 1.7;
+  animation: btLine 0.7s ease-out both;
+}
+
+@keyframes btLine {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// Only at the live translation point.
+.caret {
+  display: inline-block;
+  width: 9px;
+  height: 19px;
+  margin-left: 4px;
+  vertical-align: -3px;
+  background: var(--bt-accent);
+  animation: btCaret 1s steps(1) infinite;
+}
+
+@keyframes btCaret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demoReveal,
+  .caret {
+    animation: none;
+  }
+}
+
+.demoTags {
+  display: flex;
+  gap: 8px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  border: $rule solid var(--bt-divider);
+  padding: 6px 10px;
+  font: 600 11px/1 inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tagAccent {
+  border-color: var(--bt-accent);
+  color: var(--bt-accent);
+}
+
+// ---- How it works ---------------------------------------------------------
+
+.how {
+  border-bottom: $rule solid var(--bt-divider);
+}
+
+.howHead {
+  padding: 56px var(--bt-gutter) 20px;
+
+  @include tablet {
+    padding: 40px 20px 16px;
+  }
+}
+
+.howGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: $rule solid var(--bt-divider);
+
+  @include tablet {
+    grid-template-columns: 1fr;
+  }
+}
+
+.howCell {
+  padding: 32px 34px 44px;
+
+  & + & {
+    border-left: $rule solid var(--bt-divider);
+
+    @include tablet {
+      border-left: none;
+      border-top: $rule solid var(--bt-divider);
+    }
   }
 
-  p {
-    color: var(--text-secondary);
-    line-height: 1.5;
+  @include tablet {
+    padding: 26px 20px 30px;
+  }
+}
+
+.howNum {
+  font-weight: 900;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--bt-accent);
+}
+
+.howTitle {
+  margin: 18px 0 10px;
+  font: 800 22px/1.2 inherit;
+}
+
+.howDesc {
+  margin: 0;
+  font: 400 15px/1.6 inherit;
+  color: var(--bt-neutral-700);
+}
+
+// ---- Already translated ---------------------------------------------------
+
+.shelf {
+  border-bottom: $rule solid var(--bt-divider);
+  padding: 56px var(--bt-gutter);
+
+  @include tablet {
+    padding: 40px 20px;
+  }
+}
+
+.shelfHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.shelfLink {
+  font: 700 13px/1 inherit;
+  border-bottom: $rule solid var(--bt-accent);
+  padding-bottom: 3px;
+
+  &:hover {
+    color: var(--bt-accent);
+  }
+}
+
+.shelfGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  margin-top: 32px;
+
+  @include below-desktop {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  @include mobile {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.cover {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  background: var(--bt-neutral-200);
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+}
+
+.shelfItem:hover .shelfTitle {
+  color: var(--bt-accent);
+}
+
+.shelfTitle {
+  margin-top: 12px;
+  font: 700 14px/1.3 inherit;
+}
+
+.shelfMeta {
+  margin-top: 4px;
+  font: 500 12px/1.3 inherit;
+  color: var(--bt-neutral-700);
+}
+
+// ---- Who it is for / FAQ --------------------------------------------------
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: $rule solid var(--bt-divider);
+
+  @include tablet {
+    grid-template-columns: 1fr;
+  }
+}
+
+.who {
+  padding: 56px var(--bt-gutter);
+  border-right: $rule solid var(--bt-divider);
+
+  @include tablet {
+    border-right: none;
+    border-bottom: $rule solid var(--bt-divider);
+    padding: 40px 20px;
+  }
+}
+
+.faq {
+  padding: 56px var(--bt-gutter);
+
+  @include tablet {
+    padding: 40px 20px;
+  }
+}
+
+.whoRows {
+  margin-top: 24px;
+}
+
+.whoRow {
+  padding: 18px 0;
+  border-top: $rule solid var(--bt-divider);
+  display: flex;
+  gap: 18px;
+  align-items: baseline;
+
+  &:last-child {
+    border-bottom: $rule solid var(--bt-divider);
+  }
+
+  @include mobile {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+.whoLabel {
+  font: 700 15px/1.3 inherit;
+  min-width: 150px;
+}
+
+.whoDesc {
+  font: 400 15px/1.55 inherit;
+  color: var(--bt-neutral-700);
+}
+
+.faqList {
+  margin-top: 24px;
+}
+
+.faqItem {
+  border-top: $rule solid var(--bt-divider);
+  padding: 16px 0;
+
+  &:last-child {
+    border-bottom: $rule solid var(--bt-divider);
+  }
+}
+
+.faqQ {
+  font: 700 16px/1.3 inherit;
+  cursor: pointer;
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
   }
 
   &:hover {
-    box-shadow: 0 4px 24px var(--shadow);
+    color: var(--bt-accent);
   }
 }
 
-// Pricing
-.pricing {
-  padding: $spacing-xl 0 $spacing-xl * 2;
+.faqA {
+  margin: 12px 0 0;
+  font: 400 15px/1.6 inherit;
+  color: var(--bt-neutral-700);
 }
 
-.priceGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: $spacing-lg;
-  max-width: 640px;
-  margin: 0 auto;
+// ---- Poster close ---------------------------------------------------------
+
+.poster {
+  background: var(--bt-accent);
+  color: #fff;
+  padding: 88px var(--bt-gutter);
+
+  @include tablet {
+    padding: 56px 20px;
+  }
+}
+
+.posterEyebrow {
+  font: 700 12px/1 inherit;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.posterTitle {
+  margin: 20px 0 0;
+  font-weight: 900;
+  font-size: 68px;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  max-width: 22ch;
+
+  @include below-desktop {
+    font-size: 52px;
+  }
+
+  @include tablet {
+    font-size: 38px;
+  }
 
   @include mobile {
-    grid-template-columns: 1fr;
+    font-size: 30px;
   }
 }
 
-.priceCard {
-  text-align: center;
-  padding: $spacing-xl $spacing-lg;
-  border: 2px solid var(--card-border);
-  border-radius: $radius-lg;
-  background: var(--card-bg);
-
-  h3 {
-    font-size: 1.125rem;
-    margin-bottom: $spacing-sm;
-  }
-
-  p {
-    color: var(--text-secondary);
-    line-height: 1.5;
-  }
+.posterActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 40px;
+  flex-wrap: wrap;
 }
 
-.price {
-  font-size: 2.5rem;
-  font-weight: 800;
-  color: var(--primary);
-  margin: $spacing-sm 0;
+.posterBtn {
+  background: #fff;
+  color: var(--bt-accent);
+  padding: 17px 24px;
+  font: 800 15px/1 inherit;
+}
+
+.posterBtnOutline {
+  border: $rule solid #fff;
+  color: #fff;
+  padding: 17px 24px;
+  font: 800 15px/1 inherit;
+
+  &:hover {
+    background: #fff;
+    color: var(--bt-accent);
+  }
 }

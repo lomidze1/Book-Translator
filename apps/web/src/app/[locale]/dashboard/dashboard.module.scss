@@ -35,7 +35,7 @@
 
 .statCard {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-lg;
   padding: $spacing-lg;
   text-align: center;
@@ -80,7 +80,7 @@
   align-items: center;
   gap: $spacing-md;
   padding: $spacing-md;
-  border-bottom: 1px solid var(--card-border);
+  border-bottom: 2px solid var(--card-border);
   transition: background-color 0.1s;
 
   &:last-child {
@@ -194,7 +194,7 @@
   gap: $spacing-sm;
   padding: 12px 24px;
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-md;
   color: var(--foreground);
   font-size: 0.9rem;

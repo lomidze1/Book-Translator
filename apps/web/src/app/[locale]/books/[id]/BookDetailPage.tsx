@@ -8,7 +8,9 @@ import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import PaymentModal from '@/components/PaymentModal';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import PreviewCta from './PreviewCta';
 import { API_URL, apiFetch, getAccessToken } from '@/lib/api-client';
+import { PREVIEW_ENABLED } from '@/lib/features';
 import styles from './page.module.scss';
 
 interface BookDetails {
@@ -401,6 +403,13 @@ export default function BookDetailsPage() {
                 >
                   {translating ? t('translation_started') : t('translate')}
                 </button>
+              )}
+
+              {/* Orthogonal to the buy CTA above, so it stays visible while a
+                  payment is pending — the moment a wavering user most wants to
+                  see the translation quality. */}
+              {PREVIEW_ENABLED && !completedTranslation && !activeTranslation && (
+                <PreviewCta bookId={book.id} />
               )}
             </div>
 

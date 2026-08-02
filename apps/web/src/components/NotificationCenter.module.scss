@@ -7,9 +7,8 @@
   width: 360px;
   max-height: 440px;
   background: var(--card-bg, white);
-  border: 1px solid var(--card-border, $color-border);
+  border: 2px solid var(--card-border, $color-border);
   border-radius: $radius-lg;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 100;
   overflow: hidden;
   display: flex;
@@ -26,7 +25,7 @@
   align-items: center;
   justify-content: space-between;
   padding: $spacing-md;
-  border-bottom: 1px solid var(--card-border, $color-border);
+  border-bottom: 2px solid var(--card-border, $color-border);
 }
 
 .title {
@@ -67,7 +66,7 @@
   width: 100%;
   padding: 12px $spacing-md;
   border: none;
-  border-bottom: 1px solid var(--card-border, $color-border);
+  border-bottom: 2px solid var(--card-border, $color-border);
   background: none;
   cursor: pointer;
   text-align: left;

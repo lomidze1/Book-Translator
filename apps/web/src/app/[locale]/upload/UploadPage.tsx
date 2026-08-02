@@ -187,7 +187,18 @@ export default function UploadPage() {
 
   return (
     <div className={styles.main}>
-      <div className={styles.container}>
+      <div className={styles.left}>
+        {/* Three-step indicator: one 2px-bordered row of equal cells. */}
+        <div className={styles.steps}>
+          <div className={`${styles.step} ${!file ? styles.stepCurrent : ''}`}>{t('step_upload')}</div>
+          <div className={`${styles.step} ${file && uploadProgress < 100 ? styles.stepCurrent : ''}`}>
+            {t('step_settings')}
+          </div>
+          <div className={`${styles.step} ${uploadProgress === 100 ? styles.stepCurrent : ''}`}>
+            {t('step_translate')}
+          </div>
+        </div>
+
         <h1 className={styles.title}>{t('title')}</h1>
         <p className={styles.subtitle}>{t('subtitle')}</p>
 
@@ -215,17 +226,13 @@ export default function UploadPage() {
 
           {!file ? (
             <div className={styles.dropContent}>
-              <div className={styles.dropIcon}>📄</div>
-              <p className={styles.dropText}>
-                {t('drag_text')} <span>{t('drag_click')}</span>
-              </p>
-              <p className={styles.dropHint}>{t('drag_hint')}</p>
+              <p className={styles.dropText}>{t('drag_text')}</p>
+              <p className={styles.dropHint}>{t('formats_line')}</p>
+              <span className={styles.dropBtn}>{t('drag_click')}</span>
             </div>
           ) : (
             <div className={styles.filePreview}>
-              <div className={styles.fileIcon}>
-                {getFileExtension(file.name) === '.pdf' ? '📕' : '📘'}
-              </div>
+              <div className={styles.fileThumb} aria-hidden="true" />
               <div className={styles.fileDetails}>
                 <p className={styles.fileName}>{file.name}</p>
                 <p className={styles.fileSize}>{formatFileSize(file.size)}</p>
@@ -254,12 +261,9 @@ export default function UploadPage() {
         )}
 
         {file && !uploading && uploadProgress < 100 && (
-          <>
-            <button className={styles.uploadBtn} onClick={handleUpload}>
-              {t('upload_button')}
-            </button>
-            <p className={styles.rightsNote}>{t('rights_note')}</p>
-          </>
+          <button className={styles.uploadBtn} onClick={handleUpload}>
+            {t('upload_button')} <span aria-hidden="true">→</span>
+          </button>
         )}
 
         {uploadProgress === 100 && uploadResult && (
@@ -287,16 +291,31 @@ export default function UploadPage() {
           </div>
         )}
 
-        <div className={styles.infoBox}>
-          <h3>{t('how_title')}</h3>
-          <ol>
-            <li>{t('how_step1')}</li>
-            <li>{t('how_step2')}</li>
-            <li>{t('how_step3')}</li>
-            <li>{t('how_step4')}</li>
-          </ol>
-        </div>
       </div>
+
+      {/* Right column on neutral-100 — what happens next, and the only
+          commercial promise the design allows: the first 2 pages are free and
+          the price is quoted after translation. */}
+      <aside className={styles.right}>
+        <div className={styles.panelLabel}>{t('how_title')}</div>
+        <ol className={styles.stepsList}>
+          <li>{t('how_step1')}</li>
+          <li>{t('how_step2')}</li>
+          <li>{t('how_step3')}</li>
+          <li>{t('how_step4')}</li>
+        </ol>
+        <div className={styles.summary}>
+          <div className={styles.summaryRow}>
+            <span>{t('free_pages_label')}</span>
+            <span className={styles.summaryFree}>{t('free_pages_value')}</span>
+          </div>
+          <div className={`${styles.summaryRow} ${styles.summaryRowMuted}`}>
+            <span>{t('full_book_label')}</span>
+            <span>{t('full_book_value')}</span>
+          </div>
+        </div>
+        <p className={styles.rightsNote}>{t('rights_note')}</p>
+      </aside>
     </div>
   );
 }

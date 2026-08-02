@@ -19,10 +19,14 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Close the mobile drawer on route change. usePathname is the cheapest
-  // signal here — react-router-level navigation always updates it.
-  useEffect(() => {
+  // signal here — react-router-level navigation always updates it. Adjusting
+  // during render (instead of in an effect) avoids a frame where the drawer is
+  // still open on the new route.
+  const [renderedPathname, setRenderedPathname] = useState(pathname);
+  if (renderedPathname !== pathname) {
+    setRenderedPathname(pathname);
     setMenuOpen(false);
-  }, [pathname]);
+  }
 
   // Lock body scroll while the drawer is open so the page underneath doesn't
   // scroll when the user is panning inside the drawer.
@@ -50,7 +54,7 @@ export default function Navbar() {
     <nav className={styles.navbar} aria-label="Main navigation">
       <div className={styles.container}>
         <Link href="/" className={styles.logo}>
-          Book Translator
+          Book<span className={styles.logoDot}>·</span>Translator
         </Link>
 
         {/* Desktop nav — hidden under the mobile breakpoint. */}

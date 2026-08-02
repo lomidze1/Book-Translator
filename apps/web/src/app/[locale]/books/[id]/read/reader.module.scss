@@ -18,33 +18,36 @@
   color: var(--reader-text);
   transition: background-color 0.3s, color 0.3s;
 
-  // Light theme (default)
-  --reader-bg: #ffffff;
-  --reader-text: #1a1a1a;
-  --reader-sidebar-bg: #f8f9fa;
-  --reader-toolbar-bg: #ffffff;
-  --reader-border: #e2e8f0;
-  --reader-selection: rgba(37, 99, 235, 0.2);
-  --reader-hover: #f1f5f9;
+  // Light theme (default) — the page is paper (#f6f3ec), warmer than the
+  // app's cool ground, so page and chrome read as different materials. The
+  // chrome (sidebar, reader bar) stays on the system's ground and rules.
+  --reader-bg: var(--bt-paper);
+  --reader-text: var(--bt-paper-ink);
+  --reader-text-soft: var(--bt-paper-ink-soft);
+  --reader-sidebar-bg: var(--background);
+  --reader-toolbar-bg: var(--background);
+  --reader-border: var(--bt-divider);
+  --reader-selection: rgba(236, 48, 19, 0.18);
+  --reader-hover: var(--bt-neutral-200);
 
   &[data-reader-theme="sepia"] {
     --reader-bg: #f4ecd8;
-    --reader-text: #5b4636;
+    --reader-text: #4a3b2c;
+    --reader-text-soft: #857459;
     --reader-sidebar-bg: #ede4d3;
-    --reader-toolbar-bg: #f4ecd8;
-    --reader-border: #d4c5a9;
-    --reader-selection: rgba(139, 90, 43, 0.2);
+    --reader-toolbar-bg: #ede4d3;
+    --reader-border: rgba(74, 59, 44, 0.4);
     --reader-hover: #e8dcc5;
   }
 
   &[data-reader-theme="dark"] {
-    --reader-bg: #1a1a2e;
-    --reader-text: #e0e0e0;
-    --reader-sidebar-bg: #16213e;
-    --reader-toolbar-bg: #1a1a2e;
-    --reader-border: #2d2d5e;
-    --reader-selection: rgba(99, 179, 237, 0.3);
-    --reader-hover: #252550;
+    --reader-bg: #191715;
+    --reader-text: #e6e0d6;
+    --reader-text-soft: #98918a;
+    --reader-sidebar-bg: #141312;
+    --reader-toolbar-bg: #141312;
+    --reader-border: rgba(243, 242, 242, 0.42);
+    --reader-hover: #262423;
   }
 }
 
@@ -65,7 +68,7 @@
   height: 56px;
   padding: 0 $spacing-md;
   background: var(--reader-toolbar-bg);
-  border-bottom: 1px solid var(--reader-border);
+  border-bottom: $rule solid var(--reader-border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -114,8 +117,9 @@
   }
 
   &.active {
-    background: $color-primary;
-    color: white;
+    background: var(--bt-accent);
+    color: #fff;
+    font-weight: 800;
   }
 }
 
@@ -137,10 +141,9 @@
   right: $spacing-md;
   width: 280px;
   background: var(--reader-toolbar-bg);
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-md;
   padding: $spacing-md;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   z-index: 200;
 }
 
@@ -170,7 +173,7 @@
 .sizeBtn {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   background: transparent;
   color: var(--reader-text);
   border-radius: $radius-sm;
@@ -198,7 +201,7 @@
 
 .fontSelect {
   padding: 4px 8px;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
   background: transparent;
   color: var(--reader-text);
@@ -248,7 +251,7 @@
   width: 280px;
   flex-shrink: 0;
   background: var(--reader-sidebar-bg);
-  border-right: 1px solid var(--reader-border);
+  border-right: $rule solid var(--reader-border);
   overflow-y: auto;
   transition: margin-left 0.3s;
 
@@ -258,7 +261,6 @@
     left: 0;
     bottom: 0;
     z-index: 150;
-    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
   }
 
   &.hidden {
@@ -275,7 +277,7 @@
   // Five tabs don't fit the 280px sidebar on one line — let them wrap
   // instead of pushing the last tab outside the clickable area.
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--reader-border);
+  border-bottom: $rule solid var(--reader-border);
 }
 
 .sidebarTab {
@@ -297,7 +299,7 @@
 
   &.active {
     opacity: 1;
-    border-bottom-color: $color-primary;
+    border-bottom-color: var(--bt-accent);
   }
 }
 
@@ -323,14 +325,15 @@
   }
 
   &.active {
-    background: $color-primary;
-    color: white;
+    background: var(--bt-accent);
+    color: #fff;
+    font-weight: 800;
   }
 }
 
 .sidebarItem {
   padding: $spacing-sm;
-  border-bottom: 1px solid var(--reader-border);
+  border-bottom: $rule solid var(--reader-border);
   font-size: 0.85rem;
   cursor: pointer;
 
@@ -416,7 +419,7 @@
 .searchInput {
   width: 100%;
   padding: $spacing-sm $spacing-md;
-  border: 1px solid var(--card-border, rgba(128, 128, 128, 0.3));
+  border: 2px solid var(--card-border, rgba(128, 128, 128, 0.3));
   border-radius: $radius-sm;
   background: transparent;
   color: inherit;
@@ -424,7 +427,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--primary, #3b82f6);
+    border-color: var(--primary);
   }
 }
 
@@ -448,36 +451,60 @@
 .contentArea {
   flex: 1;
   overflow-y: auto;
-  padding: $spacing-xl $spacing-md;
+  padding: 76px 44px 56px;
   scroll-behavior: smooth;
+
+  @include tablet {
+    padding: 40px 20px;
+  }
 }
 
+// Measure is 33em (≈62–66 characters) — the reading spec, not a layout column.
 .contentInner {
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: 33em;
 }
 
 .chapter {
-  margin-bottom: $spacing-xl * 3;
+  margin-bottom: 96px;
   scroll-margin-top: $spacing-lg;
 
+  // Archivo stays for the chapter title; the body below is serif.
   h2 {
-    font-size: 1.5rem;
-    margin: 0 0 $spacing-lg;
-    padding-bottom: $spacing-sm;
-    border-bottom: 1px solid var(--reader-border);
+    font-family: var(--font-archivo), var(--font-sans), sans-serif;
+    font-weight: 800;
+    font-size: 40px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin: 18px 0 44px;
+    // No rules inside the page — hierarchy is space and type only.
+    padding-bottom: 0;
+    border-bottom: none;
+
+    @include tablet {
+      font-size: 28px;
+    }
   }
 }
 
 .chapterText {
   line-height: var(--reader-line-height, 1.8);
-  font-size: var(--reader-font-size, 18px);
-  font-family: var(--reader-font-family, '"Noto Serif Georgian", Georgia, serif');
+  font-size: var(--reader-font-size, 20px);
+  font-family: var(--reader-font-family, var(--font-serif), 'Noto Serif Georgian', Georgia, serif);
+  font-weight: 400;
   white-space: pre-wrap;
   word-wrap: break-word;
 
   p {
-    margin: 0 0 $spacing-md;
+    margin: 0 0 26px;
+  }
+
+  // The pull-quote is set in space, not behind a rule.
+  blockquote {
+    margin: 44px 0 44px 2.2em;
+    padding: 0;
+    font-size: 1.1em;
+    line-height: 1.65;
+    max-width: 26em;
   }
 }
 
@@ -492,7 +519,7 @@
 
 .highlightSpan {
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 0;
   transition: filter 0.15s;
 
   &:hover {
@@ -510,9 +537,8 @@
   gap: $spacing-xs;
   padding: $spacing-xs $spacing-sm;
   background: var(--reader-toolbar-bg);
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-md;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 300;
 }
 
@@ -549,7 +575,7 @@
 
 .dotYellow { background: #facc15; }
 .dotGreen { background: #22c55e; }
-.dotBlue { background: #3b82f6; }
+.dotBlue { background: var(--bt-neutral-700); }
 .dotRed { background: #ef4444; }
 
 // ========================
@@ -562,9 +588,8 @@
   right: $spacing-lg;
   width: 320px;
   background: var(--reader-toolbar-bg);
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-md;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   z-index: 300;
   padding: $spacing-md;
 }
@@ -572,7 +597,7 @@
 .noteTextarea {
   width: 100%;
   min-height: 100px;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
   padding: $spacing-sm;
   background: transparent;
@@ -611,7 +636,7 @@
   padding: 6px 16px;
   background: transparent;
   color: var(--reader-text);
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
   font-size: 0.85rem;
   cursor: pointer;
@@ -640,15 +665,14 @@
   gap: $spacing-md;
   padding: $spacing-sm $spacing-md;
   background: var(--reader-toolbar-bg);
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-lg;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 200;
 }
 
 .pageNavBtn {
   padding: 8px 16px;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   background: transparent;
   color: var(--reader-text);
   font-size: 1rem;
@@ -790,10 +814,9 @@
   transform: translateX(-50%);
   width: min(600px, calc(100% - 32px));
   background: var(--reader-toolbar-bg);
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-lg;
   padding: $spacing-sm $spacing-md;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -861,7 +884,7 @@
   height: 4px;
   appearance: none;
   background: var(--reader-border);
-  border-radius: 2px;
+  border-radius: 0;
   cursor: pointer;
 
   &::-webkit-slider-thumb {
@@ -890,7 +913,7 @@
 
 .audioSelect {
   padding: 2px 6px;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
   background: transparent;
   color: var(--reader-text);
@@ -904,7 +927,7 @@
 
 .ttsPanel {
   padding: $spacing-md;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-md;
   background: var(--reader-bg);
   margin-bottom: $spacing-md;
@@ -931,7 +954,7 @@
 
 .ttsSelect {
   padding: 4px 8px;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
   background: transparent;
   color: var(--reader-text);
@@ -977,7 +1000,7 @@
 
 .ttsConfirm {
   padding: $spacing-sm;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
   background: var(--reader-card-bg, rgba(0, 0, 0, 0.03));
 }
@@ -1016,7 +1039,7 @@
   flex: 1;
   padding: $spacing-xs $spacing-sm;
   background: transparent;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
   color: var(--reader-text);
   cursor: pointer;
@@ -1054,15 +1077,16 @@
 .genderBtn {
   padding: 3px 10px;
   font-size: 0.75rem;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
   background: transparent;
   color: var(--reader-text);
   cursor: pointer;
 
   &.active {
-    background: $color-primary;
-    color: white;
+    background: var(--bt-accent);
+    color: #fff;
+    font-weight: 800;
     border-color: $color-primary;
   }
 }
@@ -1070,7 +1094,7 @@
 .voiceList {
   max-height: 160px;
   overflow-y: auto;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-sm;
 }
 
@@ -1080,7 +1104,7 @@
   justify-content: space-between;
   padding: $spacing-xs $spacing-sm;
   cursor: pointer;
-  border-bottom: 1px solid var(--reader-border);
+  border-bottom: $rule solid var(--reader-border);
   transition: background 0.15s;
 
   &:last-child { border-bottom: none; }
@@ -1133,7 +1157,7 @@
 
 .ttsProgress {
   padding: $spacing-md;
-  border: 1px solid var(--reader-border);
+  border: $rule solid var(--reader-border);
   border-radius: $radius-md;
   background: var(--reader-bg);
   margin-bottom: $spacing-md;
@@ -1167,7 +1191,7 @@
 .ttsProgressBarOuter {
   height: 8px;
   background: var(--reader-border);
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
   margin-bottom: $spacing-xs;
 }
@@ -1175,7 +1199,7 @@
 .ttsProgressBarInner {
   height: 100%;
   background: $color-primary;
-  border-radius: 4px;
+  border-radius: 0;
   transition: width 0.5s ease;
 }
 
@@ -1199,7 +1223,7 @@
 
 .karaokeActive {
   background-color: rgba($color-primary, 0.15);
-  border-radius: 3px;
+  border-radius: 0;
   transition: background-color 0.3s ease;
   padding: 1px 0;
 }
@@ -1216,11 +1240,10 @@
   width: 340px;
   max-width: 90vw;
   background: var(--reader-bg, #fff);
-  border-left: 1px solid var(--reader-border);
+  border-left: 2px solid var(--reader-border);
   z-index: 100;
   overflow-y: auto;
   padding: $spacing-md;
-  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.1);
 }
 
 .ttsClosePanelBtn {
@@ -1251,7 +1274,6 @@
   border: none;
   font-size: 1.3rem;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   z-index: 50;
   display: flex;
   align-items: center;

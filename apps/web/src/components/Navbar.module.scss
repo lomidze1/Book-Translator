@@ -6,29 +6,44 @@
   top: 0;
   z-index: 100;
   background: var(--background);
-  border-bottom: 1px solid var(--card-border);
-  padding: $spacing-md $spacing-lg;
+  border-bottom: $rule solid var(--bt-divider);
+  padding: 14px var(--bt-gutter);
+
+  @include tablet {
+    padding: 12px 20px;
+  }
 }
 
 .container {
-  max-width: 1200px;
-  margin: 0 auto;
+  // Full-bleed chrome on a 40px gutter — the system never centres a column.
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
 }
 
 .logo {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--primary);
+  font-weight: 900;
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+.logoDot {
+  color: var(--bt-accent);
 }
 
 // Desktop link cluster.
 .desktopLinks {
   display: flex;
-  gap: $spacing-sm;
+  gap: 10px;
   align-items: center;
+  flex: 1;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
 
   @include tablet {
     display: none;
@@ -47,43 +62,47 @@
 }
 
 .navLink {
-  padding: $spacing-sm $spacing-md;
-  border-radius: $radius-md;
-  font-weight: 500;
-  color: var(--text-secondary);
-  transition: color 0.2s;
+  padding: 8px 12px;
+  font: 600 11px/1 inherit;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--foreground);
+  border: $rule solid transparent;
+  transition: border-color 0.15s, color 0.15s;
 
   &:hover {
-    color: var(--primary);
+    border-color: var(--bt-divider);
   }
 }
 
 .navLinkActive {
-  color: var(--primary);
-  background: var(--surface-hover);
+  color: var(--bt-accent);
+  border-color: var(--bt-accent);
 }
 
 .loginBtn {
-  padding: $spacing-sm $spacing-md;
-  border-radius: $radius-md;
-  font-weight: 500;
-  transition: background 0.2s;
+  padding: 9px 12px;
+  font: 700 12px/1 inherit;
+  letter-spacing: 0.08em;
+  border: $rule solid var(--bt-divider);
+  color: var(--foreground);
+  transition: border-color 0.15s, color 0.15s;
 
   &:hover {
-    background: var(--surface-hover);
+    border-color: var(--bt-accent);
+    color: var(--bt-accent);
   }
 }
 
 .registerBtn {
-  padding: $spacing-sm $spacing-md;
-  border-radius: $radius-md;
-  font-weight: 500;
-  background: var(--primary);
+  padding: 11px 18px;
+  font: 700 13px/1 inherit;
+  background: var(--bt-accent);
   color: #fff;
-  transition: background 0.2s;
+  transition: background 0.15s;
 
   &:hover {
-    background: var(--primary-hover);
+    background: var(--bt-accent-600);
   }
 }
 
@@ -106,7 +125,7 @@
   border-radius: $radius-md;
   font-weight: 500;
   background: none;
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
@@ -131,7 +150,7 @@
   justify-content: center;
   gap: 5px;
   background: none;
-  border: 1px solid var(--card-border);
+  border: 2px solid var(--card-border);
   border-radius: $radius-md;
   cursor: pointer;
   padding: 0;
@@ -146,7 +165,7 @@
   width: 22px;
   height: 2px;
   background: var(--foreground);
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .drawerBackdrop {
@@ -168,7 +187,7 @@
   height: 100dvh;
   width: min(320px, 85vw);
   background: var(--background);
-  border-left: 1px solid var(--card-border);
+  border-left: 2px solid var(--card-border);
   transform: translateX(100%);
   transition: transform 0.25s ease-out;
   z-index: 150;
@@ -215,8 +234,8 @@
   display: flex;
   gap: $spacing-md;
   padding: $spacing-sm 0;
-  border-top: 1px solid var(--card-border);
-  border-bottom: 1px solid var(--card-border);
+  border-top: 2px solid var(--card-border);
+  border-bottom: 2px solid var(--card-border);
 }
 
 .drawerAuth {

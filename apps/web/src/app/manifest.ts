@@ -13,7 +13,7 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     dir: 'ltr',
     background_color: '#ffffff',
-    theme_color: '#2563eb',
+    theme_color: '#ec3013',
     orientation: 'any',
     categories: ['books', 'education'],
     lang: 'ka',

@@ -10,6 +10,9 @@ export default function Footer() {
   return (
     <footer className={styles.footer}>
       <div className={styles.container}>
+        <div className={styles.wordmark}>
+          Book<span className={styles.wordmarkDot}>·</span>Translator
+        </div>
         <nav className={styles.links} aria-label={t('legal_nav')}>
           <Link href="/terms">{t('terms')}</Link>
           <Link href="/privacy">{t('privacy')}</Link>

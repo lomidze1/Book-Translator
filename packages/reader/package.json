@@ -6,11 +6,14 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "react": ">=18.0.0"

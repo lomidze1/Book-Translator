@@ -41,16 +41,17 @@ export default function AudioPlayer({
   const currentChapterAudio = chapters.find(
     (c) => c.chapterNumber === currentChapter && c.status === 'COMPLETED',
   );
+  const currentAudioChapterId = currentChapterAudio?.audioChapterId;
 
   // Load audio for current chapter (speed excluded — handled separately)
   useEffect(() => {
-    if (!currentChapterAudio) return;
+    if (!currentAudioChapterId) return;
     let cancelled = false;
 
     const loadAudio = async () => {
       setIsLoading(true);
       try {
-        const url = await getStreamUrl(currentChapterAudio.audioChapterId);
+        const url = await getStreamUrl(currentAudioChapterId);
         if (url && audioRef.current && !cancelled) {
           audioRef.current.src = url;
           audioRef.current.load();
@@ -64,7 +65,7 @@ export default function AudioPlayer({
 
     loadAudio();
     return () => { cancelled = true; };
-  }, [currentChapterAudio?.audioChapterId, getStreamUrl]);
+  }, [currentAudioChapterId, getStreamUrl]);
 
   // Time update handler
   const handleTimeUpdate = useCallback(() => {
@@ -117,29 +118,29 @@ export default function AudioPlayer({
     setIsPlaying(!isPlaying);
   }, [isPlaying]);
 
-  const seek = (time: number) => {
+  const seek = useCallback((time: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime = time;
       setCurrentTime(time);
     }
-  };
+  }, []);
 
-  const skip = (seconds: number) => {
+  const skip = useCallback((seconds: number) => {
     if (audioRef.current) {
       seek(Math.max(0, Math.min(duration, audioRef.current.currentTime + seconds)));
     }
-  };
+  }, [duration, seek]);
 
   const setPlaybackSpeed = (s: number) => {
     setSpeed(s);
     if (audioRef.current) audioRef.current.playbackRate = s;
   };
 
-  const changeVolume = (v: number) => {
+  const changeVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
     setVolume(clamped);
     if (audioRef.current) audioRef.current.volume = clamped;
-  };
+  }, []);
 
   const nextChapter = useCallback(() => {
     const next = chapters.find(
@@ -201,7 +202,7 @@ export default function AudioPlayer({
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [togglePlay, prevChapter, nextChapter, volume]);
+  }, [togglePlay, prevChapter, nextChapter, volume, skip, changeVolume]);
 
   const formatTime = (seconds: number): string => {
     const m = Math.floor(seconds / 60);
@@ -222,18 +223,18 @@ export default function AudioPlayer({
       />
 
       <div className={styles.audioControls}>
-        <button className={styles.audioBtn} onClick={prevChapter} aria-label="Previous chapter">⏮</button>
-        <button className={styles.audioBtn} onClick={() => skip(-15)} aria-label="Rewind 15 seconds">-15</button>
+        <button className={styles.audioBtn} onClick={prevChapter} aria-label={t('tts_prev_chapter')}>⏮</button>
+        <button className={styles.audioBtn} onClick={() => skip(-15)} aria-label={t('tts_rewind_15')}>-15</button>
         <button
           className={`${styles.audioBtn} ${styles.audioPlayBtn}`}
           onClick={togglePlay}
           disabled={isLoading}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
+          aria-label={isPlaying ? t('tts_pause') : t('tts_play')}
         >
           {isLoading ? '⏳' : isPlaying ? '⏸' : '▶'}
         </button>
-        <button className={styles.audioBtn} onClick={() => skip(15)} aria-label="Forward 15 seconds">+15</button>
-        <button className={styles.audioBtn} onClick={nextChapter} aria-label="Next chapter">⏭</button>
+        <button className={styles.audioBtn} onClick={() => skip(15)} aria-label={t('tts_forward_15')}>+15</button>
+        <button className={styles.audioBtn} onClick={nextChapter} aria-label={t('tts_next_chapter')}>⏭</button>
       </div>
 
       <div className={styles.audioProgress}>
@@ -276,9 +277,9 @@ export default function AudioPlayer({
           onChange={(e) => setSleepTimer(e.target.value ? Number(e.target.value) : null)}
           className={styles.audioSelect}
         >
-          <option value="">Sleep</option>
+          <option value="">{t('tts_sleep_timer')}</option>
           {SLEEP_OPTIONS.map((m) => (
-            <option key={m} value={m}>{m}min</option>
+            <option key={m} value={m}>{t('tts_sleep_minutes', { minutes: m })}</option>
           ))}
         </select>
 

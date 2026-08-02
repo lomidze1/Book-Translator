@@ -1,54 +1,101 @@
 @use '../../../styles/variables' as *;
 @use '../../../styles/mixins' as *;
 
+// Upload & translate — two full-bleed columns split by a 2px rule. Everything
+// flush left, including the labels inside wide buttons.
 .main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: $rule solid var(--bt-divider);
   min-height: calc(100vh - 140px);
-  padding: $spacing-xl 0;
+
+  @include tablet {
+    grid-template-columns: 1fr;
+  }
 }
 
-.container {
-  max-width: 700px;
-  margin: 0 auto;
-  padding: 0 $spacing-md;
+.left {
+  padding: 44px var(--bt-gutter);
+  border-right: $rule solid var(--bt-divider);
+
+  @include tablet {
+    border-right: none;
+    border-bottom: $rule solid var(--bt-divider);
+    padding: 32px 20px;
+  }
 }
+
+.right {
+  padding: 44px var(--bt-gutter);
+  background: var(--bt-neutral-100);
+
+  @include tablet {
+    padding: 32px 20px;
+  }
+}
+
+// ---- Step indicator -------------------------------------------------------
+
+.steps {
+  display: flex;
+  border: $rule solid var(--bt-divider);
+  margin-bottom: 32px;
+}
+
+.step {
+  flex: 1;
+  padding: 12px 14px;
+  font: 700 12px/1 inherit;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bt-neutral-700);
+
+  & + & {
+    border-left: $rule solid var(--bt-divider);
+  }
+}
+
+.stepCurrent {
+  background: var(--bt-accent);
+  color: #fff;
+}
+
+// ---- Left column ----------------------------------------------------------
 
 .title {
-  font-size: 2rem;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: $spacing-sm;
+  margin: 0;
+  font: 800 34px/1.05 inherit;
+  letter-spacing: -0.02em;
+
+  @include tablet {
+    font-size: 26px;
+  }
 }
 
 .subtitle {
-  text-align: center;
-  color: var(--text-secondary);
-  margin-bottom: $spacing-xl;
+  margin: 12px 0 28px;
+  font: 400 15px/1.6 inherit;
+  color: var(--bt-neutral-700);
 }
 
 .dropZone {
-  border: 2px dashed var(--card-border);
-  border-radius: $radius-lg;
-  padding: $spacing-xl;
-  text-align: center;
+  border: $rule dashed var(--bt-divider);
+  background: var(--bt-neutral-100);
+  padding: 52px 28px;
+  text-align: left;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  margin-bottom: $spacing-md;
+  transition: border-color 0.15s;
 
-  &:hover {
-    border-color: var(--primary);
-    background: var(--info-bg);
-  }
-
+  &:hover,
   &.dragActive {
-    border-color: var(--primary);
-    background: var(--info-border);
+    border-color: var(--bt-accent);
   }
 
   &.hasFile {
     cursor: default;
     border-style: solid;
-    border-color: var(--primary);
-    background: var(--info-bg);
+    border-color: var(--bt-divider);
+    padding: 18px 20px;
   }
 }
 
@@ -59,186 +106,217 @@
 .dropContent {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: $spacing-sm;
-}
-
-.dropIcon {
-  font-size: 3rem;
-  margin-bottom: $spacing-sm;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .dropText {
-  font-size: 1.1rem;
-
-  span {
-    color: var(--primary);
-    font-weight: 600;
-    text-decoration: underline;
-  }
+  font: 800 20px/1.3 inherit;
 }
 
 .dropHint {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
+  font: 400 14px/1.5 inherit;
+  color: var(--bt-neutral-700);
+}
+
+.dropBtn {
+  margin-top: 14px;
+  background: var(--bt-accent);
+  color: #fff;
+  padding: 14px 20px;
+  font: 700 14px/1 inherit;
+}
+
+.dropZone:hover .dropBtn {
+  background: var(--bt-accent-600);
 }
 
 .filePreview {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
+  gap: 16px;
 }
 
-.fileIcon {
-  font-size: 2.5rem;
+// Stands in for the cover until parsing returns one.
+.fileThumb {
+  width: 44px;
+  height: 60px;
+  background: var(--bt-neutral-300);
+  flex: none;
 }
 
 .fileDetails {
   flex: 1;
   text-align: left;
+  min-width: 0;
 }
 
 .fileName {
-  font-weight: 600;
-  font-size: 1rem;
+  font: 700 15px/1.3 inherit;
   word-break: break-all;
 }
 
 .fileSize {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
+  margin-top: 4px;
+  font: 500 12px/1.3 inherit;
+  color: var(--bt-neutral-700);
 }
 
 .removeBtn {
   width: 32px;
   height: 32px;
-  border: none;
-  background: var(--remove-bg);
-  color: var(--remove-text);
-  border-radius: $radius-full;
+  border: $rule solid var(--bt-divider);
+  background: none;
+  color: var(--foreground);
   cursor: pointer;
   font-size: 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: border-color 0.15s, color 0.15s;
 
   &:hover {
-    background: var(--remove-hover);
+    border-color: var(--bt-accent);
+    color: var(--bt-accent);
   }
 }
 
 .error {
-  color: var(--error-text);
-  background: var(--error-bg);
-  padding: $spacing-sm $spacing-md;
-  border-radius: $radius-md;
-  margin-bottom: $spacing-md;
+  margin-top: 20px;
+  padding: 12px 16px;
+  border: $rule solid var(--bt-accent);
+  color: var(--bt-accent-700);
   font-size: 0.9rem;
 }
 
 .progressSection {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  margin-bottom: $spacing-md;
+  gap: 12px;
+  margin-top: 24px;
 
   span {
-    font-weight: 600;
-    min-width: 40px;
+    font-weight: 800;
+    min-width: 44px;
   }
 }
 
 .progressBar {
   flex: 1;
-  height: 10px;
-  background: var(--progress-bg);
-  border-radius: 5px;
+  height: 14px;
+  background: var(--bt-neutral-200);
+  border: $rule solid var(--bt-divider);
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
-  background: var(--primary);
-  border-radius: 5px;
+  background: var(--bt-accent);
   transition: width 0.3s;
 }
 
 .uploadBtn {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 16px;
-  background: var(--primary);
-  color: white;
+  margin-top: 24px;
+  padding: 17px 20px;
+  background: var(--bt-accent);
+  color: #fff;
   border: none;
-  border-radius: $radius-md;
-  font-size: 1.1rem;
-  font-weight: 600;
+  font: 800 15px/1 inherit;
+  text-align: left;
   cursor: pointer;
-  transition: background 0.2s;
-  margin-bottom: $spacing-lg;
+  transition: background 0.15s;
 
   &:hover {
-    background: var(--primary-hover);
+    background: var(--bt-accent-600);
   }
 }
 
 .success {
-  text-align: center;
-  padding: $spacing-lg;
-  background: var(--success-bg);
-  border-radius: $radius-md;
-  margin-bottom: $spacing-lg;
+  margin-top: 24px;
+  padding: 20px;
+  border: $rule solid var(--bt-divider);
 
   p {
-    color: var(--success-text);
+    color: var(--foreground);
     font-weight: 500;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
   }
 }
 
 .viewBookBtn {
   display: inline-block;
-  margin-top: $spacing-md;
-  padding: 10px 24px;
-  background: var(--accent-color);
-  color: white;
+  margin-top: 16px;
+  padding: 13px 20px;
+  background: var(--bt-accent);
+  color: #fff;
   border: none;
-  border-radius: $radius-md;
   cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 500;
-  transition: opacity 0.2s;
+  font: 700 14px/1 inherit;
+  transition: background 0.15s;
 
   &:hover {
-    opacity: 0.9;
+    background: var(--bt-accent-600);
   }
 }
 
-.infoBox {
-  background: var(--surface);
-  border-radius: $radius-md;
-  padding: $spacing-lg;
+// ---- Right column ---------------------------------------------------------
 
-  h3 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: $spacing-md;
-  }
+.panelLabel {
+  font: 700 11px/1 inherit;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bt-neutral-700);
+}
 
-  ol {
-    padding-left: $spacing-lg;
-    display: flex;
-    flex-direction: column;
-    gap: $spacing-sm;
-    color: var(--text-secondary);
-    line-height: 1.5;
+.stepsList {
+  margin-top: 24px;
+  padding: 0;
+  list-style: none;
+
+  li {
+    padding: 16px 0;
+    border-top: $rule solid var(--bt-divider);
+    font: 400 15px/1.55 inherit;
+    color: var(--bt-neutral-800);
+
+    &:last-child {
+      border-bottom: $rule solid var(--bt-divider);
+    }
   }
+}
+
+.summary {
+  margin-top: 32px;
+  border-top: $rule solid var(--bt-divider);
+  padding-top: 24px;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font: 500 14px/1.4 inherit;
+
+  & + & {
+    margin-top: 10px;
+  }
+}
+
+.summaryRowMuted {
+  color: var(--bt-neutral-700);
+}
+
+.summaryFree {
+  font-weight: 800;
+  color: var(--bt-accent);
 }
 
 .rightsNote {
-  margin-top: $spacing-sm;
+  margin-top: 24px;
   font-size: 0.8125rem;
-  color: var(--text-secondary);
-  text-align: center;
+  color: var(--bt-neutral-700);
 }
