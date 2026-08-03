@@ -27,6 +27,14 @@ function createMockConfigService(overrides: Record<string, string> = {}): Config
   } as unknown as ConfigService;
 }
 
+/**
+ * The system prompt ships as cached + live blocks; most assertions only care
+ * that some text is present somewhere in it.
+ */
+function systemText(callArgs: any): string {
+  return callArgs.system.map((block: any) => block.text).join('\n');
+}
+
 function createService(configOverrides: Record<string, string> = {}): ClaudeService {
   const configService = createMockConfigService(configOverrides);
   const service = new ClaudeService(configService);
@@ -77,9 +85,9 @@ describe('ClaudeService', () => {
       });
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.system).toContain('GLOSSARY');
-      expect(callArgs.system).toContain('ჯონი');
-      expect(callArgs.system).toContain('ნიუ-იორკი');
+      expect(systemText(callArgs)).toContain('GLOSSARY');
+      expect(systemText(callArgs)).toContain('ჯონი');
+      expect(systemText(callArgs)).toContain('ნიუ-იორკი');
     });
 
     it('should include previous summary for context continuity', async () => {
@@ -96,8 +104,8 @@ describe('ClaudeService', () => {
       });
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.system).toContain('STORY SO FAR');
-      expect(callArgs.system).toContain('ჯონი სახლში წავიდა');
+      expect(systemText(callArgs)).toContain('STORY SO FAR');
+      expect(systemText(callArgs)).toContain('ჯონი სახლში წავიდა');
     });
 
     it('should throw if API key not set', async () => {
@@ -218,7 +226,7 @@ describe('ClaudeService', () => {
       });
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.system).not.toContain('GLOSSARY');
+      expect(systemText(callArgs)).not.toContain('GLOSSARY');
     });
 
     it('should sanitize book title (strip newlines, truncate)', async () => {
@@ -234,8 +242,8 @@ describe('ClaudeService', () => {
       });
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.system).not.toContain('\n"Title');
-      expect(callArgs.system).toContain('Title With Newlines');
+      expect(systemText(callArgs)).not.toContain('\n"Title');
+      expect(systemText(callArgs)).toContain('Title With Newlines');
     });
 
     it('should use default model when CLAUDE_MODEL not set', () => {
@@ -276,9 +284,54 @@ describe('ClaudeService', () => {
       }
 
       // Chunks after the first must carry the previous chunk's tail
-      const secondSystem: string = mockCreate.mock.calls[1][0].system;
+      const secondSystem: string = mockCreate.mock.calls[1][0].system
+        .map((block: any) => block.text)
+        .join('\n');
       expect(secondSystem).toContain('CONTINUATION');
       expect(secondSystem).toContain('PREVIOUS TRANSLATION (ending)');
+    });
+
+    it('should translate a 10k-char chapter in a single chunk', async () => {
+      // Fewer seams means less style drift; 10k used to be split in two.
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ნათარგმნი '.repeat(600) }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      const content = 'A sentence of source text that reads naturally. '.repeat(210); // ~10k chars
+      await service.translateChapter(content, {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should carry a larger continuation tail into later chunks', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ნათარგმნი ტექსტი. '.repeat(400) }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      const content = 'The quick brown fox jumps over the lazy dog by the river. '.repeat(500);
+      await service.translateChapter(content, {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      const secondSystem: string = mockCreate.mock.calls[1][0].system
+        .map((block: any) => block.text)
+        .join('\n');
+      const sourceTail = secondSystem.split('PREVIOUS SOURCE (ending):')[1].split('PREVIOUS TRANSLATION')[0];
+      // 600 chars was too little context to hold style across a seam
+      expect(sourceTail.trim().length).toBeGreaterThan(1000);
+    });
+
+    it('should estimate chunk count against the current chunk size', () => {
+      expect(service.estimateChunkCount(10000)).toBe(1);
+      expect(service.estimateChunkCount(24000)).toBe(2);
     });
 
     it('should retry once when output is suspiciously short', async () => {
@@ -326,7 +379,7 @@ describe('ClaudeService', () => {
 
       expect(mockCreate).toHaveBeenCalledTimes(2);
       const editorCall = mockCreate.mock.calls[1][0];
-      expect(editorCall.system).toContain('literary editor');
+      expect(systemText(editorCall)).toContain('literary editor');
       expect(editorCall.messages[0].content).toContain('ENGLISH SOURCE');
       expect(editorCall.messages[0].content).toContain('პირველადი თარგმანი');
       expect(result.translatedText).toBe('დახვეწილი თარგმანი');
@@ -414,6 +467,143 @@ describe('ClaudeService', () => {
     });
   });
 
+  describe('prompt caching', () => {
+    const translateOnce = async (overrides: Record<string, unknown> = {}) => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ნათარგმნი ტექსტი საკმარისი სიგრძის' }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+      await service.translateChapter('Some source text to translate.', {
+        bookTitle: 'My Book',
+        chapterNumber: 3,
+        totalChapters: 10,
+        ...overrides,
+      });
+      return mockCreate.mock.calls[0][0];
+    };
+
+    it('should send the system prompt as blocks with a cache breakpoint', async () => {
+      const args = await translateOnce();
+
+      expect(Array.isArray(args.system)).toBe(true);
+      expect(args.system[0].cache_control).toEqual({ type: 'ephemeral' });
+      // Only the stable prefix is cached
+      expect(args.system.at(-1).cache_control).toBeUndefined();
+    });
+
+    it('should keep book-stable content in the cached block', async () => {
+      const args = await translateOnce({ styleGuide: 'ჟანრი: რომანი.' });
+
+      const cached = args.system[0].text;
+      expect(cached).toContain('GEORGIAN STYLE RULES');
+      expect(cached).toContain('My Book');
+      expect(cached).toContain('BOOK STYLE GUIDE');
+      expect(cached).toContain('ჟანრი: რომანი');
+    });
+
+    it('should keep per-chapter and per-chunk content OUT of the cached block', async () => {
+      // Deliberately a name that does not appear in the Georgian style rules,
+      // which use John/ჯონი as their transliteration example.
+      const args = await translateOnce({
+        glossary: { Queequeg: { ka: 'ქიქეგი' } },
+        previousSummary: 'აქამდე მოხდა ესა და ეს.',
+      });
+
+      const cached = args.system[0].text;
+      const volatile = args.system.map((b: any) => b.text).slice(1).join('\n');
+
+      // Chapter number changes every chapter — in the cached prefix it would
+      // invalidate the cache on every single chapter.
+      expect(cached).not.toContain('CHAPTER: 3');
+      expect(volatile).toContain('CHAPTER: 3');
+      // The glossary grows chapter by chapter, the summary changes too
+      expect(cached).not.toContain('ქიქეგი');
+      expect(volatile).toContain('ქიქეგი');
+      expect(volatile).toContain('აქამდე მოხდა');
+    });
+
+    it('should produce a byte-identical cached block across chapters of one book', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ნათარგმნი ტექსტი საკმარისი სიგრძის' }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      const base = { bookTitle: 'My Book', totalChapters: 10, styleGuide: 'ბრიფი' };
+      await service.translateChapter('Chapter one source.', { ...base, chapterNumber: 1 });
+      await service.translateChapter('Chapter two source.', {
+        ...base,
+        chapterNumber: 2,
+        glossary: { John: { ka: 'ჯონი' } },
+        previousSummary: 'რეზიუმე',
+      });
+
+      const first = mockCreate.mock.calls[0][0].system[0].text;
+      const second = mockCreate.mock.calls[1][0].system[0].text;
+      expect(second).toBe(first);
+    });
+
+    it('should cache the editor pass system prompt too', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ნათარგმნი ტექსტი საკმარისი სიგრძის ამისთვის' }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      await service.translateChapter('Some source text to translate here.', {
+        bookTitle: 'My Book',
+        chapterNumber: 1,
+        totalChapters: 2,
+        editorPass: true,
+      });
+
+      const editorSystem = mockCreate.mock.calls[1][0].system;
+      expect(Array.isArray(editorSystem)).toBe(true);
+      expect(editorSystem[0].cache_control).toEqual({ type: 'ephemeral' });
+      expect(editorSystem[0].text).toContain('GEORGIAN STYLE RULES');
+    });
+  });
+
+  describe('truncated output guard', () => {
+    it('should retry when the model stops on max_tokens', async () => {
+      const truncated = {
+        content: [{ type: 'text', text: 'ნ'.repeat(500) }],
+        usage: { input_tokens: 100, output_tokens: 16000 },
+        stop_reason: 'max_tokens',
+      };
+      const complete = {
+        content: [{ type: 'text', text: 'ს'.repeat(600) }],
+        usage: { input_tokens: 100, output_tokens: 300 },
+        stop_reason: 'end_turn',
+      };
+      mockCreate.mockResolvedValueOnce(truncated).mockResolvedValueOnce(complete);
+
+      const result = await service.translateChapter('x'.repeat(1000), {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      // A truncated generation must not be saved silently
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(result.translatedText).toBe('ს'.repeat(600));
+    });
+
+    it('should not retry a complete response of normal length', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ს'.repeat(600) }],
+        usage: { input_tokens: 100, output_tokens: 300 },
+        stop_reason: 'end_turn',
+      });
+
+      await service.translateChapter('x'.repeat(1000), {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('Georgian style rules', () => {
     it('should always include the Georgian style rules in the system prompt', async () => {
       mockCreate.mockResolvedValue({
@@ -427,7 +617,7 @@ describe('ClaudeService', () => {
         totalChapters: 1,
       });
 
-      const system = mockCreate.mock.calls[0][0].system;
+      const system = systemText(mockCreate.mock.calls[0][0]);
       expect(system).toContain('GEORGIAN STYLE RULES');
       // Dialogue dash convention is the single most visible Georgian norm
       expect(system).toContain('—');
@@ -446,7 +636,7 @@ describe('ClaudeService', () => {
         editorPass: true,
       });
 
-      const editorSystem = mockCreate.mock.calls[1][0].system;
+      const editorSystem = systemText(mockCreate.mock.calls[1][0]);
       expect(editorSystem).toContain('GEORGIAN STYLE RULES');
     });
   });
@@ -496,7 +686,7 @@ describe('ClaudeService', () => {
         styleGuide: 'ჟანრი: დეტექტივი. თხრობა: პირველი პირი.',
       });
 
-      const system = mockCreate.mock.calls[0][0].system;
+      const system = systemText(mockCreate.mock.calls[0][0]);
       expect(system).toContain('BOOK STYLE GUIDE');
       expect(system).toContain('ჟანრი: დეტექტივი');
     });
@@ -599,7 +789,7 @@ describe('ClaudeService', () => {
         },
       });
 
-      const system = mockCreate.mock.calls[0][0].system;
+      const system = systemText(mockCreate.mock.calls[0][0]);
       expect(system).toContain('ჯონი');
       expect(system).toContain('character');
       expect(system).toContain('male');

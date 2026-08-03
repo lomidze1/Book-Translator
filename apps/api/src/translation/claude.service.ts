@@ -6,6 +6,8 @@ import { GEORGIAN_STYLE_RULES } from './georgian-style-rules';
 export interface TranslationResult {
   translatedText: string;
   tokensUsed: number;
+  /** The model hit max_tokens — the text is cut off mid-thought. */
+  truncated?: boolean;
 }
 
 /** A glossary term with the metadata Georgian translation actually needs. */
@@ -45,13 +47,21 @@ export interface StorySummaryResult {
 // will start failing. Sonnet 5 is the current Sonnet-tier model.
 const DEFAULT_MODEL = 'claude-sonnet-5';
 
-const MAX_CHUNK_SIZE = 8000; // ~2000 words per chunk
+// ~3000 words per chunk. Raised from 8000 once prompt caching made the large
+// stable prefix nearly free: fewer chunks means fewer seams for style to drift
+// across. Kept well under the 16k output-token ceiling — Georgian tokenizes
+// less efficiently than English, so the translation of a 12k-char chunk still
+// has headroom.
+const MAX_CHUNK_SIZE = 12000;
 // Tail of the previous chunk fed to the next one so style/terminology don't
 // drift across chunk boundaries within a chapter.
-const CONTINUATION_TAIL_CHARS = 600;
+const CONTINUATION_TAIL_CHARS = 1500;
 // A translated chunk shorter than this fraction of its source is treated as a
 // failed/truncated generation and retried once.
 const MIN_OUTPUT_RATIO = 0.3;
+// Non-streaming ceiling. Raising this without switching to streaming risks
+// HTTP timeouts, so chunk size is tuned to stay under it instead.
+const MAX_OUTPUT_TOKENS = 16000;
 const MAX_GLOSSARY_ENTRIES = 100;
 // Proper-noun extraction reads the whole chapter in windows — a character
 // introduced on page 30 was invisible when only the opening was scanned.
@@ -179,8 +189,11 @@ export class ClaudeService implements OnModuleInit {
   }
 
   /**
-   * Translate one chunk, retrying once if the output is suspiciously short
-   * (truncated or failed generations shouldn't be saved silently).
+   * Translate one chunk, retrying once if the generation failed: either the
+   * output is suspiciously short, or the model ran into the output ceiling and
+   * the text is cut off mid-thought. A truncated chunk can still be longer than
+   * the length threshold, so `stop_reason` has to be checked separately —
+   * otherwise half a chapter gets saved as if it were complete.
    */
   private async translateChunkValidated(
     content: string,
@@ -191,13 +204,20 @@ export class ClaudeService implements OnModuleInit {
     const tooShort =
       content.length > 200 &&
       result.translatedText.trim().length < content.length * MIN_OUTPUT_RATIO;
-    if (!tooShort) return result;
+    if (!tooShort && !result.truncated) return result;
 
     this.logger.warn(
-      `Chunk output suspiciously short (${result.translatedText.length}/${content.length} chars) — retrying once`,
+      result.truncated
+        ? `Chunk hit the ${MAX_OUTPUT_TOKENS}-token output ceiling — retrying once`
+        : `Chunk output suspiciously short (${result.translatedText.length}/${content.length} chars) — retrying once`,
     );
     const retry = await this.translateSingleChunk(content, options);
     retry.tokensUsed += result.tokensUsed;
+
+    // A complete generation beats a truncated one even when it is shorter;
+    // otherwise keep whichever produced more text.
+    if (result.truncated && !retry.truncated) return retry;
+    if (retry.truncated && !result.truncated) return { ...result, tokensUsed: retry.tokensUsed };
     return retry.translatedText.trim().length > result.translatedText.trim().length
       ? retry
       : { ...result, tokensUsed: retry.tokensUsed };
@@ -207,12 +227,10 @@ export class ClaudeService implements OnModuleInit {
     content: string,
     options: ChunkOptions,
   ): Promise<TranslationResult> {
-    const systemPrompt = this.buildSystemPrompt(options);
-
     const response = await this.client!.messages.create({
       model: this._model,
-      max_tokens: 16000,
-      system: systemPrompt,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      system: this.buildSystemPrompt(options),
       messages: [
         {
           role: 'user',
@@ -226,6 +244,7 @@ export class ClaudeService implements OnModuleInit {
     return {
       translatedText: this.extractText(response),
       tokensUsed: this.countTokens(response),
+      truncated: response.stop_reason === 'max_tokens',
     };
   }
 
@@ -261,29 +280,10 @@ export class ClaudeService implements OnModuleInit {
     draft: string,
     options: ChunkOptions,
   ): Promise<TranslationResult> {
-    let systemPrompt = `You are a senior Georgian literary editor reviewing a translation from English.
-
-Compare the DRAFT Georgian translation against the ENGLISH SOURCE and produce the final version:
-- Fix mistranslations and any omitted or summarized content
-- Make the Georgian natural and fluent while staying faithful to the source's style, tone, and register
-- Keep proper nouns and terminology consistent
-
-${GEORGIAN_STYLE_RULES}`;
-
-    if (options.styleGuide?.trim()) {
-      systemPrompt += `\n\nBOOK STYLE GUIDE:\n${options.styleGuide.slice(0, 2000)}`;
-    }
-
-    systemPrompt += this.renderGlossary(options.glossary, 'GLOSSARY (these translations are mandatory):');
-
-    systemPrompt += `\n
-- Preserve the paragraph structure of the draft
-- Output ONLY the final Georgian text — no notes, no commentary, no diff`;
-
     const response = await this.client!.messages.create({
       model: this._model,
-      max_tokens: 16000,
-      system: systemPrompt,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      system: this.buildEditorSystemPrompt(options),
       messages: [
         {
           role: 'user',
@@ -298,6 +298,39 @@ ${GEORGIAN_STYLE_RULES}`;
       translatedText: this.extractText(response),
       tokensUsed: this.countTokens(response),
     };
+  }
+
+  /**
+   * Editor-pass system prompt, split the same way as the translation prompt:
+   * a book-stable cached prefix plus the per-chapter glossary.
+   */
+  buildEditorSystemPrompt(options: ChunkOptions): Anthropic.TextBlockParam[] {
+    let prefix = `You are a senior Georgian literary editor reviewing a translation from English.
+
+Compare the DRAFT Georgian translation against the ENGLISH SOURCE and produce the final version:
+- Fix mistranslations and any omitted or summarized content
+- Make the Georgian natural and fluent while staying faithful to the source's style, tone, and register
+- Keep proper nouns and terminology consistent
+- Preserve the paragraph structure of the draft
+- Output ONLY the final Georgian text — no notes, no commentary, no diff
+
+${GEORGIAN_STYLE_RULES}`;
+
+    if (options.styleGuide?.trim()) {
+      prefix += `\n\nBOOK STYLE GUIDE:\n${options.styleGuide.slice(0, 2000)}`;
+    }
+
+    const blocks: Anthropic.TextBlockParam[] = [
+      { type: 'text', text: prefix, cache_control: { type: 'ephemeral' } },
+    ];
+
+    const glossary = this.renderGlossary(
+      options.glossary,
+      'GLOSSARY (these translations are mandatory):',
+    ).trim();
+    if (glossary) blocks.push({ type: 'text', text: glossary });
+
+    return blocks;
   }
 
   /**
@@ -588,13 +621,32 @@ ${sampleText}`;
     return `${text.slice(0, SUMMARY_HEAD_CHARS)}\n\n[...]\n\n${text.slice(-SUMMARY_TAIL_CHARS)}`;
   }
 
-  private buildSystemPrompt(options: ChunkOptions): string {
+  /**
+   * The system prompt is split into a cached prefix and a live suffix.
+   *
+   * Caching is a prefix match, so everything that changes between calls has to
+   * come *after* the breakpoint. The prefix (instructions + Georgian style
+   * rules + book title + style guide) is byte-identical for every chunk of a
+   * book and is billed at ~10% on every call after the first; the suffix
+   * (chapter number, glossary, continuation tail, story summary) changes
+   * constantly and stays outside the cache.
+   */
+  private buildSystemPrompt(options: ChunkOptions): Anthropic.TextBlockParam[] {
+    const blocks: Anthropic.TextBlockParam[] = [
+      { type: 'text', text: this.buildCachedPrefix(options), cache_control: { type: 'ephemeral' } },
+    ];
+    const live = this.buildLiveSuffix(options);
+    if (live) blocks.push({ type: 'text', text: live });
+    return blocks;
+  }
+
+  /** Stable for the whole book — safe to cache. */
+  private buildCachedPrefix(options: ChunkOptions): string {
     const sanitizedTitle = this.sanitize(options.bookTitle, 200);
 
     let prompt = `You are a professional literary translator specializing in English to Georgian translation.
 
 BOOK: "${sanitizedTitle}"
-CHAPTER: ${options.chapterNumber} of ${options.totalChapters}
 
 RULES:
 - Translate from English to Georgian (ქართული)
@@ -612,6 +664,13 @@ ${GEORGIAN_STYLE_RULES}`;
     if (options.styleGuide?.trim()) {
       prompt += `\n\nBOOK STYLE GUIDE (follow it for the whole book):\n${options.styleGuide.slice(0, 2000)}`;
     }
+
+    return prompt;
+  }
+
+  /** Changes per chapter or per chunk — must stay outside the cached prefix. */
+  private buildLiveSuffix(options: ChunkOptions): string {
+    let prompt = `CHAPTER: ${options.chapterNumber} of ${options.totalChapters}`;
 
     prompt += this.renderGlossary(options.glossary, 'GLOSSARY (use these translations consistently):');
 

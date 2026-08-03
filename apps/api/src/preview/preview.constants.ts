@@ -28,7 +28,7 @@ export const PREVIEW_WORD_COUNT = 1000;
 export const PREVIEW_OVERSHOOT_WORDS = 60;
 
 /**
- * Hard ceiling, kept below claude.service's MAX_CHUNK_SIZE (8000) so a preview
+ * Hard ceiling, kept below claude.service's MAX_CHUNK_SIZE (12000) so a preview
  * is always exactly ONE Claude call. No pathological input can turn one preview
  * into twenty API calls.
  */
