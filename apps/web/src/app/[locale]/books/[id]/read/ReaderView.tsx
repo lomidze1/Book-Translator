@@ -9,6 +9,7 @@ import {
   useBookmarks,
   useHighlights,
   useNotes,
+  feedbackApi,
   FONT_FAMILIES,
   type HighlightColor,
   type Bookmark,
@@ -18,6 +19,7 @@ import {
 import ReaderToolbar from './components/ReaderToolbar';
 import ReaderSidebar, { type SearchResult } from './components/ReaderSidebar';
 import TextSelectionPopup from './components/TextSelectionPopup';
+import ReportTranslationModal from './components/ReportTranslationModal';
 import NoteEditor from './components/NoteEditor';
 import TtsGenerationPanel from './components/TtsGenerationPanel';
 import AudioPlayer from './components/AudioPlayer';
@@ -102,6 +104,8 @@ export default function ReaderView({ translation, token }: Props) {
   const [activeChapter, setActiveChapter] = useState(1);
   const [percentage, setPercentage] = useState(0);
   const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; text: string; chapterNumber: number; start: number; end: number } | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ text: string; chapterNumber: number; start: number; end: number } | null>(null);
+  const [feedbackRemaining, setFeedbackRemaining] = useState<number | null>(null);
   const [noteEditor, setNoteEditor] = useState<NoteEditorState | null>(null);
   const [flashParagraph, setFlashParagraph] = useState<string | null>(null);
   // Paginated mode state
@@ -407,6 +411,30 @@ export default function ReaderView({ translation, token }: Props) {
     setSelectionPopup(null);
   };
 
+  // Report a passage that reads wrong — the API re-translates just that chunk
+  const handleOpenReport = () => {
+    if (!selectionPopup) return;
+    const { chapterNumber, start, end, text } = selectionPopup;
+    window.getSelection()?.removeAllRanges();
+    setReportTarget({ chapterNumber, start, end, text });
+    // Best effort — the modal simply omits the counter if this fails
+    feedbackApi
+      .getQuota(token, translation.id)
+      .then((quota) => setFeedbackRemaining(quota.remaining))
+      .catch(() => setFeedbackRemaining(null));
+  };
+
+  const handleSubmitReport = async (comment: string) => {
+    if (!reportTarget) return;
+    await feedbackApi.report(token, translation.id, {
+      chapterNumber: reportTarget.chapterNumber,
+      startPosition: reportTarget.start,
+      endPosition: reportTarget.end,
+      selectedText: reportTarget.text,
+      comment: comment || undefined,
+    });
+  };
+
   // Copy text
   const handleCopy = () => {
     if (selectionPopup?.text) {
@@ -651,7 +679,18 @@ export default function ReaderView({ translation, token }: Props) {
           onHighlight={handleHighlight}
           onAddNote={handleAddNoteFromSelection}
           onCopy={handleCopy}
+          onReport={handleOpenReport}
           onClose={() => setSelectionPopup(null)}
+        />
+      )}
+
+      {/* Report a bad passage — queues a targeted re-translation */}
+      {reportTarget && (
+        <ReportTranslationModal
+          selectedText={reportTarget.text}
+          remaining={feedbackRemaining}
+          onSubmit={handleSubmitReport}
+          onClose={() => setReportTarget(null)}
         />
       )}
 

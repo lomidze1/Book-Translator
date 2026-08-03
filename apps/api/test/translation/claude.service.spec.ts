@@ -627,6 +627,67 @@ describe('ClaudeService', () => {
     });
   });
 
+  describe('retranslateWithFeedback', () => {
+    it('should send the source, the rejected draft and the reader complaint', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'მან გადაწყვიტა და წავიდა სახლში ამის შემდეგ.' }],
+        usage: { input_tokens: 200, output_tokens: 100 },
+      });
+
+      const result = await service.retranslateWithFeedback(
+        'He made a decision and went home.',
+        'მან მიიღო გადაწყვეტილება და წავიდა სახლში.',
+        { selectedText: 'მან მიიღო გადაწყვეტილება', comment: 'კალკია' },
+        { bookTitle: 'Book', chapterNumber: 1, totalChapters: 3 },
+      );
+
+      expect(result.translatedText).toContain('გადაწყვიტა');
+      expect(result.tokensUsed).toBe(300);
+
+      const userContent = mockCreate.mock.calls[0][0].messages[0].content;
+      expect(userContent).toContain('He made a decision');
+      expect(userContent).toContain('მან მიიღო გადაწყვეტილება და წავიდა');
+      expect(userContent).toContain('კალკია');
+
+      // The Georgian rules and book brief still apply to a redo
+      const system = mockCreate.mock.calls[0][0].system;
+      expect(system[0].cache_control).toEqual({ type: 'ephemeral' });
+      expect(system[0].text).toContain('GEORGIAN STYLE RULES');
+    });
+
+    it('should work without a written comment', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'გადამუშავებული ტექსტი' }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      await service.retranslateWithFeedback(
+        'Source.',
+        'დრაფტი.',
+        { selectedText: 'დრაფტი' },
+        { bookTitle: 'Book', chapterNumber: 1, totalChapters: 1 },
+      );
+
+      const userContent = mockCreate.mock.calls[0][0].messages[0].content;
+      expect(userContent).toContain('დრაფტი');
+    });
+
+    it('should throw without an API key', async () => {
+      const origReadFileSync = require('fs').readFileSync;
+      require('fs').readFileSync = () => { throw new Error('no .env in test'); };
+      try {
+        const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
+        await expect(
+          noKeyService.retranslateWithFeedback('s', 'd', { selectedText: 'x' }, {
+            bookTitle: 'B', chapterNumber: 1, totalChapters: 1,
+          }),
+        ).rejects.toThrow();
+      } finally {
+        require('fs').readFileSync = origReadFileSync;
+      }
+    });
+  });
+
   describe('prompt caching', () => {
     const translateOnce = async (overrides: Record<string, unknown> = {}) => {
       mockCreate.mockResolvedValue({

@@ -48,3 +48,15 @@ export const EDITOR_BATCH_JOB_OPTIONS = {
   removeOnComplete: { count: 100 },
   removeOnFail: { count: 500 },
 };
+
+/** Reader-triggered re-translations, off the translation queue's critical path. */
+export const RETRANSLATION_QUEUE = 'retranslation';
+
+// attempts: 2 — every retry is a real Claude spend, and a failed redo just
+// leaves the reader with the draft they already have.
+export const RETRANSLATION_JOB_OPTIONS = {
+  attempts: 2,
+  backoff: { type: 'exponential' as const, delay: 10000 },
+  removeOnComplete: { count: 200 },
+  removeOnFail: { count: 500 },
+};

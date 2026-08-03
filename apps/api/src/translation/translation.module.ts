@@ -7,6 +7,9 @@ import { QualityCheckService } from './quality-check.service';
 import { GeminiJudgeService } from './gemini-judge.service';
 import { BatchEditorService } from './batch-editor.service';
 import { EditorBatchProcessor } from './editor-batch.processor';
+import { FeedbackService } from './feedback.service';
+import { RetranslationService } from './retranslation.service';
+import { RetranslationProcessor } from './retranslation.processor';
 import { ParsingModule } from '../parsing/parsing.module';
 import { NotificationModule } from '../notification/notification.module';
 
@@ -21,7 +24,10 @@ import { NotificationModule } from '../notification/notification.module';
     GeminiJudgeService,
     BatchEditorService,
     EditorBatchProcessor,
+    FeedbackService,
+    RetranslationService,
+    RetranslationProcessor,
   ],
-  exports: [TranslationService, ClaudeService, QualityCheckService, GeminiJudgeService],
+  exports: [TranslationService, ClaudeService, QualityCheckService, GeminiJudgeService, FeedbackService],
 })
 export class TranslationModule {}

@@ -46,6 +46,7 @@ model User {
   highlights      Highlight[]
   notes           Note[]
   readingProgress ReadingProgress[]
+  translationFeedback TranslationFeedback[]
 
   // Notification relations
   notificationPreference NotificationPreference?
@@ -136,6 +137,7 @@ model Chapter {
 
   translatedChapters TranslatedChapter[]
   audioChapters      AudioChapter[]
+  translationFeedback TranslationFeedback[]
 
   @@unique([bookId, number])
   @@index([bookId])
@@ -164,6 +166,7 @@ model Translation {
   translatedChapters TranslatedChapter[]
   audioBooks         AudioBook[]
   payment            Payment?
+  feedback           TranslationFeedback[]
 
   startedAt    DateTime?
   completedAt  DateTime?
@@ -188,6 +191,47 @@ enum TranslationStatus {
   IN_PROGRESS
   COMPLETED
   FAILED
+}
+
+enum FeedbackStatus {
+  PENDING
+  RETRANSLATING
+  APPLIED
+  REJECTED
+}
+
+/**
+ * A reader flagging a passage that reads wrong. Two jobs: it queues a targeted
+ * re-translation of the affected chunk, and it accumulates as the real-error
+ * corpus that glossary fixes and prompt examples are drawn from.
+ */
+model TranslationFeedback {
+  id            String      @id @default(cuid())
+  translationId String
+  translation   Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  chapterId     String
+  chapter       Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /** Character range in the TRANSLATED chapter text. */
+  startPosition Int
+  endPosition   Int
+  selectedText  String
+  comment       String?
+
+  status     FeedbackStatus @default(PENDING)
+  /** Reports of the same passage collapse into one row and bump this. */
+  reportCount Int           @default(1)
+  resolvedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([translationId])
+  @@index([userId])
+  @@index([status])
+  @@index([translationId, chapterId])
 }
 
 model TranslatedChapter {

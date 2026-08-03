@@ -11,7 +11,9 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { TranslationService } from './translation.service';
+import { FeedbackService } from './feedback.service';
 import { CreateTranslationDto } from './dto';
+import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { devShortcutsEnabled } from '../common/dev-shortcuts';
@@ -19,7 +21,10 @@ import { devShortcutsEnabled } from '../common/dev-shortcuts';
 @Controller('translations')
 @UseGuards(JwtAuthGuard)
 export class TranslationController {
-  constructor(private readonly translationService: TranslationService) {}
+  constructor(
+    private readonly translationService: TranslationService,
+    private readonly feedbackService: FeedbackService,
+  ) {}
 
   @Post()
   async create(@Body() dto: CreateTranslationDto, @CurrentUser('id') userId: string) {
@@ -48,6 +53,29 @@ export class TranslationController {
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {
     return this.translationService.getTranslationsByBook(bookId, userId, page, limit);
+  }
+
+  /**
+   * Reader-reported translation problem. Queues a targeted re-translation of
+   * the affected passage and feeds our record of real errors.
+   */
+  @Post(':id/feedback')
+  async createFeedback(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreateFeedbackDto,
+  ) {
+    return this.feedbackService.create(id, userId, dto);
+  }
+
+  @Get(':id/feedback/quota')
+  async getFeedbackQuota(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.feedbackService.getQuota(id, userId);
+  }
+
+  @Get(':id/feedback')
+  async listFeedback(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.feedbackService.listForTranslation(id, userId);
   }
 
   @Post(':id/retry')

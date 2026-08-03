@@ -270,6 +270,56 @@ export class ClaudeService implements OnModuleInit {
     return batch.id;
   }
 
+  /**
+   * Redo one passage a reader flagged as wrong. The model is given the source,
+   * the draft it produced, and the complaint, and returns a replacement for the
+   * whole passage — not a patch — so the result still reads as one piece.
+   */
+  async retranslateWithFeedback(
+    source: string,
+    previousDraft: string,
+    feedback: { selectedText: string; comment?: string | null },
+    options: ChunkOptions,
+  ): Promise<TranslationResult> {
+    if (!this.client) {
+      throw new Error('Claude API not configured — set ANTHROPIC_API_KEY');
+    }
+
+    const complaint = feedback.comment?.trim()
+      ? `A reader flagged this passage as wrong:\n"${feedback.selectedText}"\nTheir note: ${feedback.comment.trim()}`
+      : `A reader flagged this passage as wrong:\n"${feedback.selectedText}"\n(no explanation given — work out what reads badly and fix it)`;
+
+    const response = await this.client.messages.create({
+      model: this._model,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      system: this.buildEditorSystemPrompt(options),
+      messages: [
+        {
+          role: 'user',
+          content: `${complaint}
+
+Retranslate the passage below from scratch, keeping everything that was already right and fixing what the reader flagged. Preserve the paragraph structure. Output ONLY the Georgian text.
+
+ENGLISH SOURCE:
+${source}
+
+---
+
+PREVIOUS GEORGIAN TRANSLATION:
+${previousDraft}`,
+        },
+      ],
+    }, {
+      timeout: 300000,
+    });
+
+    return {
+      translatedText: this.extractText(response),
+      tokensUsed: this.countTokens(response),
+      truncated: response.stop_reason === 'max_tokens',
+    };
+  }
+
   async isBatchEnded(batchId: string): Promise<boolean> {
     if (!this.client) return false;
     const batch = await this.client.messages.batches.retrieve(batchId);

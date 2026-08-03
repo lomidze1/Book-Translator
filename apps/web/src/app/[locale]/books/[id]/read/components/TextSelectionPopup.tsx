@@ -9,10 +9,11 @@ interface Props {
   onHighlight: (color: HighlightColor) => void;
   onAddNote: () => void;
   onCopy: () => void;
+  onReport: () => void;
   onClose: () => void;
 }
 
-export default function TextSelectionPopup({ position, onHighlight, onAddNote, onCopy, onClose }: Props) {
+export default function TextSelectionPopup({ position, onHighlight, onAddNote, onCopy, onReport, onClose }: Props) {
   const t = useTranslations('reader');
 
   return (
@@ -34,6 +35,9 @@ export default function TextSelectionPopup({ position, onHighlight, onAddNote, o
       </button>
       <button className={styles.selectionBtn} onClick={() => { onCopy(); onClose(); }}>
         {t('copy_text')}
+      </button>
+      <button className={styles.selectionBtn} onClick={() => { onReport(); onClose(); }}>
+        {t('report_translation')}
       </button>
     </div>
   );

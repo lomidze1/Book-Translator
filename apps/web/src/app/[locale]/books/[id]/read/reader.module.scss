@@ -1282,3 +1282,113 @@
 
   &:hover { transform: scale(1.1); }
 }
+
+// ========================
+// Report a bad translation
+// ========================
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-md;
+  z-index: 400;
+}
+
+.reportModal {
+  width: 100%;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--reader-toolbar-bg);
+  color: var(--reader-text);
+  border: $rule solid var(--reader-border);
+  border-radius: $radius-md;
+  padding: $spacing-lg;
+
+  h3 {
+    margin: 0 0 $spacing-sm;
+    font-size: 1.05rem;
+  }
+}
+
+.reportHint {
+  margin: 0 0 $spacing-sm;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.reportQuote {
+  margin: 0 0 $spacing-md;
+  padding: $spacing-sm $spacing-md;
+  border-left: 3px solid $color-primary;
+  background: var(--reader-bg);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  max-height: 8rem;
+  overflow-y: auto;
+}
+
+.reportLabel {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+}
+
+.reportTextarea {
+  width: 100%;
+  border: $rule solid var(--reader-border);
+  border-radius: $radius-sm;
+  padding: $spacing-sm;
+  background: transparent;
+  color: var(--reader-text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+
+  &:focus {
+    outline: 2px solid $color-primary;
+    outline-offset: -1px;
+  }
+}
+
+.reportError {
+  margin: $spacing-sm 0 0;
+  font-size: 0.85rem;
+  color: #ef4444;
+}
+
+.reportActions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-md;
+  justify-content: flex-end;
+}
+
+.reportSubmit {
+  padding: 6px 16px;
+  background: $color-primary;
+  color: white;
+  border: none;
+  border-radius: $radius-sm;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { background: $color-primary-dark; }
+  &:disabled { opacity: 0.6; cursor: default; }
+}
+
+.reportCancel {
+  padding: 6px 16px;
+  background: transparent;
+  color: var(--reader-text);
+  border: $rule solid var(--reader-border);
+  border-radius: $radius-sm;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:disabled { opacity: 0.6; cursor: default; }
+}

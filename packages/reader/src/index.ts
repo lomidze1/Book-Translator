@@ -2,6 +2,12 @@ export * from './types';
 export { setApiUrl } from './api/api-client';
 export { readerApi } from './api/reader-api';
 export { ttsApi } from './api/tts-api';
+export { feedbackApi } from './api/feedback-api';
+export type {
+  TranslationFeedback,
+  FeedbackQuota,
+  ReportInput,
+} from './api/feedback-api';
 export type { AudioChapterInfo, AudioBookStatus, TtsVoice } from './api/tts-api';
 export { useReaderSettings } from './hooks/useReaderSettings';
 export { useReadingProgress } from './hooks/useReadingProgress';
