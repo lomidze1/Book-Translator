@@ -1,14 +1,43 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
+import { GEORGIAN_STYLE_RULES } from './georgian-style-rules';
 
 export interface TranslationResult {
   translatedText: string;
   tokensUsed: number;
 }
 
+/** A glossary term with the metadata Georgian translation actually needs. */
+export interface GlossaryEntry {
+  /** The Georgian form. */
+  ka: string;
+  type?: 'character' | 'place' | 'organization' | 'term';
+  /**
+   * Characters only. Georgian has no grammatical gender — this exists so the
+   * model can repeat a name where genderless "ის" would be ambiguous.
+   */
+  gender?: 'male' | 'female';
+}
+
+/**
+ * Persisted glossaries predate the rich shape, so both are accepted on read:
+ * a bare string is the Georgian form.
+ */
+export type Glossary = Record<string, string | GlossaryEntry>;
+
 export interface GlossaryExtractionResult {
-  glossary: Record<string, string>;
+  glossary: Record<string, GlossaryEntry>;
+  tokensUsed: number;
+}
+
+export interface StyleGuideResult {
+  styleGuide: string;
+  tokensUsed: number;
+}
+
+export interface StorySummaryResult {
+  summary: string;
   tokensUsed: number;
 }
 
@@ -24,13 +53,23 @@ const CONTINUATION_TAIL_CHARS = 600;
 // failed/truncated generation and retried once.
 const MIN_OUTPUT_RATIO = 0.3;
 const MAX_GLOSSARY_ENTRIES = 100;
+// Proper-noun extraction reads the whole chapter in windows — a character
+// introduced on page 30 was invisible when only the opening was scanned.
+const GLOSSARY_WINDOW_CHARS = 12000;
+const MAX_GLOSSARY_WINDOWS = 4;
+// The rolling story summary reads the head and tail of each chapter so late
+// plot turns are not lost.
+const SUMMARY_HEAD_CHARS = 6000;
+const SUMMARY_TAIL_CHARS = 3000;
 
 interface ChapterOptions {
   bookTitle: string;
   chapterNumber: number;
   totalChapters: number;
-  glossary?: Record<string, string>;
+  glossary?: Glossary;
   previousSummary?: string;
+  /** Book-level brief: genre, register, narrative voice, address forms. */
+  styleGuide?: string;
   /** Second editor pass comparing draft vs source (premium tier). */
   editorPass?: boolean;
   onChunkComplete?: (chunkIndex: number, totalChunks: number) => Promise<void>;
@@ -40,8 +79,9 @@ interface ChunkOptions {
   bookTitle: string;
   chapterNumber: number;
   totalChapters: number;
-  glossary?: Record<string, string>;
+  glossary?: Glossary;
   previousSummary?: string;
+  styleGuide?: string;
   continuation?: { sourceTail: string; translationTail: string };
 }
 
@@ -226,14 +266,15 @@ export class ClaudeService implements OnModuleInit {
 Compare the DRAFT Georgian translation against the ENGLISH SOURCE and produce the final version:
 - Fix mistranslations and any omitted or summarized content
 - Make the Georgian natural and fluent while staying faithful to the source's style, tone, and register
-- Keep proper nouns and terminology consistent`;
+- Keep proper nouns and terminology consistent
 
-    if (options.glossary && Object.keys(options.glossary).length > 0) {
-      systemPrompt += '\n\nGLOSSARY (these translations are mandatory):';
-      for (const [english, georgian] of Object.entries(options.glossary)) {
-        systemPrompt += `\n- "${this.sanitize(english, 100)}" → "${this.sanitize(georgian, 100)}"`;
-      }
+${GEORGIAN_STYLE_RULES}`;
+
+    if (options.styleGuide?.trim()) {
+      systemPrompt += `\n\nBOOK STYLE GUIDE:\n${options.styleGuide.slice(0, 2000)}`;
     }
+
+    systemPrompt += this.renderGlossary(options.glossary, 'GLOSSARY (these translations are mandatory):');
 
     systemPrompt += `\n
 - Preserve the paragraph structure of the draft
@@ -267,28 +308,69 @@ Compare the DRAFT Georgian translation against the ENGLISH SOURCE and produce th
    */
   async extractGlossaryTerms(
     sourceText: string,
-    existing: Record<string, string> = {},
+    existing: Glossary = {},
   ): Promise<GlossaryExtractionResult> {
     if (!this.client) return { glossary: {}, tokensUsed: 0 };
-    if (Object.keys(existing).length >= MAX_GLOSSARY_ENTRIES) {
-      return { glossary: {}, tokensUsed: 0 };
+
+    // Established terms accumulate across windows so a name found on page 1
+    // is not re-proposed (with a different spelling) on page 30.
+    const known = this.normalizeGlossary(existing);
+    const found: Record<string, GlossaryEntry> = {};
+    let tokensUsed = 0;
+
+    const windows = this.splitForGlossaryScan(sourceText);
+    for (const window of windows) {
+      if (Object.keys(known).length >= MAX_GLOSSARY_ENTRIES) break;
+
+      const result = await this.extractGlossaryWindow(window, known);
+      tokensUsed += result.tokensUsed;
+      Object.assign(found, result.glossary);
+      Object.assign(known, result.glossary);
     }
 
+    return { glossary: found, tokensUsed };
+  }
+
+  /** Whole-chapter coverage, capped so a huge chapter cannot run away. */
+  private splitForGlossaryScan(text: string): string[] {
+    if (text.length <= GLOSSARY_WINDOW_CHARS) return [text];
+    const windows: string[] = [];
+    for (
+      let i = 0;
+      i < text.length && windows.length < MAX_GLOSSARY_WINDOWS;
+      i += GLOSSARY_WINDOW_CHARS
+    ) {
+      windows.push(text.slice(i, i + GLOSSARY_WINDOW_CHARS));
+    }
+    return windows;
+  }
+
+  private async extractGlossaryWindow(
+    sourceText: string,
+    known: Record<string, GlossaryEntry>,
+  ): Promise<GlossaryExtractionResult> {
     let prompt = `From the following English text, extract proper nouns that need a consistent Georgian transliteration: character names, place names, organizations, and recurring invented terms. Skip common words and one-off mentions of real-world places with obvious Georgian forms.`;
 
-    const existingEntries = Object.entries(existing);
-    if (existingEntries.length > 0) {
+    const knownEntries = Object.entries(known);
+    if (knownEntries.length > 0) {
       prompt += `\n\nAlready established (do NOT repeat or change these):`;
-      for (const [english, georgian] of existingEntries) {
-        prompt += `\n- "${this.sanitize(english, 100)}" → "${this.sanitize(georgian, 100)}"`;
+      for (const [english, entry] of knownEntries) {
+        prompt += `\n- "${this.sanitize(english, 100)}" → "${this.sanitize(entry.ka, 100)}"`;
       }
     }
 
-    prompt += `\n\nReturn ONLY a JSON object mapping each NEW English name to its Georgian transliteration, e.g. {"John":"ჯონი"}. Return {} if there is nothing new.\n\nTEXT:\n${sourceText}`;
+    prompt += `\n\nFor each NEW name return the Georgian form plus its type ("character", "place", "organization" or "term"). For characters also give "gender" ("male" or "female") when the text makes it clear — Georgian pronouns are genderless, so the translator needs this to avoid ambiguity.
 
-    const response = await this.client.messages.create({
+Return ONLY a JSON object, e.g.:
+{"John":{"ka":"ჯონი","type":"character","gender":"male"},"London":{"ka":"ლონდონი","type":"place"}}
+Return {} if there is nothing new.
+
+TEXT:
+${sourceText}`;
+
+    const response = await this.client!.messages.create({
       model: this._model,
-      max_tokens: 1500,
+      max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     }, {
       timeout: 120000,
@@ -304,20 +386,53 @@ Compare the DRAFT Georgian translation against the ENGLISH SOURCE and produce th
       if (start === -1 || end === -1) return { glossary: {}, tokensUsed };
 
       const parsed = JSON.parse(jsonText.slice(start, end + 1)) as Record<string, unknown>;
-      const glossary: Record<string, string> = {};
-      const budget = MAX_GLOSSARY_ENTRIES - existingEntries.length;
+      const glossary: Record<string, GlossaryEntry> = {};
+      const budget = MAX_GLOSSARY_ENTRIES - knownEntries.length;
 
       for (const [key, value] of Object.entries(parsed)) {
         if (Object.keys(glossary).length >= budget) break;
-        if (typeof value === 'string' && key.trim() && value.trim() && !(key in existing)) {
-          glossary[this.sanitize(key, 100)] = this.sanitize(value, 100);
-        }
+        if (!key.trim() || key in known) continue;
+        const entry = this.toGlossaryEntry(value);
+        if (entry) glossary[this.sanitize(key, 100)] = entry;
       }
       return { glossary, tokensUsed };
     } catch {
       this.logger.warn('Glossary extraction returned unparseable JSON — skipping');
       return { glossary: {}, tokensUsed };
     }
+  }
+
+  /** Accepts both the rich object form and the legacy bare-string form. */
+  private toGlossaryEntry(value: unknown): GlossaryEntry | null {
+    if (typeof value === 'string') {
+      return value.trim() ? { ka: this.sanitize(value, 100) } : null;
+    }
+    if (!value || typeof value !== 'object') return null;
+
+    const raw = value as Record<string, unknown>;
+    const ka = typeof raw.ka === 'string' ? raw.ka.trim() : '';
+    if (!ka) return null;
+
+    const entry: GlossaryEntry = { ka: this.sanitize(ka, 100) };
+    const type = String(raw.type || '');
+    if (['character', 'place', 'organization', 'term'].includes(type)) {
+      entry.type = type as GlossaryEntry['type'];
+    }
+    const gender = String(raw.gender || '');
+    if (entry.type === 'character' && (gender === 'male' || gender === 'female')) {
+      entry.gender = gender;
+    }
+    return entry;
+  }
+
+  /** Normalize a persisted glossary (either shape) to the rich form. */
+  normalizeGlossary(glossary: Glossary = {}): Record<string, GlossaryEntry> {
+    const normalized: Record<string, GlossaryEntry> = {};
+    for (const [key, value] of Object.entries(glossary)) {
+      const entry = this.toGlossaryEntry(value);
+      if (entry) normalized[key] = entry;
+    }
+    return normalized;
   }
 
   /**
@@ -390,21 +505,87 @@ Compare the DRAFT Georgian translation against the ENGLISH SOURCE and produce th
     return pieces;
   }
 
-  async generateChapterSummary(translatedText: string): Promise<string> {
-    if (!this.client) return '';
+  /**
+   * One call at the start of a book: read samples from the beginning, middle
+   * and end and write the brief a human translator would be given — genre,
+   * era, narrative voice, dialogue register, address forms. Every chunk then
+   * translates against the same brief instead of re-guessing the tone.
+   */
+  async generateStyleGuide(samples: string[], bookTitle: string): Promise<StyleGuideResult> {
+    if (!this.client) return { styleGuide: '', tokensUsed: 0 };
+
+    const sampleText = samples
+      .filter((sample) => sample?.trim())
+      .map((sample, i) => `--- SAMPLE ${i + 1} ---\n${sample.slice(0, 4000)}`)
+      .join('\n\n');
+    if (!sampleText) return { styleGuide: '', tokensUsed: 0 };
+
+    const prompt = `You are briefing a Georgian literary translator before they start "${this.sanitize(bookTitle, 200)}". Read the samples and write the brief.
+
+Cover, in Georgian, briefly and concretely:
+- ჟანრი და ეპოქა (genre and period)
+- თხრობის ხმა (narrative voice: person, tense, distance)
+- რეგისტრი (register: archaic/neutral/colloquial — and how to render it in Georgian)
+- დიალოგის ტონი (how characters speak to each other)
+- მიმართვის ფორმა (შენ/თქვენ per character pair, with the reason)
+- განმეორებადი მოტივები ან ტერმინოლოგია (recurring motifs or terminology to keep consistent)
+
+Write at most 250 words. No preamble, no headings other than the six above.
+
+SAMPLES:
+${sampleText}`;
 
     const response = await this.client.messages.create({
       model: this._model,
-      max_tokens: 500,
-      messages: [
-        {
-          role: 'user',
-          content: `Summarize this chapter in 2-3 sentences in Georgian for context continuity:\n\n${translatedText.slice(0, 3000)}`,
-        },
-      ],
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: prompt }],
+    }, {
+      timeout: 180000,
     });
 
-    return this.extractText(response);
+    return {
+      styleGuide: this.extractText(response).trim(),
+      tokensUsed: this.countTokens(response),
+    };
+  }
+
+  /**
+   * Rolling plot memory. Built from the SOURCE chapter (not the translation)
+   * and folded into the running summary, so chapter 20 knows what happened in
+   * chapter 5 — the old per-chapter summary only saw the first 3000 characters
+   * of the chapter that had just been translated.
+   */
+  async generateStorySummary(
+    sourceChapter: string,
+    previousSummary?: string,
+  ): Promise<StorySummaryResult> {
+    if (!this.client) return { summary: '', tokensUsed: 0 };
+
+    let prompt = 'You maintain a running plot summary for a translator working chapter by chapter.\n\n';
+    if (previousSummary?.trim()) {
+      prompt += `STORY SO FAR:\n${previousSummary.slice(0, 3000)}\n\n`;
+    }
+    prompt += `NEW CHAPTER (English source):\n${this.sampleHeadAndTail(sourceChapter)}\n\n`;
+    prompt += `Rewrite the running summary in Georgian so it covers the story through this chapter: who the characters are, their relationships, and the plot state. Keep what still matters, drop what no longer does. At most 200 words. Output only the summary.`;
+
+    const response = await this.client.messages.create({
+      model: this._model,
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }],
+    }, {
+      timeout: 120000,
+    });
+
+    return {
+      summary: this.extractText(response).trim(),
+      tokensUsed: this.countTokens(response),
+    };
+  }
+
+  /** Head + tail of a long chapter, so late plot turns survive truncation. */
+  private sampleHeadAndTail(text: string): string {
+    if (text.length <= SUMMARY_HEAD_CHARS + SUMMARY_TAIL_CHARS) return text;
+    return `${text.slice(0, SUMMARY_HEAD_CHARS)}\n\n[...]\n\n${text.slice(-SUMMARY_TAIL_CHARS)}`;
   }
 
   private buildSystemPrompt(options: ChunkOptions): string {
@@ -424,14 +605,15 @@ RULES:
 - Preserve any numbered lists, headings, or special formatting
 - Do NOT add translator notes or commentary
 - Do NOT skip or summarize any content — translate everything
-- Output ONLY the translated text`;
+- Output ONLY the translated text
 
-    if (options.glossary && Object.keys(options.glossary).length > 0) {
-      prompt += '\n\nGLOSSARY (use these translations consistently):';
-      for (const [english, georgian] of Object.entries(options.glossary)) {
-        prompt += `\n- "${this.sanitize(english, 100)}" → "${this.sanitize(georgian, 100)}"`;
-      }
+${GEORGIAN_STYLE_RULES}`;
+
+    if (options.styleGuide?.trim()) {
+      prompt += `\n\nBOOK STYLE GUIDE (follow it for the whole book):\n${options.styleGuide.slice(0, 2000)}`;
     }
+
+    prompt += this.renderGlossary(options.glossary, 'GLOSSARY (use these translations consistently):');
 
     if (options.continuation) {
       prompt += `\n\nCONTINUATION: This text continues mid-chapter, directly after the passage below. Continue seamlessly — same style, register, and terminology. Do NOT re-translate or repeat the previous passage.
@@ -442,10 +624,26 @@ ${options.continuation.translationTail}`;
     }
 
     if (options.previousSummary) {
-      prompt += `\n\nPREVIOUS CHAPTER CONTEXT:\n${options.previousSummary.slice(0, 1000)}`;
+      prompt += `\n\nSTORY SO FAR (context only — do not translate this):\n${options.previousSummary.slice(0, 1500)}`;
     }
 
     return prompt;
+  }
+
+  /**
+   * Render glossary entries, including type and gender when known, so the
+   * model can decline names correctly and disambiguate genderless pronouns.
+   */
+  private renderGlossary(glossary: Glossary | undefined, heading: string): string {
+    const entries = Object.entries(this.normalizeGlossary(glossary));
+    if (entries.length === 0) return '';
+
+    let section = `\n\n${heading}`;
+    for (const [english, entry] of entries) {
+      const meta = [entry.type, entry.gender].filter(Boolean).join(', ');
+      section += `\n- "${this.sanitize(english, 100)}" → "${this.sanitize(entry.ka, 100)}"${meta ? ` (${meta})` : ''}`;
+    }
+    return section;
   }
 
   private extractText(response: Anthropic.Message): string {

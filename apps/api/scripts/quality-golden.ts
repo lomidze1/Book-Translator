@@ -48,10 +48,13 @@ async function main() {
     console.log(`\n=== ${file} (${source.length} chars) ===`);
 
     const started = Date.now();
+    // Mirror the real pipeline: brief first, then translate against it.
+    const { styleGuide } = await claude.generateStyleGuide([source], file);
     const { translatedText, tokensUsed } = await claude.translateChapter(source, {
       bookTitle: 'Golden Set',
       chapterNumber: 1,
       totalChapters: 1,
+      styleGuide,
       editorPass: true,
     });
     const seconds = Math.round((Date.now() - started) / 100) / 10;
@@ -70,7 +73,7 @@ async function main() {
       }
     }
 
-    results.push({ file, tokensUsed, seconds, mechanical, judge: scores, translatedText });
+    results.push({ file, tokensUsed, seconds, styleGuide, mechanical, judge: scores, translatedText });
   }
 
   const outDir = path.join(__dirname, '../test/golden/results');

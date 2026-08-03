@@ -154,6 +154,7 @@ model Translation {
   aiModel         String?
   totalTokensUsed Int?
   glossary        Json?
+  styleGuide      String?
   qualityScore    Float?
   qualityReport   Json?
 

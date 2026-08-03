@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { Worker, Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
-import { ClaudeService } from './claude.service';
+import { ClaudeService, Glossary } from './claude.service';
 import { TranslationService } from './translation.service';
 import { NotificationService } from '../notification/notification.service';
 import { QualityCheckService, ChapterQualityReport } from './quality-check.service';
@@ -24,6 +24,9 @@ interface QualitySample {
 // The judge scores an aligned slice from the top of each sampled chapter —
 // enough to evaluate, small enough to keep judging cost negligible.
 const JUDGE_SAMPLE_CHARS = 2500;
+// Style-guide samples: enough prose to read the register, small enough that
+// the brief costs one cheap call per book.
+const STYLE_SAMPLE_CHARS = 4000;
 
 @Injectable()
 export class TranslationProcessor implements OnModuleInit {
@@ -107,12 +110,15 @@ export class TranslationProcessor implements OnModuleInit {
       throw new Error('Book not found');
     }
 
-    const glossary = (translation?.glossary as Record<string, string>) || {};
+    const glossary = this.claude.normalizeGlossary((translation?.glossary as Glossary) || {});
     // Premium (FAST) tier gets a second editor pass per chunk
     const editorPass = translation?.translationType === 'FAST';
 
     // Mark as in progress
     await this.translationService.updateProgress(translationId, 0, 'IN_PROGRESS');
+
+    // Book-level brief, written once and reused by every chunk (and by a retry).
+    const styleGuide = await this.ensureStyleGuide(translationId, book.title, chapters, translation?.styleGuide);
 
     // Pre-scan all chapters to estimate total chunks for granular progress
     const chapterContents = chapters.map((chapter) => ({
@@ -144,7 +150,7 @@ export class TranslationProcessor implements OnModuleInit {
         // translating. Failures are non-fatal — translation proceeds without.
         try {
           const extraction = await this.claude.extractGlossaryTerms(
-            chapter.originalContent.slice(0, 12000),
+            chapter.originalContent,
             glossary,
           );
           totalTokens += extraction.tokensUsed;
@@ -164,6 +170,7 @@ export class TranslationProcessor implements OnModuleInit {
           totalChapters,
           glossary,
           previousSummary,
+          styleGuide,
           editorPass,
           onChunkComplete: async () => {
             completedChunks++;
@@ -203,13 +210,28 @@ export class TranslationProcessor implements OnModuleInit {
         const s3Key = this.s3.generateTranslationKey(bookId, translationId, chapter.number);
         await this.s3.upload(s3Key, Buffer.from(result.translatedText, 'utf-8'), 'text/plain');
 
-        // Generate summary for context continuity
-        previousSummary = await this.claude.generateChapterSummary(result.translatedText);
+        // Roll the story summary forward from the SOURCE, so chapter 20 still
+        // knows what happened in chapter 5. Non-fatal: a failed summary only
+        // costs context, it must not fail the chapter.
+        try {
+          const summary = await this.claude.generateStorySummary(
+            chapter.originalContent,
+            previousSummary,
+          );
+          totalTokens += summary.tokensUsed;
+          if (summary.summary) previousSummary = summary.summary;
+        } catch (err) {
+          this.logger.warn(`Story summary failed for chapter ${chapter.number}: ${err instanceof Error ? err.message : err}`);
+        }
 
         // Persist accumulated tokens and the growing glossary
         await this.prisma.translation.update({
           where: { id: translationId },
-          data: { totalTokensUsed: totalTokens, aiModel: this.claude.getModel(), glossary },
+          data: {
+            totalTokensUsed: totalTokens,
+            aiModel: this.claude.getModel(),
+            glossary: glossary as unknown as Prisma.InputJsonValue,
+          },
         });
       } catch (error) {
         this.logger.error(`Failed to translate chapter ${chapter.number}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -235,6 +257,40 @@ export class TranslationProcessor implements OnModuleInit {
 
     // Send notification
     await this.notifyCompletion(translationId, bookId);
+  }
+
+  /**
+   * Return the book's style guide, generating and persisting it on first run.
+   * A stored guide is reused so a retry doesn't pay for it twice, and any
+   * failure degrades to translating without one.
+   */
+  private async ensureStyleGuide(
+    translationId: string,
+    bookTitle: string,
+    chapters: Array<{ originalContent: string }>,
+    stored?: string | null,
+  ): Promise<string | undefined> {
+    if (stored?.trim()) return stored;
+
+    try {
+      // Beginning, middle and end — a book's register can shift a long way
+      // between its opening page and its last chapter.
+      const indices = [...new Set([0, Math.floor(chapters.length / 2), chapters.length - 1])];
+      const samples = indices.map((i) => chapters[i].originalContent.slice(0, STYLE_SAMPLE_CHARS));
+
+      const { styleGuide, tokensUsed } = await this.claude.generateStyleGuide(samples, bookTitle);
+      if (!styleGuide) return undefined;
+
+      await this.prisma.translation.update({
+        where: { id: translationId },
+        data: { styleGuide },
+      });
+      this.logger.log(`Style guide generated (${styleGuide.length} chars, ${tokensUsed} tokens)`);
+      return styleGuide;
+    } catch (err) {
+      this.logger.warn(`Style guide generation failed (non-fatal): ${err instanceof Error ? err.message : err}`);
+      return undefined;
+    }
   }
 
   /**

@@ -96,7 +96,7 @@ describe('ClaudeService', () => {
       });
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.system).toContain('PREVIOUS CHAPTER CONTEXT');
+      expect(callArgs.system).toContain('STORY SO FAR');
       expect(callArgs.system).toContain('ჯონი სახლში წავიდა');
     });
 
@@ -382,7 +382,8 @@ describe('ClaudeService', () => {
 
       const result = await service.extractGlossaryTerms('John met Mary.', { John: 'ჯონი' });
 
-      expect(result.glossary).toEqual({ Mary: 'მერი' });
+      // Entries normalize to the rich shape; a bare string means just `ka`.
+      expect(result.glossary).toEqual({ Mary: { ka: 'მერი' } });
       expect(result.tokensUsed).toBe(230);
       const callArgs = mockCreate.mock.calls[0][0];
       expect(callArgs.messages[0].content).toContain('Already established');
@@ -413,53 +414,256 @@ describe('ClaudeService', () => {
     });
   });
 
-  describe('generateChapterSummary', () => {
-    it('should return summary text', async () => {
+  describe('Georgian style rules', () => {
+    it('should always include the Georgian style rules in the system prompt', async () => {
       mockCreate.mockResolvedValue({
-        content: [{ type: 'text', text: 'ეს თავი მოგვითხრობს...' }],
-        usage: { input_tokens: 50, output_tokens: 20 },
+        content: [{ type: 'text', text: 'ტექსტი' }],
+        usage: { input_tokens: 10, output_tokens: 5 },
       });
 
-      const summary = await service.generateChapterSummary('Long translated text here...');
-      expect(summary).toBe('ეს თავი მოგვითხრობს...');
-      expect(mockCreate).toHaveBeenCalledTimes(1);
+      await service.translateChapter('Hello', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      const system = mockCreate.mock.calls[0][0].system;
+      expect(system).toContain('GEORGIAN STYLE RULES');
+      // Dialogue dash convention is the single most visible Georgian norm
+      expect(system).toContain('—');
     });
 
-    it('should return empty string if no API key', async () => {
-      const origKey = process.env.ANTHROPIC_API_KEY;
-      delete process.env.ANTHROPIC_API_KEY;
-      // Also prevent .env file fallback from finding the key
+    it('should include the Georgian style rules in the editor pass too', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ტექსტი საკმარისი სიგრძის რომ არ ჩაითვალოს მოკლედ' }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+
+      await service.translateChapter('Hello world, this is a source text.', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+        editorPass: true,
+      });
+
+      const editorSystem = mockCreate.mock.calls[1][0].system;
+      expect(editorSystem).toContain('GEORGIAN STYLE RULES');
+    });
+  });
+
+  describe('generateStyleGuide', () => {
+    it('should build a book-level brief from samples and return tokens used', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ჟანრი: სათავგადასავლო რომანი. რეგისტრი: ლიტერატურული.' }],
+        usage: { input_tokens: 400, output_tokens: 100 },
+      });
+
+      const result = await service.generateStyleGuide(
+        ['Opening sample text.', 'Middle sample text.', 'Closing sample text.'],
+        'Moby Dick',
+      );
+
+      expect(result.styleGuide).toContain('ჟანრი');
+      expect(result.tokensUsed).toBe(500);
+      const prompt = mockCreate.mock.calls[0][0].messages[0].content;
+      expect(prompt).toContain('Moby Dick');
+      expect(prompt).toContain('Opening sample text.');
+      expect(prompt).toContain('Closing sample text.');
+    });
+
+    it('should return an empty guide without an API key', async () => {
       const origReadFileSync = require('fs').readFileSync;
       require('fs').readFileSync = () => { throw new Error('no .env in test'); };
       try {
         const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
-        const summary = await noKeyService.generateChapterSummary('text');
-        expect(summary).toBe('');
+        const result = await noKeyService.generateStyleGuide(['sample'], 'Book');
+        expect(result).toEqual({ styleGuide: '', tokensUsed: 0 });
       } finally {
-        process.env.ANTHROPIC_API_KEY = origKey || 'test-key';
         require('fs').readFileSync = origReadFileSync;
       }
     });
 
-    it('should truncate input to 3000 chars', async () => {
+    it('should include the style guide in every chunk system prompt', async () => {
       mockCreate.mockResolvedValue({
-        content: [{ type: 'text', text: 'summary' }],
-        usage: { input_tokens: 50, output_tokens: 10 },
+        content: [{ type: 'text', text: 'ტექსტი' }],
+        usage: { input_tokens: 10, output_tokens: 5 },
       });
 
-      const longText = 'a'.repeat(10000);
-      await service.generateChapterSummary(longText);
+      await service.translateChapter('Hello', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+        styleGuide: 'ჟანრი: დეტექტივი. თხრობა: პირველი პირი.',
+      });
 
-      const callArgs = mockCreate.mock.calls[0][0];
-      const userContent = callArgs.messages[0].content;
-      // The input should be truncated (content after slice should be ~3000 chars, not 10000)
-      expect(userContent.length).toBeLessThan(10000);
-    });
-
-    it('should propagate API errors from generateChapterSummary', async () => {
-      mockCreate.mockRejectedValue(new Error('API timeout'));
-
-      await expect(service.generateChapterSummary('some text')).rejects.toThrow('API timeout');
+      const system = mockCreate.mock.calls[0][0].system;
+      expect(system).toContain('BOOK STYLE GUIDE');
+      expect(system).toContain('ჟანრი: დეტექტივი');
     });
   });
+
+  describe('rich glossary', () => {
+    it('should parse typed glossary entries with gender', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{
+          type: 'text',
+          text: '{"John":{"ka":"ჯონი","type":"character","gender":"male"},"London":{"ka":"ლონდონი","type":"place"}}',
+        }],
+        usage: { input_tokens: 200, output_tokens: 30 },
+      });
+
+      const result = await service.extractGlossaryTerms('John went to London.');
+
+      expect(result.glossary).toEqual({
+        John: { ka: 'ჯონი', type: 'character', gender: 'male' },
+        London: { ka: 'ლონდონი', type: 'place' },
+      });
+    });
+
+    it('should accept the legacy flat string form from the model', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: '{"Mary":"მერი"}' }],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      });
+
+      const result = await service.extractGlossaryTerms('Mary arrived.');
+      expect(result.glossary).toEqual({ Mary: { ka: 'მერი' } });
+    });
+
+    it('should skip entries already established, in either shape', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{
+          type: 'text',
+          text: '{"John":{"ka":"ჯონი"},"Mary":{"ka":"მერი","type":"character"}}',
+        }],
+        usage: { input_tokens: 100, output_tokens: 20 },
+      });
+
+      // Existing glossary in the OLD flat shape (as persisted before Phase 3)
+      const result = await service.extractGlossaryTerms('John met Mary.', { John: 'ჯონი' });
+
+      expect(result.glossary).toEqual({ Mary: { ka: 'მერი', type: 'character' } });
+      const prompt = mockCreate.mock.calls[0][0].messages[0].content;
+      expect(prompt).toContain('ჯონი');
+    });
+
+    it('should scan the whole chapter in windows, not just the opening', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: '{}' }],
+        usage: { input_tokens: 100, output_tokens: 5 },
+      });
+
+      // 30k chars — the old code only looked at the first 12k
+      const chapter = 'x'.repeat(14000) + ' LATE_CHARACTER ' + 'y'.repeat(14000);
+      await service.extractGlossaryTerms(chapter);
+
+      expect(mockCreate.mock.calls.length).toBeGreaterThan(1);
+      const allPrompts = mockCreate.mock.calls.map((c: any) => c[0].messages[0].content).join('');
+      expect(allPrompts).toContain('LATE_CHARACTER');
+    });
+
+    it('should carry terms found in an early window into later windows', async () => {
+      mockCreate
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: '{"Ahab":{"ka":"აჰაბი","type":"character"}}' }],
+          usage: { input_tokens: 100, output_tokens: 20 },
+        })
+        .mockResolvedValue({
+          content: [{ type: 'text', text: '{}' }],
+          usage: { input_tokens: 100, output_tokens: 5 },
+        });
+
+      const chapter = 'a'.repeat(14000) + ' more text ' + 'b'.repeat(14000);
+      const result = await service.extractGlossaryTerms(chapter);
+
+      expect(result.glossary).toEqual({ Ahab: { ka: 'აჰაბი', type: 'character' } });
+      // The second window must be told Ahab is already established
+      const secondPrompt = mockCreate.mock.calls[1][0].messages[0].content;
+      expect(secondPrompt).toContain('აჰაბი');
+    });
+
+    it('should render types and gender in the translation system prompt', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ტექსტი' }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+
+      await service.translateChapter('John and Mary in London.', {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+        glossary: {
+          John: { ka: 'ჯონი', type: 'character', gender: 'male' },
+          London: { ka: 'ლონდონი', type: 'place' },
+          Mary: 'მერი', // legacy flat entry must still render
+        },
+      });
+
+      const system = mockCreate.mock.calls[0][0].system;
+      expect(system).toContain('ჯონი');
+      expect(system).toContain('character');
+      expect(system).toContain('male');
+      expect(system).toContain('ლონდონი');
+      expect(system).toContain('მერი');
+    });
+  });
+
+  describe('generateStorySummary', () => {
+    it('should summarize from the source and fold in the previous summary', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'განახლებული რეზიუმე' }],
+        usage: { input_tokens: 300, output_tokens: 80 },
+      });
+
+      const result = await service.generateStorySummary(
+        'Ishmael boards the Pequod and meets Queequeg.',
+        'აქამდე: იშმაელი ნავსადგურში ჩავიდა.',
+      );
+
+      expect(result.summary).toBe('განახლებული რეზიუმე');
+      expect(result.tokensUsed).toBe(380);
+      const prompt = mockCreate.mock.calls[0][0].messages[0].content;
+      // Cumulative: both the running summary and the new source chapter
+      expect(prompt).toContain('იშმაელი ნავსადგურში ჩავიდა');
+      expect(prompt).toContain('Ishmael boards the Pequod');
+    });
+
+    it('should work without a previous summary (first chapter)', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'პირველი რეზიუმე' }],
+        usage: { input_tokens: 100, output_tokens: 40 },
+      });
+
+      const result = await service.generateStorySummary('Chapter one source text.');
+      expect(result.summary).toBe('პირველი რეზიუმე');
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return an empty summary without an API key', async () => {
+      const origReadFileSync = require('fs').readFileSync;
+      require('fs').readFileSync = () => { throw new Error('no .env in test'); };
+      try {
+        const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
+        const result = await noKeyService.generateStorySummary('text');
+        expect(result).toEqual({ summary: '', tokensUsed: 0 });
+      } finally {
+        require('fs').readFileSync = origReadFileSync;
+      }
+    });
+
+    it('should sample long chapters from both ends instead of only the head', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'რეზიუმე' }],
+        usage: { input_tokens: 100, output_tokens: 20 },
+      });
+
+      const chapter = 'START_MARKER ' + 'x'.repeat(20000) + ' END_MARKER';
+      await service.generateStorySummary(chapter);
+
+      const prompt = mockCreate.mock.calls[0][0].messages[0].content;
+      expect(prompt).toContain('START_MARKER');
+      expect(prompt).toContain('END_MARKER');
+    });
+  });
+
 });

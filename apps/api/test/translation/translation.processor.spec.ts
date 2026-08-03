@@ -33,8 +33,18 @@ describe('TranslationProcessor', () => {
 
   const mockClaude = {
     translateChapter: vi.fn(),
-    generateChapterSummary: vi.fn(),
+    generateStorySummary: vi.fn().mockResolvedValue({ summary: 'რეზიუმე', tokensUsed: 10 }),
+    generateStyleGuide: vi.fn().mockResolvedValue({ styleGuide: 'ჟანრი: რომანი.', tokensUsed: 20 }),
     extractGlossaryTerms: vi.fn().mockResolvedValue({ glossary: {}, tokensUsed: 0 }),
+    // Mirrors the real implementation: legacy string entries become { ka }.
+    normalizeGlossary: vi.fn((glossary: Record<string, unknown> = {}) =>
+      Object.fromEntries(
+        Object.entries(glossary).map(([key, value]) => [
+          key,
+          typeof value === 'string' ? { ka: value } : value,
+        ]),
+      ),
+    ),
     getModel: vi.fn().mockReturnValue('claude-sonnet-5'),
     estimateChunkCount: vi.fn().mockReturnValue(1),
   };
@@ -81,6 +91,8 @@ describe('TranslationProcessor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClaude.generateStorySummary.mockResolvedValue({ summary: 'რეზიუმე', tokensUsed: 10 });
+    mockClaude.generateStyleGuide.mockResolvedValue({ styleGuide: 'ჟანრი: რომანი.', tokensUsed: 20 });
     mockQualityCheck.checkChapter.mockReturnValue(cleanReport);
     mockQualityCheck.summarize.mockReturnValue({ chaptersChecked: 1, chaptersFlagged: 0, flagCounts: {} });
     mockGeminiJudge.isEnabled.mockReturnValue(false);
@@ -113,7 +125,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'ნათარგმნი ტექსტი', tokensUsed: 100 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('თავის რეზიუმე');
 
       await callProcess(job);
 
@@ -128,8 +139,8 @@ describe('TranslationProcessor', () => {
       // Should upload to S3
       expect(mockS3.upload).toHaveBeenCalledTimes(2);
 
-      // Should generate summaries for context continuity
-      expect(mockClaude.generateChapterSummary).toHaveBeenCalledTimes(2);
+      // Should maintain the rolling story summary for context continuity
+      expect(mockClaude.generateStorySummary).toHaveBeenCalledTimes(2);
 
       // Should mark as completed
       expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
@@ -152,15 +163,48 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
       );
-      mockClaude.generateChapterSummary
-        .mockResolvedValueOnce('Summary of chapter 1')
-        .mockResolvedValueOnce('Summary of chapter 2');
+      mockClaude.generateStorySummary
+        .mockResolvedValueOnce({ summary: 'Summary through chapter 1', tokensUsed: 10 })
+        .mockResolvedValueOnce({ summary: 'Summary through chapter 2', tokensUsed: 10 });
 
       await callProcess(job);
 
-      // Second chapter should receive first chapter's summary
+      // Second chapter should receive the running summary
       const secondCall = mockClaude.translateChapter.mock.calls[1];
-      expect(secondCall[1].previousSummary).toBe('Summary of chapter 1');
+      expect(secondCall[1].previousSummary).toBe('Summary through chapter 1');
+    });
+
+    it('should build the rolling summary from the SOURCE and carry it forward', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+
+      mockPrisma.chapter.findMany.mockResolvedValue([
+        { id: 'ch-1', number: 1, originalContent: 'English source of chapter one.' },
+        { id: 'ch-2', number: 2, originalContent: 'English source of chapter two.' },
+      ]);
+      mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
+      mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null });
+      mockPrisma.translation.update.mockResolvedValue({});
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'ნათარგმნი', tokensUsed: 50 }),
+      );
+      mockClaude.generateStorySummary
+        .mockResolvedValueOnce({ summary: 'რეზიუმე თავი 1-ის შემდეგ', tokensUsed: 10 })
+        .mockResolvedValueOnce({ summary: 'რეზიუმე თავი 2-ის შემდეგ', tokensUsed: 10 });
+
+      await callProcess(job);
+
+      // Summary is derived from the source text, not the translation
+      expect(mockClaude.generateStorySummary).toHaveBeenNthCalledWith(
+        1,
+        'English source of chapter one.',
+        undefined,
+      );
+      // ...and the running summary is folded into the next call
+      expect(mockClaude.generateStorySummary).toHaveBeenNthCalledWith(
+        2,
+        'English source of chapter two.',
+        'რეზიუმე თავი 1-ის შემდეგ',
+      );
     });
 
     it('should fail if no chapters found', async () => {
@@ -220,7 +264,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 10 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
@@ -249,13 +292,14 @@ describe('TranslationProcessor', () => {
         if (options.onChunkComplete) await options.onChunkComplete(0, 1);
         return { translatedText: 'text', tokensUsed };
       });
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
-      // Second update should have accumulated tokens (100 + 200 = 300)
-      const lastTokenCall = mockPrisma.translation.update.mock.calls[1];
-      expect(lastTokenCall[0].data.totalTokensUsed).toBe(300);
+      // Translation tokens (100 + 200) plus the rolling summary calls (10 each)
+      const tokenCalls = mockPrisma.translation.update.mock.calls.filter(
+        (call) => call[0].data.totalTokensUsed !== undefined,
+      );
+      expect(tokenCalls.at(-1)![0].data.totalTokensUsed).toBe(320);
     });
 
     it('should use glossary from translation record', async () => {
@@ -273,13 +317,13 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
+      // Persisted glossaries are normalized to the rich shape before use
       expect(mockClaude.translateChapter).toHaveBeenCalledWith(
         'glossary test text',
-        expect.objectContaining({ glossary: { John: 'ჯონი' } }),
+        expect.objectContaining({ glossary: { John: { ka: 'ჯონი' } } }),
       );
     });
 
@@ -296,29 +340,33 @@ describe('TranslationProcessor', () => {
       });
       mockPrisma.translation.update.mockResolvedValue({});
       mockClaude.extractGlossaryTerms.mockResolvedValue({
-        glossary: { Mary: 'მერი' },
+        glossary: { Mary: { ka: 'მერი', type: 'character' } },
         tokensUsed: 100,
       });
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
       // NOTE: the processor mutates the same glossary object it passed in, so
       // the recorded argument reflects the post-merge state — assert loosely.
+      const mergedGlossary = {
+        John: { ka: 'ჯონი' },
+        Mary: { ka: 'მერი', type: 'character' },
+      };
+      // The whole chapter is scanned now, not just its first 12k characters
       expect(mockClaude.extractGlossaryTerms).toHaveBeenCalledWith(
         'John met Mary in London.',
-        expect.objectContaining({ John: 'ჯონი' }),
+        expect.objectContaining({ John: { ka: 'ჯონი' } }),
       );
       expect(mockClaude.translateChapter).toHaveBeenCalledWith(
         'John met Mary in London.',
-        expect.objectContaining({ glossary: { John: 'ჯონი', Mary: 'მერი' } }),
+        expect.objectContaining({ glossary: mergedGlossary }),
       );
       expect(mockPrisma.translation.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ glossary: { John: 'ჯონი', Mary: 'მერი' } }),
+          data: expect.objectContaining({ glossary: mergedGlossary }),
         }),
       );
     });
@@ -339,7 +387,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
@@ -364,7 +411,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
       mockClaude.estimateChunkCount.mockReturnValue(1);
 
       await callProcess(job);
@@ -387,7 +433,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
@@ -411,7 +456,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
@@ -432,7 +476,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'text', tokensUsed: 50 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
 
       await callProcess(job);
 
@@ -463,6 +506,87 @@ describe('TranslationProcessor', () => {
     });
   });
 
+  describe('style guide', () => {
+    const callProcess = (job: any) => (processor as any).processTranslation(job);
+
+    const setupChapters = (count: number, existing: Record<string, unknown> = {}) => {
+      mockPrisma.chapter.findMany.mockResolvedValue(
+        Array.from({ length: count }, (_, i) => ({
+          id: `ch-${i + 1}`,
+          number: i + 1,
+          originalContent: `Source of chapter ${i + 1}.`,
+        })),
+      );
+      mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'My Book' });
+      mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null, ...existing });
+      mockPrisma.translation.update.mockResolvedValue({});
+      mockClaude.translateChapter.mockImplementation(
+        mockTranslateWithCallback({ translatedText: 'ნათარგმნი', tokensUsed: 50 }),
+      );
+    };
+
+    it('should generate a style guide once and persist it', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupChapters(3);
+
+      await callProcess(job);
+
+      expect(mockClaude.generateStyleGuide).toHaveBeenCalledTimes(1);
+      expect(mockClaude.generateStyleGuide).toHaveBeenCalledWith(expect.any(Array), 'My Book');
+      expect(mockPrisma.translation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'tr-1' },
+          data: expect.objectContaining({ styleGuide: 'ჟანრი: რომანი.' }),
+        }),
+      );
+    });
+
+    it('should sample the beginning, middle and end of the book', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupChapters(7);
+
+      await callProcess(job);
+
+      const samples = mockClaude.generateStyleGuide.mock.calls[0][0];
+      expect(samples.length).toBe(3);
+      expect(samples[0]).toContain('chapter 1');
+      expect(samples[2]).toContain('chapter 7');
+    });
+
+    it('should pass the style guide into every chapter translation', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupChapters(2);
+
+      await callProcess(job);
+
+      for (const call of mockClaude.translateChapter.mock.calls) {
+        expect(call[1].styleGuide).toBe('ჟანრი: რომანი.');
+      }
+    });
+
+    it('should reuse a style guide already stored on the translation', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupChapters(2, { styleGuide: 'უკვე შენახული ბრიფი' });
+
+      await callProcess(job);
+
+      // A retry must not pay for the brief a second time
+      expect(mockClaude.generateStyleGuide).not.toHaveBeenCalled();
+      expect(mockClaude.translateChapter.mock.calls[0][1].styleGuide).toBe('უკვე შენახული ბრიფი');
+    });
+
+    it('should translate normally if style guide generation fails', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setupChapters(2);
+      mockClaude.generateStyleGuide.mockRejectedValue(new Error('API down'));
+
+      await callProcess(job);
+
+      expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
+      expect(mockClaude.translateChapter.mock.calls[0][1].styleGuide).toBeUndefined();
+    });
+  });
+
   describe('quality pipeline', () => {
     const callProcess = (job: any) => (processor as any).processTranslation(job);
 
@@ -477,7 +601,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'ნათარგმნი ტექსტი', tokensUsed: 10 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
       mockClaude.estimateChunkCount.mockReturnValue(1);
     };
 
@@ -571,7 +694,6 @@ describe('TranslationProcessor', () => {
       mockClaude.translateChapter.mockImplementation(
         mockTranslateWithCallback({ translatedText: 'ტექსტი', tokensUsed: 10 }),
       );
-      mockClaude.generateChapterSummary.mockResolvedValue('summary');
       mockGeminiJudge.isEnabled.mockReturnValue(true);
       mockGeminiJudge.judgeSample.mockResolvedValue({
         accuracy: 4, fluency: 4, consistency: 4, overall: 4, issues: [],
