@@ -8,6 +8,7 @@ import { TranslationService } from './translation.service';
 import { NotificationService } from '../notification/notification.service';
 import { QualityCheckService, ChapterQualityReport } from './quality-check.service';
 import { GeminiJudgeService, JudgeScores } from './gemini-judge.service';
+import { EditorBatchProcessor } from './editor-batch.processor';
 import { TRANSLATION_QUEUE, getRedisConnection } from './translation.constants';
 
 interface TranslationJobData {
@@ -41,6 +42,7 @@ export class TranslationProcessor implements OnModuleInit {
     private readonly notificationService: NotificationService,
     private readonly qualityCheck: QualityCheckService,
     private readonly geminiJudge: GeminiJudgeService,
+    private readonly editorBatch: EditorBatchProcessor,
   ) {}
 
   onModuleInit() {
@@ -198,12 +200,13 @@ export class TranslationProcessor implements OnModuleInit {
           this.logger.warn(`⚠️ Chapter ${chapter.number} quality flags: ${qualityReport.flags.join(', ')}`);
         }
 
-        // Save translated chapter with its quality report
+        // Save translated chapter with its quality report and chunk boundaries
         await this.translationService.saveTranslatedChapter(
           translationId,
           chapter.id,
           result.translatedText,
           qualityReport,
+          result.segments,
         );
 
         // Save to S3
@@ -252,8 +255,18 @@ export class TranslationProcessor implements OnModuleInit {
     // Best-effort: quality must never fail a finished translation.
     await this.finalizeQuality(translationId, qualityReports, qualitySamples);
 
-    // Mark as completed
+    // Mark as completed — the reader gets the draft now. For STANDARD, the
+    // batch editor then upgrades the text in place; a failure there is
+    // invisible to the reader, who simply keeps the draft.
     await this.translationService.updateProgress(translationId, 100, 'COMPLETED');
+
+    if (translation?.translationType === 'STANDARD') {
+      try {
+        await this.editorBatch.enqueue(translationId);
+      } catch (err) {
+        this.logger.warn(`Could not queue the editor batch (non-fatal): ${err instanceof Error ? err.message : err}`);
+      }
+    }
 
     // Send notification
     await this.notifyCompletion(translationId, bookId);

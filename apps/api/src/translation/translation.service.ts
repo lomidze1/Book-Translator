@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException,
 import { Prisma } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { ChapterQualityReport } from './quality-check.service';
+import { ChunkSegment } from './claude.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { ParsingService } from '../parsing/parsing.service';
@@ -257,10 +258,12 @@ export class TranslationService {
     chapterId: string,
     translatedContent: string,
     qualityReport?: ChapterQualityReport,
+    segments?: ChunkSegment[],
   ) {
-    const reportData = qualityReport
-      ? { qualityReport: qualityReport as unknown as Prisma.InputJsonValue }
-      : {};
+    const reportData = {
+      ...(qualityReport ? { qualityReport: qualityReport as unknown as Prisma.InputJsonValue } : {}),
+      ...(segments ? { segments: segments as unknown as Prisma.InputJsonValue } : {}),
+    };
     return this.prisma.translatedChapter.upsert({
       where: {
         translationId_chapterId: { translationId, chapterId },

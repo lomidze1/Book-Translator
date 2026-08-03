@@ -3,11 +3,51 @@ import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { GEORGIAN_STYLE_RULES } from './georgian-style-rules';
 
+/**
+ * A source chunk and the translation it produced, as character ranges into the
+ * chapter's source and translated text. Stored so the batch editor can rebuild
+ * exact source/draft pairs later without re-deriving chunk boundaries (which
+ * would silently shift if MAX_CHUNK_SIZE ever changed).
+ */
+export interface ChunkSegment {
+  sourceStart: number;
+  sourceEnd: number;
+  start: number;
+  end: number;
+}
+
 export interface TranslationResult {
   translatedText: string;
   tokensUsed: number;
   /** The model hit max_tokens — the text is cut off mid-thought. */
   truncated?: boolean;
+  segments?: ChunkSegment[];
+}
+
+export interface EditorBatchRequest {
+  customId: string;
+  source: string;
+  draft: string;
+  options: ChunkOptions;
+}
+
+export interface BatchResult {
+  customId: string;
+  text: string;
+  tokensUsed: number;
+  ok: boolean;
+}
+
+/**
+ * Structural shape of one Message Batch result. Declared locally rather than
+ * imported so the code doesn't depend on where the SDK happens to nest this
+ * type; `results()` returns an async-iterable of exactly this.
+ */
+interface BatchEntry {
+  custom_id: string;
+  result:
+    | { type: 'succeeded'; message: Anthropic.Message }
+    | { type: 'errored' | 'canceled' | 'expired' };
 }
 
 /** A glossary term with the metadata Georgian translation actually needs. */
@@ -85,7 +125,7 @@ interface ChapterOptions {
   onChunkComplete?: (chunkIndex: number, totalChunks: number) => Promise<void>;
 }
 
-interface ChunkOptions {
+export interface ChunkOptions {
   bookTitle: string;
   chapterNumber: number;
   totalChapters: number;
@@ -145,7 +185,12 @@ export class ClaudeService implements OnModuleInit {
         ? await this.applyEditorPass(content, result, options)
         : result;
       if (options.onChunkComplete) await options.onChunkComplete(0, 1);
-      return final;
+      return {
+        ...final,
+        segments: [
+          { sourceStart: 0, sourceEnd: content.length, start: 0, end: final.translatedText.length },
+        ],
+      };
     }
 
     this.logger.log(`Chapter ${options.chapterNumber}: ${content.length} chars — splitting into chunks`);
@@ -155,6 +200,8 @@ export class ClaudeService implements OnModuleInit {
     let translatedText = '';
     let totalTokens = 0;
     let previousChunk: { source: string; translation: string } | null = null;
+    const segments: ChunkSegment[] = [];
+    let sourceOffset = 0;
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -178,6 +225,14 @@ export class ClaudeService implements OnModuleInit {
         result = await this.applyEditorPass(chunk.text, result, chunkOptions);
       }
 
+      segments.push({
+        sourceStart: sourceOffset,
+        sourceEnd: sourceOffset + chunk.text.length,
+        start: translatedText.length,
+        end: translatedText.length + result.translatedText.length,
+      });
+      sourceOffset += chunk.text.length + chunk.separator.length;
+
       translatedText += result.translatedText + (i < chunks.length - 1 ? chunk.separator : '');
       totalTokens += result.tokensUsed;
       previousChunk = { source: chunk.text, translation: result.translatedText };
@@ -185,7 +240,67 @@ export class ClaudeService implements OnModuleInit {
       if (options.onChunkComplete) await options.onChunkComplete(i, chunks.length);
     }
 
-    return { translatedText, tokensUsed: totalTokens };
+    return { translatedText, tokensUsed: totalTokens, segments };
+  }
+
+  /**
+   * Submit editor-pass requests as one Message Batch (half price, async).
+   * Returns the batch id, or null when there is nothing to send.
+   */
+  async submitEditorBatch(requests: EditorBatchRequest[]): Promise<string | null> {
+    if (!this.client || requests.length === 0) return null;
+
+    const batch = await this.client.messages.batches.create({
+      requests: requests.map((request) => ({
+        custom_id: request.customId,
+        params: {
+          model: this._model,
+          max_tokens: MAX_OUTPUT_TOKENS,
+          system: this.buildEditorSystemPrompt(request.options),
+          messages: [
+            {
+              role: 'user' as const,
+              content: `ENGLISH SOURCE:\n${request.source}\n\n---\n\nDRAFT GEORGIAN TRANSLATION:\n${request.draft}`,
+            },
+          ],
+        },
+      })),
+    });
+
+    return batch.id;
+  }
+
+  async isBatchEnded(batchId: string): Promise<boolean> {
+    if (!this.client) return false;
+    const batch = await this.client.messages.batches.retrieve(batchId);
+    return batch.processing_status === 'ended';
+  }
+
+  /**
+   * Collect batch results. Results come back in arbitrary order, so callers
+   * must match on `customId` rather than position.
+   */
+  async getBatchResults(batchId: string): Promise<BatchResult[]> {
+    if (!this.client) return [];
+
+    const stream = await this.client.messages.batches.results(batchId);
+    const results: BatchResult[] = [];
+
+    for await (const entry of stream as AsyncIterable<BatchEntry>) {
+      if (entry.result.type === 'succeeded') {
+        results.push({
+          customId: entry.custom_id,
+          text: this.extractText(entry.result.message),
+          tokensUsed: this.countTokens(entry.result.message),
+          ok: true,
+        });
+      } else {
+        this.logger.warn(`Batch ${batchId} entry ${entry.custom_id} ${entry.result.type} — keeping draft`);
+        results.push({ customId: entry.custom_id, text: '', tokensUsed: 0, ok: false });
+      }
+    }
+
+    return results;
   }
 
   /**

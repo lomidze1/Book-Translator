@@ -75,6 +75,10 @@ describe('TranslationProcessor', () => {
     judgeSample: vi.fn().mockResolvedValue(null),
   };
 
+  const mockEditorBatch = {
+    enqueue: vi.fn().mockResolvedValue(undefined),
+  };
+
   const createMockJob = (data: { translationId: string; bookId: string }) => ({
     data,
     id: 'job-1',
@@ -97,6 +101,7 @@ describe('TranslationProcessor', () => {
     mockQualityCheck.summarize.mockReturnValue({ chaptersChecked: 1, chaptersFlagged: 0, flagCounts: {} });
     mockGeminiJudge.isEnabled.mockReturnValue(false);
     mockGeminiJudge.judgeSample.mockResolvedValue(null);
+    mockEditorBatch.enqueue.mockResolvedValue(undefined);
     processor = new (TranslationProcessor as any)(
       mockPrisma,
       mockS3,
@@ -105,6 +110,7 @@ describe('TranslationProcessor', () => {
       { notify: vi.fn().mockResolvedValue(undefined) },
       mockQualityCheck,
       mockGeminiJudge,
+      mockEditorBatch,
     );
   });
 
@@ -133,8 +139,9 @@ describe('TranslationProcessor', () => {
 
       // Should save both translated chapters
       expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledTimes(2);
-      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith('tr-1', 'ch-1', 'ნათარგმნი ტექსტი', cleanReport);
-      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith('tr-1', 'ch-2', 'ნათარგმნი ტექსტი', cleanReport);
+      // Segments are undefined here — this stub translator reports no chunks
+      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith('tr-1', 'ch-1', 'ნათარგმნი ტექსტი', cleanReport, undefined);
+      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith('tr-1', 'ch-2', 'ნათარგმნი ტექსტი', cleanReport, undefined);
 
       // Should upload to S3
       expect(mockS3.upload).toHaveBeenCalledTimes(2);
@@ -584,6 +591,70 @@ describe('TranslationProcessor', () => {
 
       expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
       expect(mockClaude.translateChapter.mock.calls[0][1].styleGuide).toBeUndefined();
+    });
+  });
+
+  describe('batch editor handoff', () => {
+    const callProcess = (job: any) => (processor as any).processTranslation(job);
+
+    const setup = (translationType: string) => {
+      mockPrisma.chapter.findMany.mockResolvedValue([
+        { id: 'ch-1', number: 1, originalContent: 'Source text.' },
+      ]);
+      mockPrisma.book.findUnique.mockResolvedValue({ id: 'book-1', title: 'Book' });
+      mockPrisma.translation.findUnique.mockResolvedValue({ id: 'tr-1', glossary: null, translationType });
+      mockPrisma.translation.update.mockResolvedValue({});
+      mockClaude.translateChapter.mockImplementation(async (_content: string, options: any) => {
+        if (options.onChunkComplete) await options.onChunkComplete(0, 1);
+        return {
+          translatedText: 'ნათარგმნი',
+          tokensUsed: 50,
+          segments: [{ sourceStart: 0, sourceEnd: 12, start: 0, end: 9 }],
+        };
+      });
+    };
+
+    it('should store chunk segments alongside the translated chapter', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setup('STANDARD');
+
+      await callProcess(job);
+
+      expect(mockTranslationService.saveTranslatedChapter).toHaveBeenCalledWith(
+        'tr-1',
+        'ch-1',
+        'ნათარგმნი',
+        cleanReport,
+        [{ sourceStart: 0, sourceEnd: 12, start: 0, end: 9 }],
+      );
+    });
+
+    it('should queue the batch editor for a STANDARD translation', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setup('STANDARD');
+
+      await callProcess(job);
+
+      expect(mockEditorBatch.enqueue).toHaveBeenCalledWith('tr-1');
+    });
+
+    it('should not queue the batch editor for FAST (already edited inline)', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setup('FAST');
+
+      await callProcess(job);
+
+      expect(mockEditorBatch.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('should still complete the translation if queueing the editor fails', async () => {
+      const job = createMockJob({ translationId: 'tr-1', bookId: 'book-1' });
+      setup('STANDARD');
+      mockEditorBatch.enqueue.mockRejectedValue(new Error('Redis down'));
+
+      await callProcess(job);
+
+      expect(mockTranslationService.updateProgress).toHaveBeenCalledWith('tr-1', 100, 'COMPLETED');
     });
   });
 

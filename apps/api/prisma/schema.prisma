@@ -157,6 +157,9 @@ model Translation {
   styleGuide      String?
   qualityScore    Float?
   qualityReport   Json?
+  /** Message Batch running the STANDARD-tier editor pass (half price, async). */
+  editorBatchId     String?
+  editorBatchStatus String?
 
   translatedChapters TranslatedChapter[]
   audioBooks         AudioBook[]
@@ -197,6 +200,8 @@ model TranslatedChapter {
   editedContent     String?
   isEdited          Boolean     @default(false)
   qualityReport     Json?
+  /** Chunk boundaries: [{sourceStart,sourceEnd,start,end}] for the batch editor. */
+  segments          Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

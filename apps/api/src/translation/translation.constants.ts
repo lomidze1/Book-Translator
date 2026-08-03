@@ -25,3 +25,26 @@ export const STUCK_TRANSLATION_THRESHOLD_MS = 30 * 60 * 1000;
 export function translationJobId(translationId: string): string {
   return `translate-${translationId}`;
 }
+
+/**
+ * Separate queue for the STANDARD-tier batch editor. Its own queue because the
+ * translation worker runs at concurrency 1 — a poll job waiting behind a
+ * multi-hour book translation would never run.
+ */
+export const EDITOR_BATCH_QUEUE = 'editor-batch';
+
+/** How long to wait between checks on a running Message Batch. */
+export const EDITOR_BATCH_POLL_DELAY_MS = 5 * 60 * 1000;
+
+/**
+ * Batches expire after 24h, so stop polling a little past that rather than
+ * re-enqueueing forever if a batch never reaches a terminal state.
+ */
+export const EDITOR_BATCH_MAX_POLLS = Math.ceil((25 * 60 * 60 * 1000) / EDITOR_BATCH_POLL_DELAY_MS);
+
+export const EDITOR_BATCH_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 30000 },
+  removeOnComplete: { count: 100 },
+  removeOnFail: { count: 500 },
+};

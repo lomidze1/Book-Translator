@@ -7,6 +7,11 @@ vi.mock('@anthropic-ai/sdk', () => {
   const MockAnthropic = vi.fn().mockImplementation(() => ({
     messages: {
       create: vi.fn(),
+      batches: {
+        create: vi.fn(),
+        retrieve: vi.fn(),
+        results: vi.fn(),
+      },
     },
   }));
   MockAnthropic.prototype.constructor = MockAnthropic;
@@ -461,6 +466,161 @@ describe('ClaudeService', () => {
         const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
         const result = await noKeyService.extractGlossaryTerms('text');
         expect(result).toEqual({ glossary: {}, tokensUsed: 0 });
+      } finally {
+        require('fs').readFileSync = origReadFileSync;
+      }
+    });
+  });
+
+  describe('chunk segments', () => {
+    it('should report one segment covering the whole text for a single chunk', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ნათარგმნი ტექსტი' }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+
+      const source = 'Short source text.';
+      const result = await service.translateChapter(source, {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(result.segments).toEqual([
+        { sourceStart: 0, sourceEnd: source.length, start: 0, end: 'ნათარგმნი ტექსტი'.length },
+      ]);
+    });
+
+    it('should report a segment per chunk that slices back to the original texts', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ქართული ტექსტი. '.repeat(300) }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      const source = 'The quick brown fox jumps over the lazy dog by the river. '.repeat(500);
+      const result = await service.translateChapter(source, {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      expect(result.segments!.length).toBeGreaterThan(1);
+      expect(result.segments!.length).toBe(mockCreate.mock.calls.length);
+
+      for (const segment of result.segments!) {
+        // Every range must address real text in both directions
+        expect(segment.sourceEnd).toBeGreaterThan(segment.sourceStart);
+        expect(segment.end).toBeGreaterThan(segment.start);
+        expect(source.slice(segment.sourceStart, segment.sourceEnd).trim().length).toBeGreaterThan(0);
+        expect(result.translatedText.slice(segment.start, segment.end).length).toBeGreaterThan(0);
+      }
+
+      // Segments are ordered and non-overlapping
+      for (let i = 1; i < result.segments!.length; i++) {
+        expect(result.segments![i].start).toBeGreaterThanOrEqual(result.segments![i - 1].end);
+        expect(result.segments![i].sourceStart).toBeGreaterThanOrEqual(result.segments![i - 1].sourceEnd);
+      }
+
+      // The first chunk's source slice matches what was actually sent
+      const firstSent: string = mockCreate.mock.calls[0][0].messages[0].content.replace(
+        /^Translate the following text from English to Georgian:\n\n/,
+        '',
+      );
+      expect(source.slice(result.segments![0].sourceStart, result.segments![0].sourceEnd)).toBe(firstSent);
+    });
+  });
+
+  describe('batch API', () => {
+    let mockBatches: any;
+
+    beforeEach(() => {
+      mockBatches = (service as any).client.messages.batches;
+    });
+
+    it('should submit editor requests and return the batch id', async () => {
+      mockBatches.create.mockResolvedValue({ id: 'msgbatch_123' });
+
+      const batchId = await service.submitEditorBatch([
+        { customId: 'ch1_0', source: 'English source.', draft: 'ქართული დრაფტი.', options: { bookTitle: 'Book', chapterNumber: 1, totalChapters: 2 } },
+      ]);
+
+      expect(batchId).toBe('msgbatch_123');
+      const payload = mockBatches.create.mock.calls[0][0];
+      expect(payload.requests).toHaveLength(1);
+      expect(payload.requests[0].custom_id).toBe('ch1_0');
+      expect(payload.requests[0].params.messages[0].content).toContain('English source.');
+      expect(payload.requests[0].params.messages[0].content).toContain('ქართული დრაფტი.');
+      // Editor instructions ride along as the system prompt
+      expect(payload.requests[0].params.system[0].text).toContain('literary editor');
+    });
+
+    it('should return null for an empty request list without calling the API', async () => {
+      const batchId = await service.submitEditorBatch([]);
+
+      expect(batchId).toBeNull();
+      expect(mockBatches.create).not.toHaveBeenCalled();
+    });
+
+    it('should report whether a batch has ended', async () => {
+      mockBatches.retrieve.mockResolvedValue({ processing_status: 'in_progress' });
+      expect(await service.isBatchEnded('msgbatch_123')).toBe(false);
+
+      mockBatches.retrieve.mockResolvedValue({ processing_status: 'ended' });
+      expect(await service.isBatchEnded('msgbatch_123')).toBe(true);
+    });
+
+    it('should return successful results keyed by custom_id', async () => {
+      mockBatches.results.mockResolvedValue([
+        {
+          custom_id: 'ch2_0',
+          result: {
+            type: 'succeeded',
+            message: {
+              content: [{ type: 'text', text: 'დარედაქტირებული ტექსტი' }],
+              usage: { input_tokens: 100, output_tokens: 200 },
+            },
+          },
+        },
+        { custom_id: 'ch1_0', result: { type: 'errored', error: { type: 'invalid_request' } } },
+      ]);
+
+      const results = await service.getBatchResults('msgbatch_123');
+
+      expect(results).toEqual([
+        { customId: 'ch2_0', text: 'დარედაქტირებული ტექსტი', tokensUsed: 300, ok: true },
+        { customId: 'ch1_0', text: '', tokensUsed: 0, ok: false },
+      ]);
+    });
+
+    it('should consume an async-iterable results stream', async () => {
+      mockBatches.results.mockResolvedValue({
+        async *[Symbol.asyncIterator]() {
+          yield {
+            custom_id: 'ch1_0',
+            result: {
+              type: 'succeeded',
+              message: {
+                content: [{ type: 'text', text: 'ტექსტი' }],
+                usage: { input_tokens: 10, output_tokens: 20 },
+              },
+            },
+          };
+        },
+      });
+
+      const results = await service.getBatchResults('msgbatch_123');
+      expect(results).toEqual([{ customId: 'ch1_0', text: 'ტექსტი', tokensUsed: 30, ok: true }]);
+    });
+
+    it('should return no batch id when the API key is missing', async () => {
+      const origReadFileSync = require('fs').readFileSync;
+      require('fs').readFileSync = () => { throw new Error('no .env in test'); };
+      try {
+        const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
+        const batchId = await noKeyService.submitEditorBatch([
+          { customId: 'c_0', source: 's', draft: 'd', options: { bookTitle: 'B', chapterNumber: 1, totalChapters: 1 } },
+        ]);
+        expect(batchId).toBeNull();
       } finally {
         require('fs').readFileSync = origReadFileSync;
       }
