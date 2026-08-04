@@ -55,7 +55,7 @@ export class RetranslationService {
       return;
     }
 
-    const segments = this.readSegments(
+    const segments = this.resolveSegments(
       translatedChapter.segments,
       translatedChapter.translatedContent,
       feedback.chapter.originalContent,
@@ -138,6 +138,21 @@ export class RetranslationService {
       where: { id: feedbackId },
       data: { status: 'REJECTED', resolvedAt: new Date() },
     });
+  }
+
+  /**
+   * Chunk boundaries for a chapter, falling back for books translated before
+   * they were recorded: if the whole chapter is one chunk anyway, it can be
+   * redone as a single segment. A multi-chunk chapter without them stays
+   * unfixable — redoing it in one call would blow the output ceiling, and
+   * guessing where the boundaries were would corrupt the text.
+   */
+  private resolveSegments(raw: unknown, translated: string, source: string): ChunkSegment[] {
+    const stored = this.readSegments(raw, translated, source);
+    if (stored.length > 0) return stored;
+
+    if (!translated.length || this.claude.estimateChunkCount(source.length) !== 1) return [];
+    return [{ sourceStart: 0, sourceEnd: source.length, start: 0, end: translated.length }];
   }
 
   /** Stored ranges are only trustworthy if they still address real text. */

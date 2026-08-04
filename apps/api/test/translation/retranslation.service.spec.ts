@@ -9,7 +9,11 @@ describe('RetranslationService', () => {
     translatedChapter: { findFirst: vi.fn(), update: vi.fn() },
   };
 
-  const mockClaude = { retranslateWithFeedback: vi.fn() };
+  const mockClaude = {
+    retranslateWithFeedback: vi.fn(),
+    // Real implementation: 1 while the text fits a single chunk (12000 chars)
+    estimateChunkCount: vi.fn((len: number) => (len <= 12000 ? 1 : Math.ceil(len / 12000))),
+  };
 
   // Chapter of two chunks; the reader flagged something in the SECOND one.
   const feedback = () => ({
@@ -138,7 +142,31 @@ describe('RetranslationService', () => {
     });
   });
 
-  it('should reject a report on a chapter with no recorded chunk boundaries', async () => {
+  it('should treat a single-chunk chapter with no recorded boundaries as one segment', async () => {
+    // Books translated before chunk tracking shipped have no segments; when the
+    // whole chapter is one chunk anyway, it can still be redone safely.
+    mockPrisma.translatedChapter.findFirst.mockResolvedValue({
+      ...translatedChapter(),
+      segments: null,
+    });
+
+    await service.retranslate('fb-1');
+
+    const [source, draft] = mockClaude.retranslateWithFeedback.mock.calls[0];
+    expect(source).toBe('First source part. Second source part.');
+    expect(draft).toBe('პირველი ნაწილი.მეორე ცუდი ნაწილი.');
+    expect(mockPrisma.translatedChapter.update).toHaveBeenCalledWith({
+      where: { id: 'tc-1' },
+      data: expect.objectContaining({ translatedContent: 'მეორე გამართული ნაწილი.' }),
+    });
+  });
+
+  it('should reject a multi-chunk chapter with no recorded boundaries', async () => {
+    // Too big to redo in one call, and no way to know where the chunks were.
+    mockPrisma.translationFeedback.findUnique.mockResolvedValue({
+      ...feedback(),
+      chapter: { number: 2, originalContent: 'x'.repeat(30000) },
+    });
     mockPrisma.translatedChapter.findFirst.mockResolvedValue({
       ...translatedChapter(),
       segments: null,
