@@ -17,7 +17,10 @@ describe('AdminService', () => {
       count: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      aggregate: vi.fn(),
     },
+    translatedChapter: { count: vi.fn(), findMany: vi.fn() },
+    translationFeedback: { groupBy: vi.fn() },
     payment: {
       aggregate: vi.fn(),
       findMany: vi.fn(),
@@ -29,6 +32,7 @@ describe('AdminService', () => {
     updateProgress: vi.fn(),
     startTranslation: vi.fn(),
     clearQueuedJob: vi.fn().mockResolvedValue(false),
+    getQueueDepth: vi.fn().mockResolvedValue({ waiting: 0, active: 0, failed: 0 }),
   };
 
   beforeEach(() => {
@@ -37,34 +41,174 @@ describe('AdminService', () => {
   });
 
   describe('getStats', () => {
-    it('aggregates counts and revenue', async () => {
-      mockPrisma.user.count.mockResolvedValue(42);
-      mockPrisma.book.count.mockResolvedValue(120);
-      mockPrisma.translation.count
-        .mockResolvedValueOnce(80) // completed
-        .mockResolvedValueOnce(3) // failed
-        .mockResolvedValueOnce(5); // in-progress
-      mockPrisma.payment.aggregate.mockResolvedValue({ _sum: { amount: 1250.5 } });
-
-      const result = await adminService.getStats();
-
-      expect(result).toEqual({
-        users: 42,
-        books: 120,
-        translations: { completed: 80, failed: 3, inProgress: 5 },
-        revenue: 1250.5,
-      });
-    });
-
-    it('returns 0 revenue when no completed payments', async () => {
+    /**
+     * Stats fires many counts in parallel, so ordered mocks would silently
+     * mis-assign the moment a query is added. Answer by `where` instead.
+     */
+    const stubStats = (over: Record<string, unknown> = {}) => {
       mockPrisma.user.count.mockResolvedValue(0);
       mockPrisma.book.count.mockResolvedValue(0);
       mockPrisma.translation.count.mockResolvedValue(0);
+      mockPrisma.translation.aggregate.mockResolvedValue({ _sum: { totalTokensUsed: 0 }, _avg: { qualityScore: null } });
+      mockPrisma.translation.findMany.mockResolvedValue([]);
       mockPrisma.payment.aggregate.mockResolvedValue({ _sum: { amount: null } });
+      mockPrisma.payment.count.mockResolvedValue(0);
+      mockPrisma.translatedChapter.count.mockResolvedValue(0);
+      mockPrisma.translatedChapter.findMany.mockResolvedValue([]);
+      mockPrisma.translationFeedback.groupBy.mockResolvedValue([]);
+      Object.assign(mockPrisma, over);
+    };
+
+    it('reports users across the time windows', async () => {
+      stubStats();
+      mockPrisma.user.count.mockImplementation(({ where } = {} as any) => {
+        if (!where) return Promise.resolve(52);
+        if (where.emailVerified) return Promise.resolve(40); // { not: null }
+        if (where.createdAt?.gte) {
+          const days = (Date.now() - where.createdAt.gte.getTime()) / 86400000;
+          return Promise.resolve(days < 8 ? 6 : 28);
+        }
+        return Promise.resolve(0);
+      });
 
       const result = await adminService.getStats();
 
-      expect(result.revenue).toBe(0);
+      expect(result.users).toMatchObject({ total: 52, new7d: 6, new30d: 28, verified: 40 });
+    });
+
+    it('splits the translation funnel by status and flags stuck jobs', async () => {
+      stubStats();
+      mockPrisma.translation.count.mockImplementation(({ where } = {} as any) => {
+        if (!where) return Promise.resolve(100);
+        if (where.status === 'COMPLETED' && where.completedAt) return Promise.resolve(12);
+        if (where.status === 'COMPLETED') return Promise.resolve(80);
+        if (where.status === 'FAILED') return Promise.resolve(3);
+        if (where.status === 'IN_PROGRESS' && where.updatedAt) return Promise.resolve(2);
+        if (where.status?.in?.includes('IN_PROGRESS')) return Promise.resolve(5);
+        if (where.status === 'PENDING') return Promise.resolve(7);
+        return Promise.resolve(0);
+      });
+
+      const result = await adminService.getStats();
+
+      expect(result.translations).toMatchObject({
+        total: 100,
+        completed: 80,
+        completed30d: 12,
+        failed: 3,
+        inProgress: 5,
+        pending: 7,
+        stuck: 2,
+      });
+    });
+
+    it('computes net revenue as gross minus refunds', async () => {
+      stubStats();
+      mockPrisma.payment.aggregate.mockImplementation(({ where } = {} as any) => {
+        if (where?.status === 'REFUNDED') return Promise.resolve({ _sum: { amount: 30 } });
+        if (where?.paidAt?.gte) {
+          const days = (Date.now() - where.paidAt.gte.getTime()) / 86400000;
+          return Promise.resolve({ _sum: { amount: days < 8 ? 50 : 200 } });
+        }
+        return Promise.resolve({ _sum: { amount: 900 } });
+      });
+
+      const result = await adminService.getStats();
+
+      expect(result.revenue).toMatchObject({
+        gross30d: 200,
+        refunded30d: 30,
+        net30d: 170,
+        last7d: 50,
+        allTime: 900,
+        currency: 'GEL',
+      });
+    });
+
+    it('summarizes quality scores, chapter flags and reader feedback', async () => {
+      stubStats();
+      mockPrisma.translation.aggregate.mockResolvedValue({
+        _sum: { totalTokensUsed: 0 },
+        _avg: { qualityScore: 4.25 },
+      });
+      mockPrisma.translation.count.mockImplementation(({ where } = {} as any) =>
+        Promise.resolve(where?.qualityScore ? 9 : 0),
+      );
+      mockPrisma.translatedChapter.count.mockResolvedValue(50);
+      mockPrisma.translatedChapter.findMany.mockResolvedValue([
+        { qualityReport: { flags: ['LATIN_LEAKAGE', 'NUMBER_MISMATCH'] } },
+        { qualityReport: { flags: ['LATIN_LEAKAGE'] } },
+        { qualityReport: { flags: [] } },
+        { qualityReport: null },
+      ]);
+      mockPrisma.translationFeedback.groupBy.mockResolvedValue([
+        { status: 'PENDING', _count: { _all: 4 } },
+        { status: 'APPLIED', _count: { _all: 6 } },
+      ]);
+
+      const result = await adminService.getStats();
+
+      expect(result.quality).toMatchObject({
+        scoredTranslations: 9,
+        avgScore: 4.25,
+        chaptersChecked: 50,
+        chaptersFlagged: 2,
+        flagCounts: { LATIN_LEAKAGE: 2, NUMBER_MISMATCH: 1 },
+        feedback: { PENDING: 4, APPLIED: 6, total: 10 },
+      });
+    });
+
+    it('estimates API cost from recorded token usage', async () => {
+      stubStats();
+      mockPrisma.translation.aggregate.mockImplementation(({ where } = {} as any) =>
+        Promise.resolve({
+          _sum: { totalTokensUsed: where?.completedAt ? 2_000_000 : 10_000_000 },
+          _avg: { qualityScore: null },
+        }),
+      );
+
+      const result = await adminService.getStats();
+
+      expect(result.cost.tokens30d).toBe(2_000_000);
+      expect(result.cost.tokensAllTime).toBe(10_000_000);
+      // Blended rate — the split between input and output tokens isn't stored
+      expect(result.cost.usd30d).toBeGreaterThan(0);
+      expect(result.cost.approximate).toBe(true);
+    });
+
+    it('reports average completion time in minutes', async () => {
+      stubStats();
+      mockPrisma.translation.findMany.mockResolvedValue([
+        { startedAt: new Date('2026-01-01T10:00:00Z'), completedAt: new Date('2026-01-01T10:30:00Z') },
+        { startedAt: new Date('2026-01-01T12:00:00Z'), completedAt: new Date('2026-01-01T13:10:00Z') },
+      ]);
+
+      const result = await adminService.getStats();
+
+      expect(result.translations.avgMinutes).toBe(50);
+    });
+
+    it('survives a queue that cannot be reached', async () => {
+      stubStats();
+      mockTranslationService.getQueueDepth.mockRejectedValue(new Error('Redis down'));
+
+      const result = await adminService.getStats();
+
+      // A dead Redis must not take the whole dashboard down
+      expect(result.queue).toBeNull();
+      expect(result.users.total).toBe(0);
+    });
+
+    it('returns zeroes rather than nulls on an empty database', async () => {
+      stubStats();
+
+      const result = await adminService.getStats();
+
+      expect(result.revenue.allTime).toBe(0);
+      expect(result.cost.tokensAllTime).toBe(0);
+      expect(result.quality.avgScore).toBeNull();
+      expect(result.translations.avgMinutes).toBeNull();
+      expect(result.generatedAt).toBeTypeOf('string');
     });
   });
 

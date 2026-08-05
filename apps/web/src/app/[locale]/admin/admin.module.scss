@@ -301,3 +301,44 @@
   gap: $spacing-xs;
   flex-wrap: wrap;
 }
+
+// ========================
+// Dashboard sections
+// ========================
+
+.sectionTitle {
+  margin: $spacing-lg 0 $spacing-sm;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--bt-neutral-900);
+}
+
+// Something is stuck, not merely queued — surfaced above the fold.
+.blockerBanner {
+  margin: $spacing-md 0;
+  padding: $spacing-sm $spacing-md;
+  border-left: 3px solid #b91c1c;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: $radius-sm;
+  font-size: 0.9rem;
+}
+
+.statCardDanger {
+  border-color: #b91c1c;
+
+  .statValue { color: #b91c1c; }
+}
+
+.statCardWarning {
+  border-color: #d97706;
+
+  .statValue { color: #b45309; }
+}
+
+.flagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+}

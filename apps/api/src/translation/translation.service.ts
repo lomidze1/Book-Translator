@@ -174,6 +174,20 @@ export class TranslationService {
     return true;
   }
 
+  /**
+   * Queue backlog, for the admin dashboard. Waiting jobs piling up is the
+   * clearest signal that translation throughput — not demand — is the blocker.
+   */
+  async getQueueDepth(): Promise<{ waiting: number; active: number; failed: number }> {
+    if (!this.queue) throw new Error('Translation queue unavailable');
+    const [waiting, active, failed] = await Promise.all([
+      this.queue.getWaitingCount(),
+      this.queue.getActiveCount(),
+      this.queue.getFailedCount(),
+    ]);
+    return { waiting, active, failed };
+  }
+
   async getTranslation(translationId: string, userId: string) {
     const translation = await this.prisma.translation.findUnique({
       where: { id: translationId },
