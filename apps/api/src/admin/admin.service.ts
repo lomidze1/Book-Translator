@@ -4,10 +4,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TranslationService } from '../translation/translation.service';
 import { STUCK_TRANSLATION_THRESHOLD_MS } from '../translation/translation.constants';
 import { clampPagination } from '../common/pagination';
+import { RetranslationProcessor } from '../translation/retranslation.processor';
 import {
   AdminListQueryDto,
   AdminPaymentsQueryDto,
   AdminTranslationsQueryDto,
+  AdminFeedbackQueryDto,
+  UpdateGlossaryDto,
 } from './dto';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -27,6 +30,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly translationService: TranslationService,
+    private readonly retranslation: RetranslationProcessor,
   ) {}
 
   /**
@@ -220,6 +224,117 @@ export class AdminService {
       blendedUsdPerMTok: perMTok,
       approximate: true,
     };
+  }
+
+  /**
+   * Reader-reported passages, most-reported first — the same passage flagged
+   * by five people is a far stronger signal than five separate one-offs.
+   */
+  async listFeedback(query: AdminFeedbackQueryDto) {
+    const { skip, take, page, limit } = clampPagination(query.page, query.limit, {
+      defaultLimit: 50,
+      maxLimit: 100,
+    });
+
+    const where = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { selectedText: { contains: query.search, mode: 'insensitive' as const } },
+              { comment: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.translationFeedback.findMany({
+        where,
+        skip,
+        take,
+        orderBy: [{ reportCount: 'desc' }, { createdAt: 'desc' }],
+        include: {
+          translation: {
+            select: {
+              id: true,
+              glossary: true,
+              book: { select: { id: true, title: true } },
+            },
+          },
+          chapter: { select: { number: true, title: true } },
+          user: { select: { email: true } },
+        },
+      }),
+      this.prisma.translationFeedback.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
+  }
+
+  /** Re-queue a report — used after fixing the glossary the redo depends on. */
+  async retryFeedback(id: string) {
+    const feedback = await this.prisma.translationFeedback.findUnique({ where: { id } });
+    if (!feedback) {
+      throw new NotFoundException('Feedback not found');
+    }
+    if (feedback.status === 'RETRANSLATING') {
+      throw new BadRequestException('This report is being re-translated right now');
+    }
+
+    const updated = await this.prisma.translationFeedback.update({
+      where: { id },
+      data: { status: 'PENDING', resolvedAt: null },
+    });
+    await this.retranslation.enqueue(id);
+    return updated;
+  }
+
+  /**
+   * Correct a book's glossary from the admin panel. Terms merge into whatever
+   * is stored (normalizing legacy string entries as they pass through); a
+   * blank Georgian form deletes the term.
+   */
+  async updateGlossary(translationId: string, dto: UpdateGlossaryDto) {
+    const translation = await this.prisma.translation.findUnique({
+      where: { id: translationId },
+      select: { id: true, glossary: true },
+    });
+    if (!translation) {
+      throw new NotFoundException('Translation not found');
+    }
+
+    const glossary: Record<string, { ka: string; type?: string; gender?: string }> = {};
+    for (const [term, value] of Object.entries((translation.glossary as Record<string, unknown>) || {})) {
+      if (typeof value === 'string') {
+        if (value.trim()) glossary[term] = { ka: value };
+      } else if (value && typeof value === 'object') {
+        const entry = value as { ka?: unknown };
+        if (typeof entry.ka === 'string' && entry.ka.trim()) {
+          glossary[term] = value as { ka: string; type?: string; gender?: string };
+        }
+      }
+    }
+
+    for (const entry of dto.entries) {
+      const term = entry.term.trim();
+      if (!term) continue;
+      if (!entry.ka.trim()) {
+        delete glossary[term];
+        continue;
+      }
+      glossary[term] = {
+        ka: entry.ka.trim(),
+        ...(entry.type ? { type: entry.type } : {}),
+        ...(entry.type === 'character' && entry.gender ? { gender: entry.gender } : {}),
+      };
+    }
+
+    return this.prisma.translation.update({
+      where: { id: translationId },
+      data: { glossary: glossary as unknown as Prisma.InputJsonValue },
+      select: { id: true, glossary: true },
+    });
   }
 
   async listUsers(query: AdminListQueryDto) {

@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/admin', key: 'dashboard' },
   { href: '/admin/users', key: 'users' },
   { href: '/admin/translations', key: 'translations' },
+  { href: '/admin/feedback', key: 'feedback' },
   { href: '/admin/payments', key: 'payments' },
 ] as const;
 

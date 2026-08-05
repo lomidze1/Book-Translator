@@ -28,6 +28,13 @@ import { NotificationModule } from '../notification/notification.module';
     RetranslationService,
     RetranslationProcessor,
   ],
-  exports: [TranslationService, ClaudeService, QualityCheckService, GeminiJudgeService, FeedbackService],
+  exports: [
+    TranslationService,
+    ClaudeService,
+    QualityCheckService,
+    GeminiJudgeService,
+    FeedbackService,
+    RetranslationProcessor,
+  ],
 })
 export class TranslationModule {}

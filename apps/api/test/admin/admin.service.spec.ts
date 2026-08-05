@@ -18,9 +18,16 @@ describe('AdminService', () => {
       findMany: vi.fn(),
       findUnique: vi.fn(),
       aggregate: vi.fn(),
+      update: vi.fn(),
     },
     translatedChapter: { count: vi.fn(), findMany: vi.fn() },
-    translationFeedback: { groupBy: vi.fn() },
+    translationFeedback: {
+      groupBy: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
+    },
     payment: {
       aggregate: vi.fn(),
       findMany: vi.fn(),
@@ -35,9 +42,16 @@ describe('AdminService', () => {
     getQueueDepth: vi.fn().mockResolvedValue({ waiting: 0, active: 0, failed: 0 }),
   };
 
+  const mockRetranslation = { enqueue: vi.fn().mockResolvedValue(undefined) };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    adminService = new AdminService(mockPrisma as any, mockTranslationService as any);
+    mockRetranslation.enqueue.mockResolvedValue(undefined);
+    adminService = new AdminService(
+      mockPrisma as any,
+      mockTranslationService as any,
+      mockRetranslation as any,
+    );
   });
 
   describe('getStats', () => {
@@ -209,6 +223,119 @@ describe('AdminService', () => {
       expect(result.quality.avgScore).toBeNull();
       expect(result.translations.avgMinutes).toBeNull();
       expect(result.generatedAt).toBeTypeOf('string');
+    });
+  });
+
+  describe('listFeedback', () => {
+    it('shows the most-reported passages first', async () => {
+      mockPrisma.translationFeedback.findMany.mockResolvedValue([{ id: 'fb-1' }]);
+      mockPrisma.translationFeedback.count.mockResolvedValue(1);
+
+      const result = await adminService.listFeedback({});
+
+      expect(result).toEqual({ items: [{ id: 'fb-1' }], total: 1, page: 1, limit: 50 });
+      const args = mockPrisma.translationFeedback.findMany.mock.calls[0][0];
+      // Passages several readers flagged matter more than one-offs
+      expect(args.orderBy).toEqual([{ reportCount: 'desc' }, { createdAt: 'desc' }]);
+      // The book title and the glossary ride along so the panel can act on them
+      expect(args.include.translation.select.book.select.title).toBe(true);
+      expect(args.include.translation.select.glossary).toBe(true);
+    });
+
+    it('filters by status', async () => {
+      mockPrisma.translationFeedback.findMany.mockResolvedValue([]);
+      mockPrisma.translationFeedback.count.mockResolvedValue(0);
+
+      await adminService.listFeedback({ status: 'PENDING' });
+
+      expect(mockPrisma.translationFeedback.findMany.mock.calls[0][0].where).toEqual({
+        status: 'PENDING',
+      });
+    });
+
+    it('searches the flagged text and the reader comment', async () => {
+      mockPrisma.translationFeedback.findMany.mockResolvedValue([]);
+      mockPrisma.translationFeedback.count.mockResolvedValue(0);
+
+      await adminService.listFeedback({ search: 'გადაწყვეტილება' });
+
+      expect(mockPrisma.translationFeedback.findMany.mock.calls[0][0].where).toEqual({
+        OR: [
+          { selectedText: { contains: 'გადაწყვეტილება', mode: 'insensitive' } },
+          { comment: { contains: 'გადაწყვეტილება', mode: 'insensitive' } },
+        ],
+      });
+    });
+  });
+
+  describe('retryFeedback', () => {
+    it('resets a rejected report and re-queues it', async () => {
+      mockPrisma.translationFeedback.findUnique.mockResolvedValue({ id: 'fb-1', status: 'REJECTED' });
+      mockPrisma.translationFeedback.update.mockResolvedValue({ id: 'fb-1', status: 'PENDING' });
+
+      const result = await adminService.retryFeedback('fb-1');
+
+      expect(mockPrisma.translationFeedback.update).toHaveBeenCalledWith({
+        where: { id: 'fb-1' },
+        data: { status: 'PENDING', resolvedAt: null },
+      });
+      expect(mockRetranslation.enqueue).toHaveBeenCalledWith('fb-1');
+      expect(result.status).toBe('PENDING');
+    });
+
+    it('refuses to redo a report that is mid-flight', async () => {
+      mockPrisma.translationFeedback.findUnique.mockResolvedValue({ id: 'fb-1', status: 'RETRANSLATING' });
+
+      await expect(adminService.retryFeedback('fb-1')).rejects.toThrow(BadRequestException);
+      expect(mockRetranslation.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('404s for an unknown report', async () => {
+      mockPrisma.translationFeedback.findUnique.mockResolvedValue(null);
+
+      await expect(adminService.retryFeedback('nope')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateGlossary', () => {
+    it('merges the corrected terms into the stored glossary', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        glossary: { John: { ka: 'ჯონი' }, London: 'ლონდონი' },
+      });
+      mockPrisma.translation.update.mockImplementation(({ data }: any) => ({ id: 'tr-1', ...data }));
+
+      const result = await adminService.updateGlossary('tr-1', {
+        entries: [{ term: 'John', ka: 'ჯონათანი', type: 'character', gender: 'male' }],
+      });
+
+      expect(result.glossary).toEqual({
+        // Legacy string entries are normalized on the way through
+        London: { ka: 'ლონდონი' },
+        John: { ka: 'ჯონათანი', type: 'character', gender: 'male' },
+      });
+    });
+
+    it('removes a term when its Georgian form is blank', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue({
+        id: 'tr-1',
+        glossary: { John: { ka: 'ჯონი' }, Mary: { ka: 'მერი' } },
+      });
+      mockPrisma.translation.update.mockImplementation(({ data }: any) => ({ id: 'tr-1', ...data }));
+
+      const result = await adminService.updateGlossary('tr-1', {
+        entries: [{ term: 'Mary', ka: '  ' }],
+      });
+
+      expect(result.glossary).toEqual({ John: { ka: 'ჯონი' } });
+    });
+
+    it('404s for an unknown translation', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue(null);
+
+      await expect(
+        adminService.updateGlossary('nope', { entries: [{ term: 'X', ka: 'ხ' }] }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

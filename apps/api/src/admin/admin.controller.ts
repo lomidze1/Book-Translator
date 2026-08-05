@@ -16,6 +16,8 @@ import {
   AdminListQueryDto,
   AdminPaymentsQueryDto,
   AdminTranslationsQueryDto,
+  AdminFeedbackQueryDto,
+  UpdateGlossaryDto,
   UpdateUserRoleDto,
 } from './dto';
 
@@ -53,6 +55,22 @@ export class AdminController {
   @Post('translations/:id/retry')
   retryTranslation(@Param('id') id: string) {
     return this.adminService.retryTranslation(id);
+  }
+
+  @Get('feedback')
+  listFeedback(@Query() query: AdminFeedbackQueryDto) {
+    return this.adminService.listFeedback(query);
+  }
+
+  /** Re-queue a report — typically after correcting the glossary it needs. */
+  @Post('feedback/:id/retry')
+  retryFeedback(@Param('id') id: string) {
+    return this.adminService.retryFeedback(id);
+  }
+
+  @Patch('translations/:id/glossary')
+  updateGlossary(@Param('id') id: string, @Body() dto: UpdateGlossaryDto) {
+    return this.adminService.updateGlossary(id, dto);
   }
 
   @Get('payments')

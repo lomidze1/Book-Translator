@@ -342,3 +342,64 @@
   gap: $spacing-sm;
   margin-top: $spacing-sm;
 }
+
+// ========================
+// Reader feedback
+// ========================
+
+.reportedText {
+  margin: 0 0 4px;
+  padding: 4px $spacing-sm;
+  border-left: 3px solid $color-primary;
+  background: var(--bt-neutral-100, #f8fafc);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  max-width: 420px;
+}
+
+.reportComment {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--bt-neutral-700, #475569);
+  max-width: 420px;
+}
+
+// Several readers flagging one passage is the signal worth acting on first.
+.reportCountHot {
+  font-weight: 700;
+  color: #b45309;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-md;
+  z-index: 400;
+}
+
+.glossaryModal {
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: $radius-md;
+  padding: $spacing-lg;
+
+  h3 {
+    margin: 0 0 4px;
+    font-size: 1.05rem;
+  }
+}
+
+.reportActions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-md;
+  justify-content: flex-end;
+}
