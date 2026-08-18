@@ -155,6 +155,14 @@ model Translation {
   estimatedPrice  Decimal?          @db.Decimal(10, 2)
   aiModel         String?
   totalTokensUsed Int?
+  /// Input and output tokens billed separately — a combined count cannot be
+  /// priced, since output costs ~5x input. Null on rows written before this
+  /// was tracked.
+  inputTokens     Int?
+  outputTokens    Int?
+  /// Source characters translated. The denominator for cost-per-1k-chars,
+  /// which is what pricing is derived from.
+  sourceChars     Int?
   glossary        Json?
   styleGuide      String?
   qualityScore    Float?

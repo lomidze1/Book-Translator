@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { Worker, Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
-import { ClaudeService, Glossary } from './claude.service';
+import { ClaudeService, Glossary, TokenUsage, addUsage } from './claude.service';
 import { TranslationService } from './translation.service';
 import { NotificationService } from '../notification/notification.service';
 import { QualityCheckService, ChapterQualityReport } from './quality-check.service';
@@ -131,10 +131,14 @@ export class TranslationProcessor implements OnModuleInit {
       (sum, c) => sum + this.claude.estimateChunkCount(c.originalContent.length),
       0,
     );
+    // Denominator for cost-per-1k-source-chars. Recorded once up front so a
+    // run that fails partway still shows what it was asked to translate.
+    const sourceChars = chapters.reduce((sum, c) => sum + c.originalContent.length, 0);
 
     this.logger.log(`Total estimated chunks across all chapters: ${totalChunks}`);
 
     let totalTokens = 0;
+    let totalUsage: TokenUsage = { input: 0, output: 0 };
     let previousSummary: string | undefined;
     let completedChunks = 0;
     const totalChapters = chapterContents.length;
@@ -156,6 +160,7 @@ export class TranslationProcessor implements OnModuleInit {
             glossary,
           );
           totalTokens += extraction.tokensUsed;
+          totalUsage = addUsage(totalUsage, extraction.usage);
           const newTerms = Object.keys(extraction.glossary).length;
           if (newTerms > 0) {
             Object.assign(glossary, extraction.glossary);
@@ -183,6 +188,7 @@ export class TranslationProcessor implements OnModuleInit {
         });
 
         totalTokens += result.tokensUsed;
+        totalUsage = addUsage(totalUsage, result.usage);
         this.logger.log(`✅ Chapter ${chapter.number} translated (${result.tokensUsed} tokens, ${result.translatedText.length} chars)`);
 
         // Mechanical quality checks — deterministic, no API calls
@@ -222,6 +228,7 @@ export class TranslationProcessor implements OnModuleInit {
             previousSummary,
           );
           totalTokens += summary.tokensUsed;
+          totalUsage = addUsage(totalUsage, summary.usage);
           if (summary.summary) previousSummary = summary.summary;
         } catch (err) {
           this.logger.warn(`Story summary failed for chapter ${chapter.number}: ${err instanceof Error ? err.message : err}`);
@@ -232,6 +239,9 @@ export class TranslationProcessor implements OnModuleInit {
           where: { id: translationId },
           data: {
             totalTokensUsed: totalTokens,
+            inputTokens: totalUsage.input,
+            outputTokens: totalUsage.output,
+            sourceChars,
             aiModel: this.claude.getModel(),
             glossary: glossary as unknown as Prisma.InputJsonValue,
           },

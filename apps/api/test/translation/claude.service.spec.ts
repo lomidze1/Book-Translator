@@ -465,7 +465,7 @@ describe('ClaudeService', () => {
       try {
         const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
         const result = await noKeyService.extractGlossaryTerms('text');
-        expect(result).toEqual({ glossary: {}, tokensUsed: 0 });
+        expect(result).toEqual({ glossary: {}, tokensUsed: 0, usage: { input: 0, output: 0 } });
       } finally {
         require('fs').readFileSync = origReadFileSync;
       }
@@ -587,8 +587,20 @@ describe('ClaudeService', () => {
       const results = await service.getBatchResults('msgbatch_123');
 
       expect(results).toEqual([
-        { customId: 'ch2_0', text: 'დარედაქტირებული ტექსტი', tokensUsed: 300, ok: true },
-        { customId: 'ch1_0', text: '', tokensUsed: 0, ok: false },
+        {
+          customId: 'ch2_0',
+          text: 'დარედაქტირებული ტექსტი',
+          tokensUsed: 300,
+          usage: { input: 100, output: 200 },
+          ok: true,
+        },
+        {
+          customId: 'ch1_0',
+          text: '',
+          tokensUsed: 0,
+          usage: { input: 0, output: 0 },
+          ok: false,
+        },
       ]);
     });
 
@@ -609,7 +621,15 @@ describe('ClaudeService', () => {
       });
 
       const results = await service.getBatchResults('msgbatch_123');
-      expect(results).toEqual([{ customId: 'ch1_0', text: 'ტექსტი', tokensUsed: 30, ok: true }]);
+      expect(results).toEqual([
+        {
+          customId: 'ch1_0',
+          text: 'ტექსტი',
+          tokensUsed: 30,
+          usage: { input: 10, output: 20 },
+          ok: true,
+        },
+      ]);
     });
 
     it('should return no batch id when the API key is missing', async () => {
@@ -808,6 +828,32 @@ describe('ClaudeService', () => {
       expect(result.translatedText).toBe('ს'.repeat(600));
     });
 
+    it('should bill both attempts, split by input and output, when it retries', async () => {
+      const truncated = {
+        content: [{ type: 'text', text: 'ნ'.repeat(500) }],
+        usage: { input_tokens: 100, output_tokens: 16000 },
+        stop_reason: 'max_tokens',
+      };
+      const complete = {
+        content: [{ type: 'text', text: 'ს'.repeat(600) }],
+        usage: { input_tokens: 100, output_tokens: 300 },
+        stop_reason: 'end_turn',
+      };
+      mockCreate.mockResolvedValueOnce(truncated).mockResolvedValueOnce(complete);
+
+      const result = await service.translateChapter('x'.repeat(1000), {
+        bookTitle: 'Book',
+        chapterNumber: 1,
+        totalChapters: 1,
+      });
+
+      // The discarded attempt was billed too — dropping it would understate
+      // cost precisely on the chapters that cost the most.
+      expect(result.usage).toEqual({ input: 200, output: 16300 });
+      // The split must stay reconcilable against the combined figure.
+      expect(result.usage!.input + result.usage!.output).toBe(result.tokensUsed);
+    });
+
     it('should not retry a complete response of normal length', async () => {
       mockCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'ს'.repeat(600) }],
@@ -888,7 +934,7 @@ describe('ClaudeService', () => {
       try {
         const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
         const result = await noKeyService.generateStyleGuide(['sample'], 'Book');
-        expect(result).toEqual({ styleGuide: '', tokensUsed: 0 });
+        expect(result).toEqual({ styleGuide: '', tokensUsed: 0, usage: { input: 0, output: 0 } });
       } finally {
         require('fs').readFileSync = origReadFileSync;
       }
@@ -1056,7 +1102,7 @@ describe('ClaudeService', () => {
       try {
         const noKeyService = createService({ ANTHROPIC_API_KEY: '' });
         const result = await noKeyService.generateStorySummary('text');
-        expect(result).toEqual({ summary: '', tokensUsed: 0 });
+        expect(result).toEqual({ summary: '', tokensUsed: 0, usage: { input: 0, output: 0 } });
       } finally {
         require('fs').readFileSync = origReadFileSync;
       }

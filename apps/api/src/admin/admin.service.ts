@@ -24,6 +24,18 @@ const DURATION_SAMPLE_LIMIT = 200;
  * CLAUDE_BLENDED_USD_PER_MTOK once real invoices show the true ratio.
  */
 const DEFAULT_BLENDED_USD_PER_MTOK = 9;
+// Sonnet 5 list price. Overridable because it moves — the promotional rate
+// ends 2026-08-31, and a stale constant would understate cost by ~50%.
+const DEFAULT_INPUT_USD_PER_MTOK = 3;
+const DEFAULT_OUTPUT_USD_PER_MTOK = 15;
+
+/** The `_sum` shape returned by the translation token aggregates. */
+type TokenSums = {
+  totalTokensUsed: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  sourceChars: number | null;
+};
 
 @Injectable()
 export class AdminService {
@@ -86,8 +98,8 @@ export class AdminService {
       this.prisma.payment.count({ where: { status: 'FAILED', createdAt: { gte: since30d } } }),
       this.prisma.payment.count({ where: { status: { in: ['PENDING', 'PROCESSING'] } } }),
 
-      this.prisma.translation.aggregate({ _sum: { totalTokensUsed: true }, _avg: { qualityScore: true } }),
-      this.prisma.translation.aggregate({ where: { completedAt: { gte: since30d } }, _sum: { totalTokensUsed: true }, _avg: { qualityScore: true } }),
+      this.prisma.translation.aggregate({ _sum: { totalTokensUsed: true, inputTokens: true, outputTokens: true, sourceChars: true }, _avg: { qualityScore: true } }),
+      this.prisma.translation.aggregate({ where: { completedAt: { gte: since30d } }, _sum: { totalTokensUsed: true, inputTokens: true, outputTokens: true, sourceChars: true }, _avg: { qualityScore: true } }),
       this.prisma.translation.aggregate({ where: { qualityScore: { not: null } }, _sum: { totalTokensUsed: true }, _avg: { qualityScore: true } }),
       this.prisma.translation.count({ where: { qualityScore: { not: null } } }),
 
@@ -163,10 +175,7 @@ export class AdminService {
         feedback: this.summarizeFeedback(feedbackByStatus),
       },
 
-      cost: this.estimateCost(
-        Number(tokensAllTime._sum.totalTokensUsed ?? 0),
-        Number(tokens30d._sum.totalTokensUsed ?? 0),
-      ),
+      cost: this.estimateCost(tokensAllTime._sum, tokens30d._sum),
 
       queue,
     };
@@ -209,20 +218,56 @@ export class AdminService {
   }
 
   /**
-   * Only the combined input+output token count is stored, so an exact cost
-   * cannot be derived — this applies one blended rate and is flagged as
-   * approximate so nobody reads it as billing truth.
+   * Exact when the input/output split is present, since the two bill at very
+   * different rates. Rows written before the split was tracked only carry a
+   * combined count, so those fall back to one blended rate — `approximate`
+   * says which of the two produced the figure.
    */
-  private estimateCost(tokensAllTime: number, tokens30d: number) {
-    const perMTok = Number(process.env.CLAUDE_BLENDED_USD_PER_MTOK) || DEFAULT_BLENDED_USD_PER_MTOK;
-    const usd = (tokens: number) => Math.round((tokens / 1_000_000) * perMTok * 100) / 100;
+  private estimateCost(allTime: TokenSums, last30d: TokenSums) {
+    const blended = Number(process.env.CLAUDE_BLENDED_USD_PER_MTOK) || DEFAULT_BLENDED_USD_PER_MTOK;
+    const inRate = Number(process.env.CLAUDE_INPUT_USD_PER_MTOK) || DEFAULT_INPUT_USD_PER_MTOK;
+    const outRate = Number(process.env.CLAUDE_OUTPUT_USD_PER_MTOK) || DEFAULT_OUTPUT_USD_PER_MTOK;
+    const round = (n: number) => Math.round(n * 100) / 100;
+
+    const usd = (sums: TokenSums) => {
+      const input = Number(sums.inputTokens ?? 0);
+      const output = Number(sums.outputTokens ?? 0);
+      const total = Number(sums.totalTokensUsed ?? 0);
+      // Split covers the whole total only once every row has been backfilled;
+      // until then a blended rate over the remainder is the honest fallback.
+      const untracked = Math.max(total - input - output, 0);
+      return round(
+        (input / 1_000_000) * inRate +
+          (output / 1_000_000) * outRate +
+          (untracked / 1_000_000) * blended,
+      );
+    };
+
+    const tokensAllTime = Number(allTime.totalTokensUsed ?? 0);
+    const tokens30d = Number(last30d.totalTokensUsed ?? 0);
+    const inputAllTime = Number(allTime.inputTokens ?? 0);
+    const outputAllTime = Number(allTime.outputTokens ?? 0);
+    const charsAllTime = Number(allTime.sourceChars ?? 0);
+    const usdAllTime = usd(allTime);
+
     return {
       tokensAllTime,
       tokens30d,
-      usdAllTime: usd(tokensAllTime),
-      usd30d: usd(tokens30d),
-      blendedUsdPerMTok: perMTok,
-      approximate: true,
+      inputTokens: inputAllTime,
+      outputTokens: outputAllTime,
+      usdAllTime,
+      usd30d: usd(last30d),
+      inputUsdPerMTok: inRate,
+      outputUsdPerMTok: outRate,
+      blendedUsdPerMTok: blended,
+      /**
+       * The number pricing is set from: what one thousand source characters
+       * costs to translate. Null until at least one run has recorded both.
+       */
+      usdPer1kSourceChars:
+        charsAllTime > 0 ? Math.round((usdAllTime / charsAllTime) * 1000 * 10000) / 10000 : null,
+      sourceChars: charsAllTime,
+      approximate: inputAllTime + outputAllTime < tokensAllTime,
     };
   }
 

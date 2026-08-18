@@ -16,9 +16,32 @@ export interface ChunkSegment {
   end: number;
 }
 
+/**
+ * Input and output tokens kept apart. They bill at very different rates, so a
+ * combined figure cannot be turned back into a cost — `tokensUsed` is retained
+ * alongside for existing callers and historical rows.
+ */
+export interface TokenUsage {
+  input: number;
+  output: number;
+}
+
+export function addUsage(a?: TokenUsage, b?: TokenUsage): TokenUsage {
+  return {
+    input: (a?.input ?? 0) + (b?.input ?? 0),
+    output: (a?.output ?? 0) + (b?.output ?? 0),
+  };
+}
+
+/** Total for a usage pair, so `tokensUsed` is always derived, never drifting. */
+export function usageTotal(u: TokenUsage): number {
+  return u.input + u.output;
+}
+
 export interface TranslationResult {
   translatedText: string;
   tokensUsed: number;
+  usage?: TokenUsage;
   /** The model hit max_tokens — the text is cut off mid-thought. */
   truncated?: boolean;
   segments?: ChunkSegment[];
@@ -35,6 +58,7 @@ export interface BatchResult {
   customId: string;
   text: string;
   tokensUsed: number;
+  usage?: TokenUsage;
   ok: boolean;
 }
 
@@ -71,16 +95,19 @@ export type Glossary = Record<string, string | GlossaryEntry>;
 export interface GlossaryExtractionResult {
   glossary: Record<string, GlossaryEntry>;
   tokensUsed: number;
+  usage?: TokenUsage;
 }
 
 export interface StyleGuideResult {
   styleGuide: string;
   tokensUsed: number;
+  usage?: TokenUsage;
 }
 
 export interface StorySummaryResult {
   summary: string;
   tokensUsed: number;
+  usage?: TokenUsage;
 }
 
 // claude-sonnet-4-20250514 (the previous default) is retired — requests to it
@@ -199,6 +226,7 @@ export class ClaudeService implements OnModuleInit {
 
     let translatedText = '';
     let totalTokens = 0;
+    let totalUsage: TokenUsage = { input: 0, output: 0 };
     let previousChunk: { source: string; translation: string } | null = null;
     const segments: ChunkSegment[] = [];
     let sourceOffset = 0;
@@ -235,12 +263,13 @@ export class ClaudeService implements OnModuleInit {
 
       translatedText += result.translatedText + (i < chunks.length - 1 ? chunk.separator : '');
       totalTokens += result.tokensUsed;
+      totalUsage = addUsage(totalUsage, result.usage);
       previousChunk = { source: chunk.text, translation: result.translatedText };
 
       if (options.onChunkComplete) await options.onChunkComplete(i, chunks.length);
     }
 
-    return { translatedText, tokensUsed: totalTokens, segments };
+    return { translatedText, tokensUsed: totalTokens, usage: totalUsage, segments };
   }
 
   /**
@@ -313,9 +342,11 @@ ${previousDraft}`,
       timeout: 300000,
     });
 
+    const usage = this.usageOf(response);
     return {
       translatedText: this.extractText(response),
-      tokensUsed: this.countTokens(response),
+      tokensUsed: usageTotal(usage),
+      usage,
       truncated: response.stop_reason === 'max_tokens',
     };
   }
@@ -338,15 +369,23 @@ ${previousDraft}`,
 
     for await (const entry of stream as AsyncIterable<BatchEntry>) {
       if (entry.result.type === 'succeeded') {
+        const usage = this.usageOf(entry.result.message);
         results.push({
           customId: entry.custom_id,
           text: this.extractText(entry.result.message),
-          tokensUsed: this.countTokens(entry.result.message),
+          tokensUsed: usageTotal(usage),
+          usage,
           ok: true,
         });
       } else {
         this.logger.warn(`Batch ${batchId} entry ${entry.custom_id} ${entry.result.type} — keeping draft`);
-        results.push({ customId: entry.custom_id, text: '', tokensUsed: 0, ok: false });
+        results.push({
+          customId: entry.custom_id,
+          text: '',
+          tokensUsed: 0,
+          usage: { input: 0, output: 0 },
+          ok: false,
+        });
       }
     }
 
@@ -377,15 +416,19 @@ ${previousDraft}`,
         : `Chunk output suspiciously short (${result.translatedText.length}/${content.length} chars) — retrying once`,
     );
     const retry = await this.translateSingleChunk(content, options);
-    retry.tokensUsed += result.tokensUsed;
+    // Both attempts were billed — carry the combined spend on whichever text wins.
+    const spent = addUsage(result.usage, retry.usage);
+    retry.tokensUsed = usageTotal(spent);
+    retry.usage = spent;
 
     // A complete generation beats a truncated one even when it is shorter;
     // otherwise keep whichever produced more text.
     if (result.truncated && !retry.truncated) return retry;
-    if (retry.truncated && !result.truncated) return { ...result, tokensUsed: retry.tokensUsed };
+    if (retry.truncated && !result.truncated)
+      return { ...result, tokensUsed: retry.tokensUsed, usage: spent };
     return retry.translatedText.trim().length > result.translatedText.trim().length
       ? retry
-      : { ...result, tokensUsed: retry.tokensUsed };
+      : { ...result, tokensUsed: retry.tokensUsed, usage: spent };
   }
 
   private async translateSingleChunk(
@@ -406,9 +449,11 @@ ${previousDraft}`,
       timeout: 300000,
     });
 
+    const usage = this.usageOf(response);
     return {
       translatedText: this.extractText(response),
-      tokensUsed: this.countTokens(response),
+      tokensUsed: usageTotal(usage),
+      usage,
       truncated: response.stop_reason === 'max_tokens',
     };
   }
@@ -425,13 +470,18 @@ ${previousDraft}`,
   ): Promise<TranslationResult> {
     try {
       const refined = await this.refineTranslation(source, draft.translatedText, options);
-      const combinedTokens = draft.tokensUsed + refined.tokensUsed;
+      const combinedUsage = addUsage(draft.usage, refined.usage);
+      const combinedTokens = usageTotal(combinedUsage);
 
       if (refined.translatedText.trim().length < draft.translatedText.trim().length * 0.5) {
         this.logger.warn('Editor pass output too short — keeping the draft');
-        return { ...draft, tokensUsed: combinedTokens };
+        return { ...draft, tokensUsed: combinedTokens, usage: combinedUsage };
       }
-      return { translatedText: refined.translatedText, tokensUsed: combinedTokens };
+      return {
+        translatedText: refined.translatedText,
+        tokensUsed: combinedTokens,
+        usage: combinedUsage,
+      };
     } catch (err) {
       this.logger.warn(
         `Editor pass failed — keeping the draft: ${err instanceof Error ? err.message : err}`,
@@ -459,9 +509,11 @@ ${previousDraft}`,
       timeout: 300000,
     });
 
+    const usage = this.usageOf(response);
     return {
       translatedText: this.extractText(response),
-      tokensUsed: this.countTokens(response),
+      tokensUsed: usageTotal(usage),
+      usage,
     };
   }
 
@@ -508,13 +560,14 @@ ${GEORGIAN_STYLE_RULES}`;
     sourceText: string,
     existing: Glossary = {},
   ): Promise<GlossaryExtractionResult> {
-    if (!this.client) return { glossary: {}, tokensUsed: 0 };
+    if (!this.client) return { glossary: {}, tokensUsed: 0, usage: { input: 0, output: 0 } };
 
     // Established terms accumulate across windows so a name found on page 1
     // is not re-proposed (with a different spelling) on page 30.
     const known = this.normalizeGlossary(existing);
     const found: Record<string, GlossaryEntry> = {};
     let tokensUsed = 0;
+    let usage: TokenUsage = { input: 0, output: 0 };
 
     const windows = this.splitForGlossaryScan(sourceText);
     for (const window of windows) {
@@ -522,11 +575,12 @@ ${GEORGIAN_STYLE_RULES}`;
 
       const result = await this.extractGlossaryWindow(window, known);
       tokensUsed += result.tokensUsed;
+      usage = addUsage(usage, result.usage);
       Object.assign(found, result.glossary);
       Object.assign(known, result.glossary);
     }
 
-    return { glossary: found, tokensUsed };
+    return { glossary: found, tokensUsed, usage };
   }
 
   /** Whole-chapter coverage, capped so a huge chapter cannot run away. */
@@ -574,14 +628,15 @@ ${sourceText}`;
       timeout: 120000,
     });
 
-    const tokensUsed = this.countTokens(response);
+    const usage = this.usageOf(response);
+    const tokensUsed = usageTotal(usage);
     const raw = this.extractText(response);
 
     try {
       const jsonText = raw.replace(/```(?:json)?/g, '').trim();
       const start = jsonText.indexOf('{');
       const end = jsonText.lastIndexOf('}');
-      if (start === -1 || end === -1) return { glossary: {}, tokensUsed };
+      if (start === -1 || end === -1) return { glossary: {}, tokensUsed, usage };
 
       const parsed = JSON.parse(jsonText.slice(start, end + 1)) as Record<string, unknown>;
       const glossary: Record<string, GlossaryEntry> = {};
@@ -593,10 +648,10 @@ ${sourceText}`;
         const entry = this.toGlossaryEntry(value);
         if (entry) glossary[this.sanitize(key, 100)] = entry;
       }
-      return { glossary, tokensUsed };
+      return { glossary, tokensUsed, usage };
     } catch {
       this.logger.warn('Glossary extraction returned unparseable JSON — skipping');
-      return { glossary: {}, tokensUsed };
+      return { glossary: {}, tokensUsed, usage };
     }
   }
 
@@ -710,13 +765,13 @@ ${sourceText}`;
    * translates against the same brief instead of re-guessing the tone.
    */
   async generateStyleGuide(samples: string[], bookTitle: string): Promise<StyleGuideResult> {
-    if (!this.client) return { styleGuide: '', tokensUsed: 0 };
+    if (!this.client) return { styleGuide: '', tokensUsed: 0, usage: { input: 0, output: 0 } };
 
     const sampleText = samples
       .filter((sample) => sample?.trim())
       .map((sample, i) => `--- SAMPLE ${i + 1} ---\n${sample.slice(0, 4000)}`)
       .join('\n\n');
-    if (!sampleText) return { styleGuide: '', tokensUsed: 0 };
+    if (!sampleText) return { styleGuide: '', tokensUsed: 0, usage: { input: 0, output: 0 } };
 
     const prompt = `You are briefing a Georgian literary translator before they start "${this.sanitize(bookTitle, 200)}". Read the samples and write the brief.
 
@@ -741,9 +796,11 @@ ${sampleText}`;
       timeout: 180000,
     });
 
+    const usage = this.usageOf(response);
     return {
       styleGuide: this.extractText(response).trim(),
-      tokensUsed: this.countTokens(response),
+      tokensUsed: usageTotal(usage),
+      usage,
     };
   }
 
@@ -757,7 +814,7 @@ ${sampleText}`;
     sourceChapter: string,
     previousSummary?: string,
   ): Promise<StorySummaryResult> {
-    if (!this.client) return { summary: '', tokensUsed: 0 };
+    if (!this.client) return { summary: '', tokensUsed: 0, usage: { input: 0, output: 0 } };
 
     let prompt = 'You maintain a running plot summary for a translator working chapter by chapter.\n\n';
     if (previousSummary?.trim()) {
@@ -774,9 +831,11 @@ ${sampleText}`;
       timeout: 120000,
     });
 
+    const usage = this.usageOf(response);
     return {
       summary: this.extractText(response).trim(),
-      tokensUsed: this.countTokens(response),
+      tokensUsed: usageTotal(usage),
+      usage,
     };
   }
 
@@ -877,8 +936,11 @@ ${options.continuation.translationTail}`;
       .join('');
   }
 
-  private countTokens(response: Anthropic.Message): number {
-    return (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+  private usageOf(response: Anthropic.Message): TokenUsage {
+    return {
+      input: response.usage?.input_tokens || 0,
+      output: response.usage?.output_tokens || 0,
+    };
   }
 
   /** Strip newlines and cap length — user-controlled strings go into prompts. */
