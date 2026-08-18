@@ -51,10 +51,18 @@ export class RetranslationProcessor implements OnModuleInit {
       this.logger.warn(`Retranslation queue unavailable — skipping feedback ${feedbackId}`);
       return;
     }
-    await this.queue.add(
-      'retranslate',
-      { feedbackId },
-      { ...RETRANSLATION_JOB_OPTIONS, jobId: `retranslate-${feedbackId}` },
-    );
+    const jobId = `retranslate-${feedbackId}`;
+    // BullMQ silently ignores add() while a job with this id survives in the
+    // completed/failed sets (see removeOnComplete/removeOnFail retention), so
+    // an admin retry would flip the row to PENDING without ever running. Drop
+    // the finished job first; a waiting/active one keeps deduping as intended.
+    const existing = await this.queue.getJob(jobId);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'completed' || state === 'failed') {
+        await existing.remove();
+      }
+    }
+    await this.queue.add('retranslate', { feedbackId }, { ...RETRANSLATION_JOB_OPTIONS, jobId });
   }
 }
