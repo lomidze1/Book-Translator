@@ -163,11 +163,38 @@ describe('BatchEditorService', () => {
       expect(result).toEqual({ done: true, applied: 1 });
       expect(mockPrisma.translatedChapter.update).toHaveBeenCalledWith({
         where: { id: 'tc-1' },
-        data: { translatedContent: 'რედაქტირებული ერთი.რედაქტირებული ორი.' },
+        data: expect.objectContaining({
+          translatedContent: 'რედაქტირებული ერთი.რედაქტირებული ორი.',
+        }),
       });
       expect(mockPrisma.translation.update).toHaveBeenCalledWith({
         where: { id: 'tr-1' },
         data: expect.objectContaining({ editorBatchStatus: 'APPLIED' }),
+      });
+    });
+
+    it('should shift later chunk boundaries by the splice delta and persist the segments', async () => {
+      mockPrisma.translation.findUnique.mockResolvedValue(submitted());
+      mockClaude.isBatchEnded.mockResolvedValue(true);
+      // 'რედაქტირებული ერთი.' is 19 chars vs the 13-char draft, so every
+      // boundary after chunk 0 must move by +6 — stale offsets would make the
+      // next editor pass or reader report address the wrong text.
+      mockClaude.getBatchResults.mockResolvedValue([
+        { customId: 'tc-1_0', text: 'რედაქტირებული ერთი.', tokensUsed: 100, ok: true },
+        { customId: 'tc-1_1', text: 'რედაქტირებული ორი.', tokensUsed: 100, ok: true },
+      ]);
+
+      await service.poll('tr-1');
+
+      expect(mockPrisma.translatedChapter.update).toHaveBeenCalledWith({
+        where: { id: 'tc-1' },
+        data: {
+          translatedContent: 'რედაქტირებული ერთი.რედაქტირებული ორი.',
+          segments: [
+            { sourceStart: 0, sourceEnd: 10, start: 0, end: 19 },
+            { sourceStart: 11, sourceEnd: 21, start: 19, end: 37 },
+          ],
+        },
       });
     });
 
@@ -183,7 +210,13 @@ describe('BatchEditorService', () => {
 
       expect(mockPrisma.translatedChapter.update).toHaveBeenCalledWith({
         where: { id: 'tc-1' },
-        data: { translatedContent: 'რედაქტირებული ერთი.ქართული ორი.' },
+        data: {
+          translatedContent: 'რედაქტირებული ერთი.ქართული ორი.',
+          segments: [
+            { sourceStart: 0, sourceEnd: 10, start: 0, end: 19 },
+            { sourceStart: 11, sourceEnd: 21, start: 19, end: 31 },
+          ],
+        },
       });
     });
 
@@ -199,7 +232,14 @@ describe('BatchEditorService', () => {
 
       expect(mockPrisma.translatedChapter.update).toHaveBeenCalledWith({
         where: { id: 'tc-1' },
-        data: { translatedContent: 'ქართული ერთი.რედაქტირებული ორი.' },
+        data: {
+          translatedContent: 'ქართული ერთი.რედაქტირებული ორი.',
+          // Chunk 0 kept the draft, so only chunk 1's own end moves.
+          segments: [
+            { sourceStart: 0, sourceEnd: 10, start: 0, end: 13 },
+            { sourceStart: 11, sourceEnd: 21, start: 13, end: 31 },
+          ],
+        },
       });
     });
 

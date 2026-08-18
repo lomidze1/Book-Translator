@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClaudeService, ChunkSegment, EditorBatchRequest, Glossary } from './claude.service';
 
@@ -80,6 +81,7 @@ export class BatchEditorService {
       let changed = false;
       // Right to left, so earlier offsets stay valid as text is spliced in.
       let content = chapter.translatedContent;
+      const updatedSegments = segments.map((segment) => ({ ...segment }));
       for (let i = segments.length - 1; i >= 0; i--) {
         const result = byCustomId.get(`${chapter.id}_${i}`);
         if (!result?.ok || !result.text.trim()) continue;
@@ -91,13 +93,25 @@ export class BatchEditorService {
         }
 
         content = content.slice(0, segments[i].start) + result.text + content.slice(segments[i].end);
+        // Splicing changes the chapter's length, so every later chunk boundary
+        // shifts by the same delta — otherwise a future editor pass or reader
+        // report would address the wrong text.
+        const delta = result.text.length - (segments[i].end - segments[i].start);
+        updatedSegments[i].end += delta;
+        for (let j = i + 1; j < updatedSegments.length; j++) {
+          updatedSegments[j].start += delta;
+          updatedSegments[j].end += delta;
+        }
         changed = true;
       }
 
       if (changed) {
         await this.prisma.translatedChapter.update({
           where: { id: chapter.id },
-          data: { translatedContent: content },
+          data: {
+            translatedContent: content,
+            segments: updatedSegments as unknown as Prisma.InputJsonValue,
+          },
         });
         applied++;
       }
