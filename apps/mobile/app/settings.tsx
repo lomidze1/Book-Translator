@@ -11,7 +11,7 @@ import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
 import { apiRequest } from '@/services/api';
 import { authService } from '@/services/auth';
-import { WEB_URL } from '@/config';
+import { TTS_ENABLED, WEB_URL } from '@/config';
 
 const READER_SETTINGS_KEY = 'reader-settings';
 const DANGER = '#dc2626';
@@ -143,10 +143,8 @@ export default function SettingsScreen() {
     { key: 'pushEnabled', label: t('settings.push_notifications') },
     { key: 'inAppEnabled', label: t('settings.in_app_notifications') },
     { key: 'translationCompleted', label: t('settings.event_translation') },
-    // Audio (TTS) paused for launch — see EXPO_PUBLIC_ENABLE_TTS.
-    ...(process.env.EXPO_PUBLIC_ENABLE_TTS === 'true'
-      ? [{ key: 'ttsCompleted' as const, label: t('settings.event_tts') }]
-      : []),
+    // Audio (TTS) paused for launch — see TTS_ENABLED in config.
+    ...(TTS_ENABLED ? [{ key: 'ttsCompleted' as const, label: t('settings.event_tts') }] : []),
     { key: 'paymentReceipt', label: t('settings.event_payment') },
   ];
 
