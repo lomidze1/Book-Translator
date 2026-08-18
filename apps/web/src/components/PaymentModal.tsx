@@ -30,7 +30,7 @@ function mapPaymentError(
 interface PaymentModalProps {
   bookId: string;
   bookTitle: string;
-  type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
+  type: 'TRANSLATION';
   translationId?: string;
   // Required when type === 'TRANSLATION' — the server enforces this and uses it
   // to pick the FAST vs STANDARD price tier.

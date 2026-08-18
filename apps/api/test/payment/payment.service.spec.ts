@@ -55,7 +55,9 @@ describe('PaymentService', () => {
           PRICE_EXISTING: '5',
           PRICE_CURRENCY: 'GEL',
           // Most specs exercise the historical resale behavior — enable the flag.
-          // The 'resale disabled' describe block below overrides this.
+          // The 'resale disabled' describe block below overrides this. Note the
+          // resale UI and DTO surface were removed; these specs cover the
+          // flag-gated service handlers that were deliberately kept.
           ENABLE_BOOK_RESALE: 'true',
         };
         // Fall through to process.env for env-driven values like NODE_ENV.

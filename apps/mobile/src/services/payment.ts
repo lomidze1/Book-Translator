@@ -1,7 +1,7 @@
 import { apiRequest } from './api';
 
 export type PaymentProvider = 'FLITT';
-export type PaymentType = 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
+export type PaymentType = 'TRANSLATION';
 
 interface CreatePaymentParams {
   bookId: string;

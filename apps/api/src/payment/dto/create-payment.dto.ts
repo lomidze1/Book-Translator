@@ -5,8 +5,11 @@ export class CreatePaymentDto {
   @IsNotEmpty()
   bookId: string;
 
-  @IsIn(['TRANSLATION', 'PURCHASE_ORIGINAL', 'PURCHASE_TRANSLATION'])
-  type: 'TRANSLATION' | 'PURCHASE_ORIGINAL' | 'PURCHASE_TRANSLATION';
+  // PURCHASE_ORIGINAL / PURCHASE_TRANSLATION are resale types, removed from the
+  // accepted set while ENABLE_BOOK_RESALE is off — the service keeps the flag-gated
+  // handlers, but the API boundary rejects them outright.
+  @IsIn(['TRANSLATION'])
+  type: 'TRANSLATION';
 
   @IsIn(['FLITT'])
   provider: 'FLITT';

@@ -54,13 +54,11 @@ export default function BookDetailsPage() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [pricing, setPricing] = useState<{
     pageCount: number;
-    hasExistingTranslation: boolean;
-    existing: { amount: number; currency: string } | null;
     fast: { amount: number; currency: string } | null;
     slow: { amount: number; currency: string } | null;
   } | null>(null);
   const [paymentModal, setPaymentModal] = useState<{
-    type: 'TRANSLATION' | 'PURCHASE_TRANSLATION';
+    type: 'TRANSLATION';
     amount: number;
     currency: string;
     translationId?: string;
@@ -363,37 +361,25 @@ export default function BookDetailsPage() {
                 <button className={styles.btnPrimary} disabled>{t('translation_pending')}</button>
               ) : pricing ? (
                 <div className={styles.pricingOptions}>
-                  {pricing.hasExistingTranslation && pricing.existing ? (
-                    <button
-                      className={styles.btnPrimary}
-                      onClick={() => handleTranslateClick('FAST')}
-                      disabled={translating}
-                    >
-                      {t('translate_existing', { price: pricing.existing.amount })}
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        className={styles.btnPrimary}
-                        onClick={() => handleTranslateClick('FAST')}
-                        disabled={translating}
-                      >
-                        {translating ? t('translation_started') : t('translate_fast', { price: pricing.fast?.amount || 10 })}
-                      </button>
-                      <p className={styles.pricingDesc}>{t('translate_fast_desc')}</p>
+                  <button
+                    className={styles.btnPrimary}
+                    onClick={() => handleTranslateClick('FAST')}
+                    disabled={translating}
+                  >
+                    {translating ? t('translation_started') : t('translate_fast', { price: pricing.fast?.amount || 10 })}
+                  </button>
+                  <p className={styles.pricingDesc}>{t('translate_fast_desc')}</p>
 
-                      <button
-                        className={styles.btnSecondary}
-                        onClick={() => handleTranslateClick('STANDARD')}
-                        disabled={translating}
-                      >
-                        {t('translate_slow', { price: pricing.slow?.amount || 5 })}
-                      </button>
-                      <p className={styles.pricingDesc}>{t('translate_slow_desc')}</p>
+                  <button
+                    className={styles.btnSecondary}
+                    onClick={() => handleTranslateClick('STANDARD')}
+                    disabled={translating}
+                  >
+                    {t('translate_slow', { price: pricing.slow?.amount || 5 })}
+                  </button>
+                  <p className={styles.pricingDesc}>{t('translate_slow_desc')}</p>
 
-                      <p className={styles.qualityNote}>{t('translate_quality_note')}</p>
-                    </>
-                  )}
+                  <p className={styles.qualityNote}>{t('translate_quality_note')}</p>
                 </div>
               ) : (
                 <button

@@ -21,9 +21,10 @@ describe('CreatePaymentDto', () => {
   it('should pass with all fields', async () => {
     const dto = toDto({
       bookId: 'book-1',
-      type: 'PURCHASE_TRANSLATION',
+      type: 'TRANSLATION',
       provider: 'FLITT',
       translationId: 'trans-1',
+      translationType: 'FAST',
     });
     const errors = await validate(dto);
     expect(errors.length).toBe(0);
@@ -53,10 +54,19 @@ describe('CreatePaymentDto', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('should accept PURCHASE_ORIGINAL type', async () => {
+  // Resale types are rejected at the API boundary while the resale surface is
+  // removed (ENABLE_BOOK_RESALE off) — the service-level handlers still exist
+  // behind the flag, but the DTO no longer admits these values.
+  it('should reject PURCHASE_ORIGINAL type', async () => {
     const dto = toDto({ bookId: 'book-1', type: 'PURCHASE_ORIGINAL', provider: 'FLITT' });
     const errors = await validate(dto);
-    expect(errors.length).toBe(0);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('should reject PURCHASE_TRANSLATION type', async () => {
+    const dto = toDto({ bookId: 'book-1', type: 'PURCHASE_TRANSLATION', provider: 'FLITT' });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
   });
 
   it('should allow optional translationId', async () => {
