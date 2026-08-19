@@ -99,6 +99,8 @@
 - ⬜ `railway init` — პროექტის შექმნა + `railway link` რეპოსთან.
 - ⬜ PostgreSQL 16 და Redis 7 სერვისების დამატება.
 - ⬜ API სერვისის შექმნა GitHub repo-დან, `main` branch, `railway.toml`-ის კონფიგით (Dockerfile build, healthcheck `/api`).
+> **მომზადებულია:** ყველა ცვლადის ზუსტი სია და მნიშვნელობა — [docs/deploy/ENV-REFERENCE.md](docs/deploy/ENV-REFERENCE.md)
+
 - ⬜ არა-საიდუმლო env ცვლადების დაყენება CLI-ით: `NODE_ENV=production`, `PORT=4000`, `CORS_ORIGIN=https://booktranslator.ge`, `FRONTEND_URL`, `API_URL`, `PRICE_*` (5 ცალი), `ENABLE_*` flag-ები, `EMAIL_FROM`, `AWS_REGION`, `AWS_S3_BUCKET`, `CLAUDE_MODEL`, `VAPID_SUBJECT` და დანარჩენი კონფიგი `.env.example`-ის მიხედვით.
 - ⬜ `DATABASE_URL`/`REDIS_URL` — Railway reference variables-ით Postgres/Redis სერვისებზე.
 - ⬜ **[GIORGI]** ⬜ 17 საიდუმლოს შეყვანა Railway dashboard-ში (ფაზა 1.2-ის სია).
