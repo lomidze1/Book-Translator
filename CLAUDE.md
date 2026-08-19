@@ -31,7 +31,6 @@ Book-Translator/
 │   │   └── src/styles/   # SCSS variables, mixins
 │   └── mobile/           # React Native (Expo)
 ├── packages/
-│   ├── shared/           # Shared types & interfaces
 │   └── reader/           # Online Reader shared logic
 ├── docs/                 # დოკუმენტაცია
 ├── docker-compose.yml    # PostgreSQL 16 + Redis 7

@@ -155,5 +155,4 @@ services:
 
 | პაკეტი | აღწერა |
 |---|---|
-| `packages/shared` | გაზიარებული ტიპები და ინტერფეისები |
 | `packages/reader` | Online Reader კომპონენტი (web/mobile) |

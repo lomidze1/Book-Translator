@@ -18,7 +18,6 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY apps/mobile/package.json apps/mobile/
 COPY packages/reader/package.json packages/reader/
-COPY packages/shared/package.json packages/shared/
 
 # No --ignore-scripts: bcrypt and the Prisma engines need their build scripts
 # (pnpm-workspace.yaml's onlyBuiltDependencies is the allowlist).

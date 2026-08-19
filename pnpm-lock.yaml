@@ -392,12 +392,6 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.19.15)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.98.0)(terser@5.49.0)(tsx@4.22.3)(yaml@2.9.0)
 
-  packages/shared:
-    devDependencies:
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
 packages:
 
   '@0no-co/graphql.web@1.2.0':
