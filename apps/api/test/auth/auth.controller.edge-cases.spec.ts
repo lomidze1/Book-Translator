@@ -20,7 +20,7 @@ describe('AuthController — Edge Cases & Error Handling', () => {
     return { cookie: vi.fn(), clearCookie: vi.fn() } as any;
   }
   function createMockReq(cookies: Record<string, string> = {}) {
-    return { cookies } as any;
+    return { cookies, headers: {}, body: {} } as any;
   }
 
   beforeEach(() => {
@@ -80,7 +80,7 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.login({ email: 'test@example.com', password: 'wrongpassword' }, createMockRes()),
+        controller.login({ email: 'test@example.com', password: 'wrongpassword' }, createMockReq(), createMockRes()),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -99,6 +99,7 @@ describe('AuthController — Edge Cases & Error Handling', () => {
 
       const result = await controller.login(
         { email: 'test@example.com', password: 'password123' },
+        createMockReq(),
         res,
       );
 
@@ -117,6 +118,7 @@ describe('AuthController — Edge Cases & Error Handling', () => {
 
       const result = await controller.login(
         { email: 'a@b.com', password: 'password123' },
+        createMockReq(),
         createMockRes(),
       );
 
@@ -186,7 +188,7 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.googleAuth({ idToken: 'invalid-google-token' }, createMockRes()),
+        controller.googleAuth({ idToken: 'invalid-google-token' }, createMockReq(), createMockRes()),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -196,7 +198,7 @@ describe('AuthController — Edge Cases & Error Handling', () => {
       );
 
       await expect(
-        controller.googleAuth({ idToken: 'any-token' }, createMockRes()),
+        controller.googleAuth({ idToken: 'any-token' }, createMockReq(), createMockRes()),
       ).rejects.toThrow('Google token verification not implemented');
     });
   });

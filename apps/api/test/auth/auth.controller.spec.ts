@@ -33,8 +33,12 @@ describe('AuthController', () => {
     } as any;
   }
 
-  function createMockReq(cookies: Record<string, string> = {}) {
-    return { cookies } as any;
+  function createMockReq(
+    cookies: Record<string, string> = {},
+    headers: Record<string, string> = {},
+    body: Record<string, unknown> = {},
+  ) {
+    return { cookies, headers, body } as any;
   }
 
   beforeEach(() => {
@@ -76,7 +80,7 @@ describe('AuthController', () => {
       });
       const res = createMockRes();
 
-      const result = await controller.login(dto, res);
+      const result = await controller.login(dto, createMockReq(), res);
 
       expect(result).toEqual({
         accessToken: 'access-123',
@@ -91,12 +95,28 @@ describe('AuthController', () => {
       );
     });
 
+    it('includes refresh token in body for mobile clients (x-mobile-client header)', async () => {
+      const dto = { email: 'test@example.com', password: 'password123' };
+      mockAuthService.login.mockResolvedValue({
+        accessToken: 'access-123',
+        refreshToken: 'refresh-123',
+        user: { id: 'user-1', email: dto.email, name: 'გიორგი', avatar: null },
+      });
+      const res = createMockRes();
+      const req = createMockReq({}, { 'x-mobile-client': 'true' });
+
+      const result = await controller.login(dto, req, res);
+
+      expect(result.accessToken).toBe('access-123');
+      expect((result as any).refreshToken).toBe('refresh-123');
+    });
+
     it('should propagate UnauthorizedException from service', async () => {
       const dto = { email: 'test@example.com', password: 'wrong' };
       mockAuthService.login.mockRejectedValue(new Error('Invalid email or password'));
       const res = createMockRes();
 
-      await expect(controller.login(dto, res)).rejects.toThrow('Invalid email or password');
+      await expect(controller.login(dto, createMockReq(), res)).rejects.toThrow('Invalid email or password');
       expect(res.cookie).not.toHaveBeenCalled();
     });
   });
@@ -119,6 +139,34 @@ describe('AuthController', () => {
         'new-refresh',
         expect.objectContaining({ httpOnly: true }),
       );
+    });
+
+    it('accepts a body refresh token (mobile) and returns the new refresh token in the body', async () => {
+      mockAuthService.refreshTokens.mockResolvedValue({
+        accessToken: 'new-access',
+        refreshToken: 'new-refresh',
+      });
+      const req = createMockReq({}, {}, { refreshToken: 'old-refresh' });
+      const res = createMockRes();
+
+      const result = await controller.refresh(req, res);
+
+      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith('old-refresh');
+      expect(result).toEqual({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+    });
+
+    it('prefers the cookie token and keeps refresh token out of the body when cookie is used', async () => {
+      mockAuthService.refreshTokens.mockResolvedValue({
+        accessToken: 'new-access',
+        refreshToken: 'new-refresh',
+      });
+      const req = createMockReq({ refresh_token: 'cookie-refresh' }, {}, { refreshToken: 'body-refresh' });
+      const res = createMockRes();
+
+      const result = await controller.refresh(req, res);
+
+      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith('cookie-refresh');
+      expect((result as any).refreshToken).toBeUndefined();
     });
 
     it('throws when refresh cookie is missing', async () => {
@@ -151,7 +199,7 @@ describe('AuthController', () => {
       });
       const res = createMockRes();
 
-      const result = await controller.googleAuth(dto, res);
+      const result = await controller.googleAuth(dto, createMockReq(), res);
 
       expect(result).toEqual({
         accessToken: 'access',
@@ -163,6 +211,21 @@ describe('AuthController', () => {
         'refresh',
         expect.objectContaining({ httpOnly: true }),
       );
+    });
+
+    it('includes refresh token in body for mobile clients', async () => {
+      const dto = { idToken: 'google-token-123' };
+      mockAuthService.googleAuth.mockResolvedValue({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        user: { id: 'user-1', email: 'user@gmail.com', name: 'User', avatar: null },
+      });
+      const res = createMockRes();
+      const req = createMockReq({}, { 'x-mobile-client': 'true' });
+
+      const result = await controller.googleAuth(dto, req, res);
+
+      expect((result as any).refreshToken).toBe('refresh');
     });
   });
 

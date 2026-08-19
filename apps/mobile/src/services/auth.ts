@@ -71,7 +71,8 @@ export const authService = {
     try {
       res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // x-mobile-client opts into refresh token in the body — no cookie jar here
+        headers: { 'Content-Type': 'application/json', 'x-mobile-client': 'true' },
         body: JSON.stringify({ email, password }),
       });
     } catch {
@@ -98,7 +99,7 @@ export const authService = {
     try {
       res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-mobile-client': 'true' },
         body: JSON.stringify({ email, password, name }),
       });
     } catch {
@@ -112,11 +113,11 @@ export const authService = {
 
     const data = await res.json();
 
-    if (!data.accessToken || !data.refreshToken) {
-      throw new Error(AUTH_ERROR_CODES.SERVER_ERROR);
+    // Registration returns a "verify your email" message, not tokens — only
+    // store tokens if the API handed them out (e.g. verification disabled).
+    if (data.accessToken && data.refreshToken) {
+      await this.setTokens(data.accessToken, data.refreshToken);
     }
-
-    await this.setTokens(data.accessToken, data.refreshToken);
     return data;
   },
 
@@ -127,7 +128,7 @@ export const authService = {
     try {
       const res = await fetch(`${API_URL}/api/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-mobile-client': 'true' },
         body: JSON.stringify({ refreshToken: refresh }),
       });
 

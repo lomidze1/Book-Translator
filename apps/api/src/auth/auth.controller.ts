@@ -54,6 +54,15 @@ export class AuthController {
     res.clearCookie(REFRESH_COOKIE, { ...this.cookieOptions, maxAge: undefined });
   }
 
+  /**
+   * Native apps have no cookie jar, so they opt into receiving the refresh
+   * token in the response body via this header. Web clients never send it and
+   * keep the httpOnly-cookie-only behavior.
+   */
+  private isMobileClient(req: Request): boolean {
+    return req.headers['x-mobile-client'] === 'true';
+  }
+
   @Public()
   @Post('register')
   async register(@Body() dto: RegisterDto) {
@@ -66,11 +75,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { refreshToken, ...rest } = await this.authService.login(dto);
     this.setRefreshCookie(res, refreshToken);
-    return rest;
+    return this.isMobileClient(req) ? { ...rest, refreshToken } : rest;
   }
 
   @Public()
@@ -80,13 +90,19 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const token = req.cookies?.[REFRESH_COOKIE];
+    const cookieToken = req.cookies?.[REFRESH_COOKIE];
+    const bodyToken =
+      typeof (req.body as { refreshToken?: unknown })?.refreshToken === 'string'
+        ? ((req.body as { refreshToken: string }).refreshToken)
+        : undefined;
+    const token = cookieToken ?? bodyToken;
     if (!token) {
       throw new UnauthorizedException('Missing refresh token');
     }
     const { accessToken, refreshToken } = await this.authService.refreshTokens(token);
     this.setRefreshCookie(res, refreshToken);
-    return { accessToken };
+    // A body token means a cookie-less native client — hand the rotated token back.
+    return cookieToken ? { accessToken } : { accessToken, refreshToken };
   }
 
   @Post('logout')
@@ -102,11 +118,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async googleAuth(
     @Body() dto: GoogleAuthDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { refreshToken, ...rest } = await this.authService.googleAuth(dto);
     this.setRefreshCookie(res, refreshToken);
-    return rest;
+    return this.isMobileClient(req) ? { ...rest, refreshToken } : rest;
   }
 
   @Public()

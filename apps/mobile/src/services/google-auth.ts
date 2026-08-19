@@ -51,7 +51,8 @@ export function useGoogleAuth() {
 
     const res = await fetch(`${API_URL}/api/auth/google`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // x-mobile-client opts into refresh token in the body — no cookie jar here
+      headers: { 'Content-Type': 'application/json', 'x-mobile-client': 'true' },
       body: JSON.stringify({ idToken }),
     });
 
