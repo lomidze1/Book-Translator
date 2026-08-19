@@ -258,16 +258,26 @@ describe('ReaderService — Gaps', () => {
   // ========================
 
   describe('Cross-entity referential behavior', () => {
-    it('createNote does NOT verify the highlight belongs to the same book (documents current behavior)', async () => {
+    it('createNote rejects a highlight anchored in a different book', async () => {
       // Highlight owned by the user but anchored in a different book.
       mockPrisma.highlight.findUnique.mockResolvedValue({ id: 'hl-1', userId, bookId: 'other-book' });
+
+      await expect(
+        service.createNote(userId, {
+          bookId, chapterNumber: 1, highlightId: 'hl-1', content: 'cross-book note',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.note.create).not.toHaveBeenCalled();
+    });
+
+    it('createNote accepts a highlight anchored in the same book', async () => {
+      mockPrisma.highlight.findUnique.mockResolvedValue({ id: 'hl-1', userId, bookId });
       mockPrisma.note.create.mockResolvedValue({ id: 'n-1', highlightId: 'hl-1' });
 
       const result = await service.createNote(userId, {
-        bookId, chapterNumber: 1, highlightId: 'hl-1', content: 'cross-book note',
+        bookId, chapterNumber: 1, highlightId: 'hl-1', content: 'same-book note',
       });
 
-      // The service currently accepts this; only ownership is enforced.
       expect(result.id).toBe('n-1');
       expect(mockPrisma.note.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ bookId, highlightId: 'hl-1' }),

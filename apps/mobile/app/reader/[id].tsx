@@ -15,6 +15,10 @@ import { bookCacheService } from '@/services/book-cache';
 import { useTheme } from '@/theme/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useToast } from '@/context/ToastContext';
+// Rendered again inside each Modal below: a native Modal lives in its own window
+// above the root view, so the app-level ToastContainer is invisible while a sheet
+// is open and toasts fired from inside one would never be seen.
+import ToastContainer from '@/components/common/Toast';
 import ColorPicker, { HIGHLIGHT_HEX, type HighlightColor } from '@/components/reader/ColorPicker';
 import SelectableChapterText from '@/components/reader/SelectableChapterText';
 import { API_URL } from '@/config';
@@ -641,6 +645,7 @@ export default function MobileReaderScreen() {
             </View>
           </View>
         </View>
+        <ToastContainer />
       </Modal>
 
       {/* ── Highlights Modal ── */}
@@ -689,6 +694,7 @@ export default function MobileReaderScreen() {
             )}
           </View>
         </View>
+        <ToastContainer />
       </Modal>
 
       {/* ── Bookmarks Modal ── */}
@@ -724,6 +730,7 @@ export default function MobileReaderScreen() {
             )}
           </View>
         </View>
+        <ToastContainer />
       </Modal>
 
       {/* ── Notes Modal ── */}
@@ -778,6 +785,7 @@ export default function MobileReaderScreen() {
             )}
           </View>
         </View>
+        <ToastContainer />
       </Modal>
     </SafeAreaView>
   );

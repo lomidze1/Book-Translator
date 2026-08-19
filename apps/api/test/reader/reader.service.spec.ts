@@ -467,7 +467,7 @@ describe('ReaderService', () => {
     });
 
     it('should create note attached to highlight', async () => {
-      mockPrisma.highlight.findUnique.mockResolvedValue({ id: 'hl-1', userId });
+      mockPrisma.highlight.findUnique.mockResolvedValue({ id: 'hl-1', userId, bookId });
       const expected = { id: 'n-1', userId, ...dto, highlightId: 'hl-1' };
       mockPrisma.note.create.mockResolvedValue(expected);
 

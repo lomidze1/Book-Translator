@@ -169,12 +169,17 @@ export class ReaderService {
     await this.validateBookAccess(userId, dto.bookId);
 
     if (dto.highlightId) {
-      await this.assertOwnership(
+      const highlight = await this.assertOwnership(
         () => this.prisma.highlight.findUnique({ where: { id: dto.highlightId } }),
         userId,
         'Highlight ვერ მოიძებნა',
         'არ გაქვთ ამ highlight-ზე შენიშვნის დამატების უფლება',
       );
+
+      // The highlight must be anchored in the same book as the note.
+      if (highlight.bookId !== dto.bookId) {
+        throw new BadRequestException('Highlight სხვა წიგნს ეკუთვნის');
+      }
     }
 
     return this.prisma.note.create({
