@@ -78,10 +78,13 @@ const DEFAULT_SETTINGS: ReaderSettings = {
 };
 
 const READER_SETTINGS_KEY = 'reader-settings';
-const READER_THEMES: Record<string, { background: string; text: string }> = {
-  light: { background: '#ffffff', text: '#1a1a1a' },
-  sepia: { background: '#f4ecd8', text: '#5c4b37' },
-  dark: { background: '#1a1a1a', text: '#e0e0e0' },
+const READER_THEMES: Record<
+  string,
+  { background: string; text: string; textSecondary: string; border: string }
+> = {
+  light: { background: '#ffffff', text: '#1a1a1a', textSecondary: '#6b7280', border: '#e5e7eb' },
+  sepia: { background: '#f4ecd8', text: '#5c4b37', textSecondary: '#8a7a63', border: '#e0d5bb' },
+  dark: { background: '#1a1a1a', text: '#e0e0e0', textSecondary: '#9ca3af', border: '#3a3a3a' },
 };
 
 const FONT_MAP: Record<string, string | undefined> = {
@@ -562,9 +565,9 @@ export default function MobileReaderScreen() {
       {/* ── Settings Panel Modal ── */}
       <Modal visible={showSettingsPanel} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: theme.background, maxHeight: screenHeight * 0.7 }]}>
+          <View style={[s.modalContent, { backgroundColor: readerTheme.background, maxHeight: screenHeight * 0.7 }]}>
             <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: theme.text }]}>{t('reader.settings_panel')}</Text>
+              <Text style={[s.modalTitle, { color: readerTheme.text }]}>{t('reader.settings_panel')}</Text>
               <TouchableOpacity onPress={() => setShowSettingsPanel(false)}>
                 <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.close')}</Text>
               </TouchableOpacity>
@@ -572,14 +575,14 @@ export default function MobileReaderScreen() {
 
             {/* Font Size */}
             <View style={s.settingRow}>
-              <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.font_size')}</Text>
+              <Text style={[s.settingLabel, { color: readerTheme.textSecondary }]}>{t('settings.font_size')}</Text>
               <View style={s.stepperRow}>
-                <TouchableOpacity style={[s.stepBtn, { borderColor: theme.border }]}
+                <TouchableOpacity style={[s.stepBtn, { borderColor: readerTheme.border }]}
                   onPress={() => updateReaderSetting('fontSize', Math.max(14, readerSettings.fontSize - 2))}>
                   <Text style={[s.stepText, { color: theme.primary }]}>A-</Text>
                 </TouchableOpacity>
-                <Text style={[s.stepValue, { color: theme.text }]}>{readerSettings.fontSize}</Text>
-                <TouchableOpacity style={[s.stepBtn, { borderColor: theme.border }]}
+                <Text style={[s.stepValue, { color: readerTheme.text }]}>{readerSettings.fontSize}</Text>
+                <TouchableOpacity style={[s.stepBtn, { borderColor: readerTheme.border }]}
                   onPress={() => updateReaderSetting('fontSize', Math.min(28, readerSettings.fontSize + 2))}>
                   <Text style={[s.stepText, { color: theme.primary }]}>A+</Text>
                 </TouchableOpacity>
@@ -587,7 +590,7 @@ export default function MobileReaderScreen() {
             </View>
 
             {/* Font Family */}
-            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.font_family')}</Text>
+            <Text style={[s.settingLabel, { color: readerTheme.textSecondary }]}>{t('settings.font_family')}</Text>
             <View style={s.chipRow}>
               {Object.entries(fontLabels).map(([key, label]) => (
                 <TouchableOpacity
@@ -595,21 +598,21 @@ export default function MobileReaderScreen() {
                   style={[s.chip, readerSettings.fontFamily === key && { backgroundColor: theme.primary }]}
                   onPress={() => updateReaderSetting('fontFamily', key)}
                 >
-                  <Text style={{ fontSize: 12, color: readerSettings.fontFamily === key ? '#fff' : theme.text }}>{label}</Text>
+                  <Text style={{ fontSize: 12, color: readerSettings.fontFamily === key ? '#fff' : readerTheme.text }}>{label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             {/* Line Height */}
             <View style={s.settingRow}>
-              <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.line_height')}</Text>
+              <Text style={[s.settingLabel, { color: readerTheme.textSecondary }]}>{t('settings.line_height')}</Text>
               <View style={s.stepperRow}>
-                <TouchableOpacity style={[s.stepBtn, { borderColor: theme.border }]}
+                <TouchableOpacity style={[s.stepBtn, { borderColor: readerTheme.border }]}
                   onPress={() => updateReaderSetting('lineHeight', Math.max(1.4, +(readerSettings.lineHeight - 0.2).toFixed(1)))}>
                   <Text style={[s.stepText, { color: theme.primary }]}>-</Text>
                 </TouchableOpacity>
-                <Text style={[s.stepValue, { color: theme.text }]}>{readerSettings.lineHeight.toFixed(1)}</Text>
-                <TouchableOpacity style={[s.stepBtn, { borderColor: theme.border }]}
+                <Text style={[s.stepValue, { color: readerTheme.text }]}>{readerSettings.lineHeight.toFixed(1)}</Text>
+                <TouchableOpacity style={[s.stepBtn, { borderColor: readerTheme.border }]}
                   onPress={() => updateReaderSetting('lineHeight', Math.min(2.2, +(readerSettings.lineHeight + 0.2).toFixed(1)))}>
                   <Text style={[s.stepText, { color: theme.primary }]}>+</Text>
                 </TouchableOpacity>
@@ -617,7 +620,7 @@ export default function MobileReaderScreen() {
             </View>
 
             {/* Reader Theme */}
-            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.reader_theme')}</Text>
+            <Text style={[s.settingLabel, { color: readerTheme.textSecondary }]}>{t('settings.reader_theme')}</Text>
             <View style={s.chipRow}>
               {[
                 { key: 'light', label: t('settings.theme_light'), bg: '#fff', fg: '#1a1a1a' },
@@ -628,7 +631,7 @@ export default function MobileReaderScreen() {
                   key={rt.key}
                   style={[
                     s.themeChip,
-                    { backgroundColor: rt.bg, borderColor: readerSettings.theme === rt.key ? theme.primary : theme.border },
+                    { backgroundColor: rt.bg, borderColor: readerSettings.theme === rt.key ? theme.primary : readerTheme.border },
                   ]}
                   onPress={() => updateReaderSetting('theme', rt.key)}
                 >
@@ -643,28 +646,28 @@ export default function MobileReaderScreen() {
       {/* ── Highlights Modal ── */}
       <Modal visible={showHighlights} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: theme.background, maxHeight: screenHeight * 0.7 }]}>
+          <View style={[s.modalContent, { backgroundColor: readerTheme.background, maxHeight: screenHeight * 0.7 }]}>
             <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: theme.text }]}>{t('reader.highlights')}</Text>
+              <Text style={[s.modalTitle, { color: readerTheme.text }]}>{t('reader.highlights')}</Text>
               <TouchableOpacity onPress={() => setShowHighlights(false)}>
                 <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.close')}</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>
+            <Text style={[s.settingLabel, { color: readerTheme.textSecondary }]}>
               {t('reader.highlight_hint')}
             </Text>
 
             {highlights.length === 0 ? (
-              <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('reader.highlights_empty')}</Text>
+              <Text style={[s.emptyText, { color: readerTheme.textSecondary }]}>{t('reader.highlights_empty')}</Text>
             ) : (
               <FlatList
                 data={highlights}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
-                  <View style={[s.highlightCard, { borderColor: theme.border, borderLeftColor: HIGHLIGHT_HEX[item.color as HighlightColor] || '#facc15' }]}>
+                  <View style={[s.highlightCard, { borderColor: readerTheme.border, borderLeftColor: HIGHLIGHT_HEX[item.color as HighlightColor] || '#facc15' }]}>
                     <View style={s.highlightHeader}>
-                      <Text style={[s.noteChapter, { color: theme.textSecondary }]}>
+                      <Text style={[s.noteChapter, { color: readerTheme.textSecondary }]}>
                         {t('reader.chapter', { number: item.chapterNumber })}
                       </Text>
                       <View style={s.highlightActions}>
@@ -677,7 +680,7 @@ export default function MobileReaderScreen() {
                         </TouchableOpacity>
                       </View>
                     </View>
-                    <Text style={[s.highlightText, { color: theme.text }]} numberOfLines={2}>
+                    <Text style={[s.highlightText, { color: readerTheme.text }]} numberOfLines={2}>
                       {item.selectedText}
                     </Text>
                   </View>
@@ -691,28 +694,28 @@ export default function MobileReaderScreen() {
       {/* ── Bookmarks Modal ── */}
       <Modal visible={showBookmarks} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: theme.background, maxHeight: screenHeight * 0.7 }]}>
+          <View style={[s.modalContent, { backgroundColor: readerTheme.background, maxHeight: screenHeight * 0.7 }]}>
             <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: theme.text }]}>{t('reader.bookmarks')}</Text>
+              <Text style={[s.modalTitle, { color: readerTheme.text }]}>{t('reader.bookmarks')}</Text>
               <TouchableOpacity onPress={() => setShowBookmarks(false)}>
                 <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.close')}</Text>
               </TouchableOpacity>
             </View>
             {bookmarks.length === 0 ? (
-              <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('reader.bookmarks_empty')}</Text>
+              <Text style={[s.emptyText, { color: readerTheme.textSecondary }]}>{t('reader.bookmarks_empty')}</Text>
             ) : (
               <FlatList
                 data={bookmarks}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={[s.listItem, { borderBottomColor: theme.border }]}
+                    style={[s.listItem, { borderBottomColor: readerTheme.border }]}
                     onPress={() => { setShowBookmarks(false); setActiveChapter(item.chapterNumber); }}
                   >
-                    <Text style={[s.listItemText, { color: theme.text }]}>
+                    <Text style={[s.listItemText, { color: readerTheme.text }]}>
                       {t('reader.chapter', { number: item.chapterNumber })}
                     </Text>
-                    <Text style={[s.listItemDate, { color: theme.textSecondary }]}>
+                    <Text style={[s.listItemDate, { color: readerTheme.textSecondary }]}>
                       {new Date(item.createdAt).toLocaleDateString('ka-GE')}
                     </Text>
                   </TouchableOpacity>
@@ -726,9 +729,9 @@ export default function MobileReaderScreen() {
       {/* ── Notes Modal ── */}
       <Modal visible={showNotes} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: theme.background, maxHeight: screenHeight * 0.7 }]}>
+          <View style={[s.modalContent, { backgroundColor: readerTheme.background, maxHeight: screenHeight * 0.7 }]}>
             <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: theme.text }]}>{t('reader.notes')}</Text>
+              <Text style={[s.modalTitle, { color: readerTheme.text }]}>{t('reader.notes')}</Text>
               <TouchableOpacity onPress={() => setShowNotes(false)}>
                 <Text style={[s.modalClose, { color: theme.primary }]}>{t('common.close')}</Text>
               </TouchableOpacity>
@@ -736,9 +739,9 @@ export default function MobileReaderScreen() {
 
             <View style={s.addNoteRow}>
               <TextInput
-                style={[s.noteInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.surface }]}
+                style={[s.noteInput, { borderColor: readerTheme.border, color: readerTheme.text, backgroundColor: theme.surface }]}
                 placeholder={t('reader.note_placeholder')}
-                placeholderTextColor={theme.textSecondary}
+                placeholderTextColor={readerTheme.textSecondary}
                 value={noteText}
                 onChangeText={setNoteText}
                 multiline
@@ -753,22 +756,22 @@ export default function MobileReaderScreen() {
             </View>
 
             {notes.length === 0 ? (
-              <Text style={[s.emptyText, { color: theme.textSecondary }]}>{t('reader.notes_empty')}</Text>
+              <Text style={[s.emptyText, { color: readerTheme.textSecondary }]}>{t('reader.notes_empty')}</Text>
             ) : (
               <FlatList
                 data={notes}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
-                  <View style={[s.noteCard, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+                  <View style={[s.noteCard, { borderColor: readerTheme.border, backgroundColor: theme.surface }]}>
                     <View style={s.noteHeader}>
-                      <Text style={[s.noteChapter, { color: theme.textSecondary }]}>
+                      <Text style={[s.noteChapter, { color: readerTheme.textSecondary }]}>
                         {t('reader.chapter', { number: item.chapterNumber })}
                       </Text>
                       <TouchableOpacity onPress={() => deleteNote(item.id)}>
                         <Text style={[s.deleteBtn, { color: theme.error }]}>{t('common.delete')}</Text>
                       </TouchableOpacity>
                     </View>
-                    <Text style={[s.noteContent, { color: theme.text }]}>{item.content}</Text>
+                    <Text style={[s.noteContent, { color: readerTheme.text }]}>{item.content}</Text>
                   </View>
                 )}
               />
