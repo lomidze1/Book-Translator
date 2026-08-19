@@ -140,6 +140,35 @@ describe('useReadingProgress — debounced auto-save', () => {
     expect(api.saveProgress).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the buffer when the tick fails, so the next tick retries it', async () => {
+    vi.useFakeTimers();
+    api.saveProgress.mockRejectedValueOnce(new Error('offline'));
+    const saved = position({ currentChapter: 1, currentPosition: 50, percentage: 10 });
+    api.saveProgress.mockResolvedValue(saved);
+
+    const { result } = renderHook(() => useReadingProgress('book-1', 'tok'));
+    await act(async () => {});
+
+    act(() => {
+      result.current.updateProgress(1, 50, 10);
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTO_SAVE_INTERVAL); // fails, buffer survives
+    });
+    expect(result.current.progress).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTO_SAVE_INTERVAL); // retried here
+    });
+
+    expect(api.saveProgress).toHaveBeenCalledTimes(2);
+    expect(api.saveProgress).toHaveBeenLastCalledWith('tok', {
+      bookId: 'book-1', currentChapter: 1, currentPosition: 50, percentage: 10,
+    });
+    expect(result.current.progress).toEqual(saved);
+  });
+
   it('never auto-saves without a token', async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useReadingProgress('book-1', null));

@@ -26,10 +26,14 @@ export function useReadingProgress(bookId: string, token: string | null) {
 
     timerRef.current = setInterval(() => {
       if (pendingRef.current && token) {
+        // Keep the buffer until the save lands, so a failed tick retries
+        // on the next one instead of silently dropping the position.
         readerApi.saveProgress(token, { bookId, ...pendingRef.current })
-          .then((saved) => setProgress(saved))
+          .then((saved) => {
+            setProgress(saved);
+            pendingRef.current = null;
+          })
           .catch(() => {});
-        pendingRef.current = null;
       }
     }, AUTO_SAVE_INTERVAL);
 

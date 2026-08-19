@@ -30,12 +30,14 @@ export const readerApi = {
   /** Fire-and-forget save that survives page unload (pagehide flush). */
   saveProgressKeepalive(token: string, data: { bookId: string; currentChapter: number; currentPosition: number; percentage: number }) {
     try {
+      // The .catch is deliberate: a rejected keepalive during unload must not
+      // surface as an unhandled promise rejection.
       void fetch(`${getApiUrl()}/api${BASE}/progress`, {
         method: 'POST',
         keepalive: true,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(data),
-      });
+      }).catch(() => {});
     } catch {
       // Best effort — the page is going away.
     }

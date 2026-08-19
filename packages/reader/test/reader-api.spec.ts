@@ -68,6 +68,19 @@ describe('progress endpoints', () => {
     expect(JSON.parse(init.body)).toMatchObject({ bookId: BOOK, percentage: 1 });
   });
 
+  it('saveProgressKeepalive attaches a catch so an async rejection stays handled', async () => {
+    const rejected = Promise.reject(new Error('network gone'));
+    const catchSpy = vi.spyOn(rejected, 'catch');
+    fetchMock.mockReturnValue(rejected);
+
+    readerApi.saveProgressKeepalive(TOKEN, {
+      bookId: BOOK, currentChapter: 1, currentPosition: 0, percentage: 0,
+    });
+
+    expect(catchSpy).toHaveBeenCalled();
+    await rejected.catch(() => {}); // settle so the run stays clean
+  });
+
   it('saveProgressKeepalive swallows a synchronous fetch failure (page is unloading)', () => {
     fetchMock.mockImplementation(() => {
       throw new Error('fetch not available during unload');
