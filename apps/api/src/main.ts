@@ -45,6 +45,11 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new LoggingInterceptor());
 
+  // Run OnModuleDestroy on SIGTERM so BullMQ workers finish their current job
+  // and Prisma/Redis disconnect cleanly. Without this every deploy would leave
+  // an in-flight translation stalled until BullMQ's lock expires.
+  app.enableShutdownHooks();
+
   const port = process.env.PORT || 4000;
   await app.listen(port);
   console.log(`Book Translator API running on http://localhost:${port}`);

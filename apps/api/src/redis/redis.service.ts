@@ -29,6 +29,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client?.status === 'ready';
   }
 
+  /** Round-trip probe for the health endpoint — `isConnected` only reads local state. */
+  async ping(): Promise<boolean> {
+    if (!this.isConnected) return false;
+    return (await this.client.ping()) === 'PONG';
+  }
+
   // --- Standard methods (silent fail for non-critical operations) ---
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {

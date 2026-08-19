@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,7 +18,7 @@ interface NotifyParams {
 }
 
 @Injectable()
-export class NotificationService {
+export class NotificationService implements OnModuleDestroy {
   private readonly logger = new Logger(NotificationService.name);
   private queue: Queue | null = null;
 
@@ -202,6 +202,12 @@ export class NotificationService {
         return true;
       default:
         return true;
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.queue) {
+      await this.queue.close();
     }
   }
 }

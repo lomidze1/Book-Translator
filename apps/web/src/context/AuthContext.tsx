@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  API_URL,
   apiFetch,
   apiJson,
   setAccessToken,
@@ -76,10 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/logout`,
-        { method: 'POST', credentials: 'include' },
-      );
+      await fetch(`${API_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
     } catch {
       // Network failure — clear local state anyway.
     }
@@ -114,10 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // Try a silent refresh — succeeds when the httpOnly refresh cookie is
         // present and valid; fails cleanly for first-time visitors.
-        const refreshRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/refresh`,
-          { method: 'POST', credentials: 'include' },
-        );
+        const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
 
         if (!refreshRes.ok) {
           if (!cancelled) clearLocalAuth();

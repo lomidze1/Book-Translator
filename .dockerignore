@@ -1,0 +1,47 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Dependencies and build output
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+.turbo
+**/.turbo
+coverage
+**/coverage
+*.tsbuildinfo
+
+# Secrets — must never enter the build context
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+apps/api/*.json
+!apps/api/package.json
+!apps/api/tsconfig.json
+!apps/api/nest-cli.json
+
+# Tests
+**/test
+**/*.spec.ts
+**/*.test.ts
+
+# Workspaces the API image does not build (manifests are still needed for
+# pnpm's frozen-lockfile check)
+apps/web/**
+!apps/web/package.json
+apps/mobile/**
+!apps/mobile/package.json
+
+# Misc
+docs
+.claude
+.vscode
+.DS_Store

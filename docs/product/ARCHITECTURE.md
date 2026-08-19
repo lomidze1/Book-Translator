@@ -95,7 +95,7 @@ book-translator/
 | **Books** | წიგნების ძებნა (Google Books + Open Library), ატვირთვა, CRUD |
 | **Translation** | BullMQ processor, Claude API თარგმანი, პროგრესის ტრეკინგი |
 | **TTS** | BullMQ processor, Google Cloud/ElevenLabs/Azure TTS, აუდიო S3-ზე |
-| **Payment** | BOG Pay, TBC Pay ინტეგრაცია, webhook callbacks |
+| **Payment** | Flitt ინტეგრაცია, webhook callbacks |
 | **Reader** | სანიშნეები, ხაზგასმები, შენიშვნები, კითხვის პროგრესი |
 | **Notification** | Email/Push/In-app, WebSocket gateway, BullMQ queue |
 | **Parsing** | PDF, EPUB, DOCX, TXT ფაილების დამუშავება |
@@ -155,6 +155,5 @@ services:
 
 | პაკეტი | აღწერა |
 |---|---|
-| `packages/config` | ESLint, Prettier, TypeScript კონფიგურაცია |
 | `packages/shared` | გაზიარებული ტიპები და ინტერფეისები |
 | `packages/reader` | Online Reader კომპონენტი (web/mobile) |

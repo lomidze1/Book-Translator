@@ -14,7 +14,7 @@ Book-Translator/
 │   │   │   ├── books/        # Books (search, upload, CRUD)
 │   │   │   ├── translation/  # AI Translation (BullMQ processor, Claude API)
 │   │   │   ├── tts/          # Text-to-Speech (Google Cloud, ElevenLabs, Azure)
-│   │   │   ├── payment/      # Payment (BOG Pay, TBC Pay)
+│   │   │   ├── payment/      # Payment (Flitt)
 │   │   │   ├── reader/       # Reader (bookmarks, highlights, notes, progress)
 │   │   │   ├── notification/ # Notifications (email, push, in-app, WebSocket)
 │   │   │   ├── email/        # Email service (Resend)
@@ -31,7 +31,6 @@ Book-Translator/
 │   │   └── src/styles/   # SCSS variables, mixins
 │   └── mobile/           # React Native (Expo)
 ├── packages/
-│   ├── config/           # ESLint, Prettier, TSConfig
 │   ├── shared/           # Shared types & interfaces
 │   └── reader/           # Online Reader shared logic
 ├── docs/                 # დოკუმენტაცია
@@ -130,7 +129,7 @@ pnpm turbo build
 - **Auth:** JWT + Google OAuth (google-auth-library) + OTP (Redis)
 - **AI Translation:** Claude API (@anthropic-ai/sdk) + BullMQ
 - **TTS:** Google Cloud TTS + ElevenLabs + Azure + BullMQ
-- **Payments:** BOG Pay + TBC Pay
+- **Payments:** Flitt (TBC Bank subsidiary)
 - **Notifications:** Web Push (VAPID) + Socket.IO + Resend (email)
 - **Database:** PostgreSQL 16 (Docker) + Redis 7 (Docker)
 - **Storage:** AWS S3

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Queue, Worker, Job } from 'bullmq';
 import { BatchEditorService } from './batch-editor.service';
 import {
@@ -22,7 +22,7 @@ export interface EditorBatchJobData {
  * and this only upgrades the text underneath them.
  */
 @Injectable()
-export class EditorBatchProcessor implements OnModuleInit {
+export class EditorBatchProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EditorBatchProcessor.name);
   private queue: Queue | null = null;
   private worker: Worker | null = null;
@@ -46,6 +46,16 @@ export class EditorBatchProcessor implements OnModuleInit {
       this.worker.on('error', (err) => this.logger.error(`Editor batch worker error: ${err.message}`));
     } catch (err) {
       this.logger.error(`Editor batch worker init FAILED: ${err instanceof Error ? err.stack : err}`);
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.worker) {
+      await this.worker.close();
+      this.logger.log('Editor batch worker closed');
+    }
+    if (this.queue) {
+      await this.queue.close();
     }
   }
 

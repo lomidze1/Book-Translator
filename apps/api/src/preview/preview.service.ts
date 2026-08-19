@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
@@ -33,7 +34,7 @@ export interface PublicPreview {
 }
 
 @Injectable()
-export class PreviewService {
+export class PreviewService implements OnModuleDestroy {
   private readonly logger = new Logger(PreviewService.name);
   private queue: Queue | null = null;
 
@@ -210,5 +211,11 @@ export class PreviewService {
     }
     await job.remove();
     return true;
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.queue) {
+      await this.queue.close();
+    }
   }
 }

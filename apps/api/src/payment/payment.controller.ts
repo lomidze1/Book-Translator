@@ -11,6 +11,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -77,6 +78,9 @@ export class PaymentController {
   // before this handler is reached. Typing the body as a plain object makes
   // ValidationPipe skip it entirely; FlittProvider.validateCallback checks
   // the required fields and the signature itself.
+  // Flitt retries and batches callbacks, so a burst can trip the global
+  // per-IP limit and hand the bank a 429 for a payment we already took.
+  @SkipThrottle()
   @Public()
   @Post('flitt/callback')
   async flittCallback(@Body() payload: Record<string, unknown>) {

@@ -136,6 +136,9 @@ importers:
       passport-jwt:
         specifier: ^4.0.1
         version: 4.0.1
+      prisma:
+        specifier: ^6.0.0
+        version: 6.19.2(magicast@0.3.5)(typescript@5.9.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -197,9 +200,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^3.0.0
         version: 3.2.4(vitest@3.2.4(@types/node@22.19.15)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.98.0)(terser@5.49.0)(tsx@4.22.3)(yaml@2.9.0))
-      prisma:
-        specifier: ^6.0.0
-        version: 6.19.2(magicast@0.3.5)(typescript@5.9.3)
       supertest:
         specifier: ^7.2.2
         version: 7.2.2
@@ -364,8 +364,6 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.3
-
-  packages/config: {}
 
   packages/reader:
     devDependencies:

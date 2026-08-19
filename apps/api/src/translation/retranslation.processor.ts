@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Queue, Worker, Job } from 'bullmq';
 import { RetranslationService } from './retranslation.service';
 import {
@@ -17,7 +17,7 @@ export interface RetranslationJobData {
  * a multi-hour book would reach the reader days late.
  */
 @Injectable()
-export class RetranslationProcessor implements OnModuleInit {
+export class RetranslationProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RetranslationProcessor.name);
   private queue: Queue | null = null;
   private worker: Worker | null = null;
@@ -43,6 +43,16 @@ export class RetranslationProcessor implements OnModuleInit {
       this.worker.on('error', (err) => this.logger.error(`Retranslation worker error: ${err.message}`));
     } catch (err) {
       this.logger.error(`Retranslation worker init FAILED: ${err instanceof Error ? err.stack : err}`);
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.worker) {
+      await this.worker.close();
+      this.logger.log('Retranslation worker closed');
+    }
+    if (this.queue) {
+      await this.queue.close();
     }
   }
 

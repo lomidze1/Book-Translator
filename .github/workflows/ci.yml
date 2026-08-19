@@ -67,11 +67,23 @@ jobs:
       - name: Lint API
         run: pnpm --filter @book-translator/api lint
 
-      - name: Lint Shared
-        run: pnpm --filter @book-translator/shared lint
+      - name: Lint Web
+        run: pnpm --filter web lint
+
+      - name: Lint Mobile
+        run: pnpm --filter mobile lint
+
+      - name: Typecheck Mobile
+        run: cd apps/mobile && npx tsc --noEmit
 
       - name: Run API tests
         run: cd apps/api && npx vitest run --exclude 'test/integration/**'
+
+      - name: Run Reader tests
+        run: pnpm --filter @book-translator/reader test
+
+      - name: Run Mobile tests
+        run: pnpm --filter mobile test
 
   build:
     needs: lint-and-test
@@ -100,3 +112,15 @@ jobs:
 
       - name: Build Web
         run: pnpm --filter web build
+
+  docker:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The API image is what Railway deploys — build it here so a broken
+      # Dockerfile fails CI instead of a production deploy.
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t book-translator-api:ci .

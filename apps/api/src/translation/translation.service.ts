@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { ChapterQualityReport } from './quality-check.service';
@@ -12,7 +12,7 @@ import { TRANSLATION_QUEUE, TRANSLATION_JOB_OPTIONS, getRedisConnection, transla
 import { devShortcutsEnabled } from '../common/dev-shortcuts';
 
 @Injectable()
-export class TranslationService {
+export class TranslationService implements OnModuleDestroy {
   private readonly logger = new Logger(TranslationService.name);
   private queue: Queue | null = null;
 
@@ -321,5 +321,11 @@ export class TranslationService {
       where: { id: bookId },
       data: { pageCount: Math.ceil(parsed.totalWordCount / 250) },
     });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.queue) {
+      await this.queue.close();
+    }
   }
 }

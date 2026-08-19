@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Worker, Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,7 +30,7 @@ const JUDGE_SAMPLE_CHARS = 2500;
 const STYLE_SAMPLE_CHARS = 4000;
 
 @Injectable()
-export class TranslationProcessor implements OnModuleInit {
+export class TranslationProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TranslationProcessor.name);
   private worker: Worker | null = null;
 
@@ -81,6 +81,13 @@ export class TranslationProcessor implements OnModuleInit {
       });
     } catch (err) {
       this.logger.error(`❌ Translation worker init FAILED: ${err instanceof Error ? err.stack : err}`);
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.worker) {
+      await this.worker.close();
+      this.logger.log('Translation Worker closed');
     }
   }
 
