@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { API_URL } from '@/lib/api-client';
 
 
-const LOCALES = ['ka', 'en'] as const;
+const LOCALES = ['ka'] as const;
 type Locale = (typeof LOCALES)[number];
 
 // Only routes that are actually indexable belong in the sitemap. /login, /register

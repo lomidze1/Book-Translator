@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     description: t('copyright_description'),
     alternates: {
       canonical: `${BASE_URL}/${locale}/copyright`,
-      languages: { ka: `${BASE_URL}/ka/copyright`, en: `${BASE_URL}/en/copyright`, 'x-default': `${BASE_URL}/ka/copyright` },
+      languages: { ka: `${BASE_URL}/ka/copyright`, 'x-default': `${BASE_URL}/ka/copyright` },
     },
   };
 }

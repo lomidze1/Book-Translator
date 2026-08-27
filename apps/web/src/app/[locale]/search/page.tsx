@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     description: t('search_description'),
     alternates: {
       canonical: `${BASE_URL}/${locale}/search`,
-      languages: { ka: `${BASE_URL}/ka/search`, en: `${BASE_URL}/en/search`, 'x-default': `${BASE_URL}/ka/search` },
+      languages: { ka: `${BASE_URL}/ka/search`, 'x-default': `${BASE_URL}/ka/search` },
     },
     openGraph: {
       title: t('search_title'),

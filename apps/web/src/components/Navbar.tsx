@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
-import LanguageSwitcher from './LanguageSwitcher';
+// English is hidden for launch — see i18n/routing.ts.
+// import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 import UserDropdown from './UserDropdown';
 import NotificationBell from './NotificationBell';
@@ -72,7 +73,6 @@ export default function Navbar() {
             {t('upload')}
           </Link>
           <ThemeSwitcher />
-          <LanguageSwitcher />
           {!isLoading && (
             isLoggedIn ? (
               <>
@@ -144,7 +144,6 @@ export default function Navbar() {
 
           <div className={styles.drawerControls}>
             <ThemeSwitcher />
-            <LanguageSwitcher />
           </div>
 
           {!isLoading && (

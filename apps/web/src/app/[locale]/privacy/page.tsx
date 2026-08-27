@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     description: t('privacy_description'),
     alternates: {
       canonical: `${BASE_URL}/${locale}/privacy`,
-      languages: { ka: `${BASE_URL}/ka/privacy`, en: `${BASE_URL}/en/privacy`, 'x-default': `${BASE_URL}/ka/privacy` },
+      languages: { ka: `${BASE_URL}/ka/privacy`, 'x-default': `${BASE_URL}/ka/privacy` },
     },
   };
 }

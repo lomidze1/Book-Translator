@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     description: t('upload_description'),
     alternates: {
       canonical: `${BASE_URL}/${locale}/upload`,
-      languages: { ka: `${BASE_URL}/ka/upload`, en: `${BASE_URL}/en/upload`, 'x-default': `${BASE_URL}/ka/upload` },
+      languages: { ka: `${BASE_URL}/ka/upload`, 'x-default': `${BASE_URL}/ka/upload` },
     },
     openGraph: {
       title: t('upload_title'),

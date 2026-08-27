@@ -85,7 +85,6 @@ export async function generateMetadata({
       canonical: `${BASE_URL}/${locale}/books/${id}`,
       languages: {
         ka: `${BASE_URL}/ka/books/${id}`,
-        en: `${BASE_URL}/en/books/${id}`,
         'x-default': `${BASE_URL}/ka/books/${id}`,
       },
     },

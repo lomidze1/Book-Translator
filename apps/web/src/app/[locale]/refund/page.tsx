@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     description: t('refund_description'),
     alternates: {
       canonical: `${BASE_URL}/${locale}/refund`,
-      languages: { ka: `${BASE_URL}/ka/refund`, en: `${BASE_URL}/en/refund`, 'x-default': `${BASE_URL}/ka/refund` },
+      languages: { ka: `${BASE_URL}/ka/refund`, 'x-default': `${BASE_URL}/ka/refund` },
     },
   };
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { apiFetch, getAccessToken } from '@/lib/api-client';
@@ -65,7 +65,7 @@ const DEFAULT_NOTIF: NotificationPrefs = {
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
-  const locale = useLocale();
+  // const locale = useLocale(); // used only by the hidden language card
   const { isLoggedIn, isLoading: authLoading } = useAuth();
 
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIF);
@@ -141,11 +141,12 @@ export default function SettingsPage() {
     }
   };
 
-  const switchLocale = (newLocale: string) => {
-    const currentPath = window.location.pathname;
-    const newPath = currentPath.replace(new RegExp(`^/${locale}(?=/|$)`), `/${newLocale}`);
-    window.location.href = newPath;
-  };
+  // Orphaned while English is hidden; restored together with the language card.
+  // const switchLocale = (newLocale: string) => {
+  //   const currentPath = window.location.pathname;
+  //   const newPath = currentPath.replace(new RegExp(`^/${locale}(?=/|$)`), `/${newLocale}`);
+  //   window.location.href = newPath;
+  // };
 
   return (
     <ProtectedRoute>
@@ -333,29 +334,9 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Language */}
-        <div className={styles.section}>
-          <h2>{t('language')}</h2>
-          <div className={styles.settingRow}>
-            <div className={styles.settingLabel}>
-              <div className={styles.labelText}>{t('language_desc')}</div>
-            </div>
-            <div className={styles.langOptions}>
-              <button
-                className={`${styles.langOption} ${locale === 'ka' ? styles.active : ''}`}
-                onClick={() => switchLocale('ka')}
-              >
-                ქართული
-              </button>
-              <button
-                className={`${styles.langOption} ${locale === 'en' ? styles.active : ''}`}
-                onClick={() => switchLocale('en')}
-              >
-                English
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Language section hidden for launch — Georgian is the only locale.
+            Restore by re-adding 'en' in i18n/routing.ts and reinstating the
+            langOptions card here plus <LanguageSwitcher /> in Navbar. */}
       </div>
     </ProtectedRoute>
   );
