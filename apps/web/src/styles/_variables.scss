@@ -1,4 +1,4 @@
-// Colors — Modernist design system (single accent, ink on a warm-grey ground).
+// Colors — single accent, ink on a warm-grey ground.
 $color-primary: #ec3013;
 $color-primary-dark: #dd2b0f;
 $color-secondary: #605d5d;
@@ -6,10 +6,11 @@ $color-background: #f3f2f2;
 $color-background-dark: #141312;
 $color-foreground: #201e1d;
 $color-foreground-dark: #f3f2f2;
-$color-border: rgba(32, 30, 29, 0.4);
+$color-border: rgba(32, 30, 29, 0.12);
 
-// The system's main organising device: a 2px rule, never a shadow.
-$rule: 2px;
+// Dividers are a hairline, not a structural device. Separation comes first
+// from space, then from a tonal surface lift, and only last from a line.
+$rule: 1px;
 
 // Typography
 // Fonts are loaded by next/font in [locale]/layout.tsx and exposed via
@@ -32,10 +33,14 @@ $spacing-md: 16px;
 $spacing-lg: 24px;
 $spacing-xl: 48px;
 
-// Border radius — 0 everywhere. No rounded corners in this system.
-// ($radius-full is kept at 9999px only for genuinely circular objects such as
-// avatars and dots, which the system still allows.)
-$radius-sm: 0;
-$radius-md: 0;
-$radius-lg: 0;
+// One radius scale, applied consistently: inputs and small chips at sm,
+// buttons and cards at md, panels and media at lg.
+$radius-sm: 6px;
+$radius-md: 10px;
+$radius-lg: 16px;
 $radius-full: 9999px;
+
+// Elevation. Tinted to the ground, never pure black, never a glow.
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.18);
+$shadow-md: 0 6px 20px rgba(0, 0, 0, 0.24);
+$shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.32);

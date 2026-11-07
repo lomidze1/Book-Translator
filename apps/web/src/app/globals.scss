@@ -1,10 +1,11 @@
 // ---------------------------------------------------------------------------
 // Modernist design system (see docs / design handoff).
 //
-// Ground #f3f2f2, ink #201e1d, a single accent #ec3013, 2px dividers as the
-// only organising device, zero border-radius and no soft shadows. The app's
-// pre-existing token names are kept and re-pointed at the system's ramps, so
-// every SCSS module inherits the new look without being rewritten.
+// Ground #f3f2f2, ink #201e1d, a single accent #ec3013. Structure is carried
+// by space and by tonal surfaces; hairline dividers are the last resort, not
+// the organising device. The app's pre-existing token names are kept and
+// re-pointed at the system's ramps, so every SCSS module inherits the look
+// without being rewritten.
 // ---------------------------------------------------------------------------
 :root {
   // System primitives
@@ -20,8 +21,15 @@
   --bt-neutral-700: #605d5d;
   --bt-neutral-800: #444141;
   --bt-neutral-900: #2d2b2b;
-  --bt-divider: rgba(32, 30, 29, 0.4); // ink @ 40%
-  --bt-rule: 2px;
+  --bt-divider: rgba(32, 30, 29, 0.12); // ink @ 12% — a hairline, not a rule
+  --bt-rule: 1px;
+  // Tonal surfaces: separation by material, not by outline.
+  --bt-surface: rgba(32, 30, 29, 0.035);
+  --bt-surface-2: rgba(32, 30, 29, 0.06);
+  --bt-surface-hover: rgba(32, 30, 29, 0.075);
+  --bt-shadow-sm: 0 1px 2px rgba(32, 30, 29, 0.06);
+  --bt-shadow-md: 0 6px 20px rgba(32, 30, 29, 0.10);
+  --bt-shadow-lg: 0 18px 48px rgba(32, 30, 29, 0.14);
   --bt-gutter: 40px;
   // "The quiet page" — the reader's second register: a warmer paper ground
   // than the app's cool ground, so page and chrome read as different materials.
@@ -90,7 +98,13 @@
   --bt-neutral-700: #b3aeae;
   --bt-neutral-800: #d6d2d2;
   --bt-neutral-900: #ece8e8;
-  --bt-divider: rgba(243, 242, 242, 0.42);
+  --bt-divider: rgba(243, 242, 242, 0.10);
+  --bt-surface: rgba(243, 242, 242, 0.035);
+  --bt-surface-2: rgba(243, 242, 242, 0.06);
+  --bt-surface-hover: rgba(243, 242, 242, 0.09);
+  --bt-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --bt-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --bt-shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.55);
   --bt-accent-700: #ff9783;
   --bt-paper: #191715;
   --bt-paper-ink: #e6e0d6;
